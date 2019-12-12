@@ -1,0 +1,30 @@
+{
+  "name": "CodeQLSnippets",
+  "description": "CodeQL snippets",
+  "version": "0.0.1",
+  "displayName": "CodeQL snippets",
+  "publisher": "pwntester",
+  "license": "SEE LICENSE IN LICENSE.md",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pwntester/codeql.nvim"
+  },
+  "engines": {
+    "neovim": "0.5.x"
+  },
+  "categories": [
+    "Snippets"
+  ],
+  "contributes": {
+    "snippets": [
+      {
+        "language": "codeql",
+        "path": "./snippets/codeql.json"
+      },
+      {
+        "language": "yaml",
+        "path": "./snippets/yaml.json"
+      }
+    ]
+  }
+}

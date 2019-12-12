@@ -1,0 +1,13 @@
+{
+  "qlpack": {
+    "prefix": "qlpack",
+    "body": [
+        "name: ${1}",
+        "version: 0.0.0",
+        "libraryPathDependencies: codeql-${2}"
+    ],
+    "description": "qlpack.yaml"
+  }
+}
+
+

@@ -1,0 +1,35 @@
+{
+  "metadata": {
+    "prefix": "metadata",
+    "body": [
+        "/*",
+        " * @name $1",
+        " * @id ${2:lang/desc}",
+        " * @description $3",
+        " * @kind ${4|problem,path-problem,metric,graph|}",
+        " * @precision ${5|low,medium,high,very-high|}",
+        " * @tags ${6:security}",
+        " * @problem.severity ${7|error,warning,recommendation|}",
+        " */",
+        "$0"
+    ],
+    "description": "Query metadata template."
+  },
+  "tainttrackingconf": {
+    "prefix": "tainttrackingconf",
+    "body": [
+        "class $1 extends TaintTracking::Configuration {",
+        "\t$1() { this = \"$1\" }",
+        "",
+        "\toverride predicate isSource(DataFlow::Node source) {",
+        "\t\t$2",
+        "\t}",
+        "",
+        "\toverride predicate isSink(DataFlow::Node sink) {",
+        "\t\t$3",
+        "\t}",
+        "}"
+    ],
+    "description": "TaintTracking Configuration"
+  }
+}
