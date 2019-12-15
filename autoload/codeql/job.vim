@@ -22,14 +22,9 @@ function! codeql#job#runCommandsHandler(...)
         let l:cmd = s:commandlist[0]
         let s:commandlist = s:commandlist[1:]
 
-        if l:cmd[0] == "process_results"
-            if !filereadable(l:cmd[2]) | return | endif
-            let l:database = l:cmd[1]
-            let l:json_file = join(readfile(l:cmd[2]))
-            let l:results = json_decode(l:json_file)
-            call codeql#process_results(l:database, l:results)
-            call codeql#panel#printToTestPanel(" ")
-            call codeql#panel#printToTestPanel("Done!")
+        if l:cmd[0] == 'process_results'
+            call codeql#process_results(l:cmd[1])
+            call codeql#job#runCommandsHandler()
         else
             " buffer stderr and stdout and flush to TestPanel every 1 seconds
             let s:testpanel_buffer = []
@@ -51,8 +46,8 @@ function! codeql#job#runCommandsHandler(...)
             call codeql#panel#flushTestPanel()
             let s:testpanel_buffer_timer = 0
         endif
-        call codeql#panel#printToTestPanel(" ")
-        call codeql#panel#printToTestPanel("Done!")
+        call codeql#panel#printToTestPanel(' ')
+        call codeql#panel#printToTestPanel('Done!')
     endif
 endfunction
 

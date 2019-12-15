@@ -1,12 +1,12 @@
-let s:database = ""
+let s:database = ''
 
 function! codeql#runQuery(database, query) abort
-    if !isdirectory(a:database)
-        call codeql#panel#printToTestPanel("database seems incorrect")
+    let s:database = fnamemodify(a:database, ':p')
+
+    if !isdirectory(s:database)
+        call codeql#panel#printToTestPanel('Incorrect database')
         return
     endif
-
-    let s:database = a:database
 
     if a:query == '%'
         let l:query = expand('%:p')'
@@ -20,42 +20,51 @@ function! codeql#runQuery(database, query) abort
     call codeql#panel#openTestPanel()
     call codeql#panel#clearTestPanel()
 
-    if !isdirectory(a:database.'/src') && filereadable(a:database.'/src.zip')
+    if !isdirectory(s:database.'/src') && filereadable(s:database.'/src.zip')
         call codeql#job#runCommands([
-            \ ['mkdir', a:database.'/src', ';', 'unzip', a:database.'/src.zip', '-d', a:database.'/src'],
+            \ ['mkdir', s:database.'/src', ';', 'unzip', s:database.'/src.zip', '-d', s:database.'/src'],
             \ ['codeql', 'query', 'run', '-o='.l:bqrs, '-d='.s:database, l:query],
             \ ['codeql', 'bqrs', 'decode', '-o='.l:results, '--format=json', '--entities=string,url', l:bqrs],
-            \ ['process_results', s:database, l:results]
+            \ ['process_results', l:results]
         \ ])
     else
         call codeql#job#runCommands([
             \ ['codeql', 'query', 'run', '-o='.l:bqrs, '-d='.s:database, l:query],
             \ ['codeql', 'bqrs', 'decode', '-o='.l:results, '--format=json', '--entities=string,url', l:bqrs],
-            \ ['process_results', s:database, l:results]
+            \ ['process_results', l:results]
         \ ])
     endif
 endfunction
 
-function! codeql#process_results(database, results) abort
-    let s:database = a:database
-    if !has_key(a:results, '#select')
-        call codeql#panel#printToTestPanel("No results")
+function! codeql#process_results(file) abort
+    if !filereadable(a:file) | return | endif
+    let l:json_file = join(readfile(a:file))
+    let l:results = json_decode(l:json_file)
+
+    if !has_key(l:results, '#select')
+        call codeql#panel#printToTestPanel('No results')
         return
     endif
 
     let l:issues = []
 
     " path query
-    if has_key(a:results, 'edges') && has_key(a:results, 'nodes') && has_key(a:results, '#select')
-        call codeql#panel#printToTestPanel("Processing Path Query results")
+    if has_key(l:results, 'edges') && has_key(l:results, 'nodes') && has_key(l:results, '#select')
+        call codeql#panel#printToTestPanel('Processing Path Query results')
 
-        let l:tuples = a:results['#select']['tuples']
-        let l:edges = a:results['edges']['tuples']
-        let l:nodes = a:results['nodes']['tuples']
+        let l:tuples = l:results['#select']['tuples']
+        let l:edges = l:results['edges']['tuples']
+        let l:nodes = l:results['nodes']['tuples']
 
+        " dedup
+        let l:nodes = filter(copy(l:nodes), 'index(l:nodes, v:val, v:key+1)==-1')
+        let l:edges = filter(copy(l:edges), 'index(l:edges, v:val, v:key+1)==-1')
+        
+        call codeql#panel#printToTestPanel("Number of results: ".len(l:tuples))
         for l:tuple in l:tuples
+
             if len(l:tuple) != 4
-                call codeql#panel#printToTestPanel("Incorrect number of columns for path query")
+                call codeql#panel#printToTestPanel('Incorrect number of columns for path query')
                 return
             endif
 
@@ -100,17 +109,23 @@ function! codeql#process_results(database, results) abort
             let l:path = [l:label_node, l:source_node]
 
             " collect paths
+            call codeql#panel#printToTestPanel("Processing Dataflow")
             call codeql#expandDataflow(l:path, l:sink_node, l:edges)
 
-            " add issue paths to issues list
-            call add(l:issues, {'is_folded': v:true, 'paths': s:paths, 'active_path': 0, 'type': 'path'})
+            if len(s:paths) > 0
+                " add issue paths to issues list
+                call add(l:issues, {'is_folded': v:true, 'paths': s:paths, 'active_path': 0, 'type': 'path'})
+            else 
+                call codeql#panel#printToTestPanel("Failed to calculate dataflow")
+            endif
+
         endfor
 
     " raw query
-    elseif has_key(a:results, '#select')
-        call codeql#panel#printToTestPanel("Processing Raw Query results")
+    elseif has_key(l:results, '#select')
+        call codeql#panel#printToTestPanel('Processing Raw Query results')
 
-        let l:tuples = a:results['#select']['tuples']
+        let l:tuples = l:results['#select']['tuples']
 
         for l:tuple in l:tuples
             let l:path = []
@@ -161,23 +176,21 @@ function! codeql#expandDataflow(path, sink_node, edges) abort
 
     let l:safe_net = 0
     while v:true
+        " reached the sink?
+        if l:node.orig == a:sink_node.orig
+            let l:node['mark'] = '⦿'
+            call add(a:path, l:node)
+            call add(s:paths, a:path)
+            return
+        endif
+
         let l:nodes = codeql#getEdgeEnd(l:node, a:edges)
         if len(l:nodes) == 0
             " end vertice, discarding path 
             return
         elseif len(l:nodes) == 1
             let l:node = l:nodes[0]
-            " reached the sink?
-            if l:nodes[0].orig == a:sink_node.orig
-                let l:node['mark'] = '⦿'
-                call add(a:path, l:node)
-                call add(s:paths, a:path)
-                return
-            " add new vertice to path
-            else
-                call add(a:path, l:node)
-            endif
-
+            call add(a:path, l:node)
         elseif len(l:nodes) > 1
             " branch new path for every edge
             for l:branch_node in l:nodes
@@ -189,12 +202,13 @@ function! codeql#expandDataflow(path, sink_node, edges) abort
                 endif
             endfor
 
-            " discard this path
+            " discard this path since new paths are created by expandDataflow
             return
         endif
 
         let l:safe_net += 1
-        if l:safe_net == 6
+        if l:safe_net == 100
+            call codeql#panel#printToTestPanel("Aborting to prevent infinite loop")
             break
         endif
     endwhile
@@ -228,7 +242,7 @@ function! s:uri_to_fname(uri) abort
     let l:scheme = a:uri[0:l:colon]
     let l:path= a:uri[l:colon+1:]
 
-    if a:uri[l:colon+1:l:colon+2] != "//"
+    if a:uri[l:colon+1:l:colon+2] != '//'
         let l:orig_fname = v:lua.vim.uri_to_fname(l:scheme.'//'.l:path)
     else
         let l:orig_fname = v:lua.vim.uri_to_fname(a:uri)
@@ -239,5 +253,4 @@ function! s:uri_to_fname(uri) abort
     else
         return l:orig_fname
     endif
-
 endfunction

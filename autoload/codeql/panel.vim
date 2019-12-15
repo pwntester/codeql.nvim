@@ -129,9 +129,9 @@ function! codeql#panel#openAuditPanel() abort
     call nvim_buf_set_keymap(l:bufnr, 'n', 'o', ':call codeql#panel#toggleFold()<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', '<CR>', ':call codeql#panel#jumpToTag(0)<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'p', ':call codeql#panel#jumpToTag(1)<CR>', {'script': v:true, 'silent': v:true})
-    call nvim_buf_set_keymap(l:bufnr, 'n', 'l', ':call codeql#panel#showLongNames()<CR>', {'script': v:true, 'silent': v:true})
+    call nvim_buf_set_keymap(l:bufnr, 'n', 'L', ':call codeql#panel#showLongNames()<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'f', ':call codeql#panel#showFilename()<CR>', {'script': v:true, 'silent': v:true})
-    call nvim_buf_set_keymap(l:bufnr, 'n', 'h', ':call codeql#panel#toggleHelp()<CR>', {'script': v:true, 'silent': v:true})
+    call nvim_buf_set_keymap(l:bufnr, 'n', 'H', ':call codeql#panel#toggleHelp()<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'q', ':call codeql#panel#closeAuditPanel()<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'O', ':call codeql#panel#setFoldLevel(0)<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'c', ':call codeql#panel#setFoldLevel(1)<CR>', {'script': v:true, 'silent': v:true})
@@ -299,6 +299,9 @@ endfunction
 
 " render audit panel
 function! codeql#panel#renderAuditPanel(database, issues) abort
+    if nvim_buf_get_option(0, 'filetype') == s:testpanel_buffer_name
+        execute 'wincmd p'
+    endif
     call codeql#panel#openAuditPanel()
     let s:database = a:database
     let s:issues = a:issues
@@ -326,7 +329,8 @@ endfunction
 function! codeql#panel#printIssues() abort
 
     let l:hl = {"CodeqlAuditPanelInfo": [[0,9]]}
-    call codeql#panel#printToAuditPanel('Database: '.s:database, l:hl)
+    let l:dbname = split(s:database, '/')[-1:][0]
+    call codeql#panel#printToAuditPanel('Database: '.l:dbname, l:hl)
     let l:hl = {"CodeqlAuditPanelInfo": [[0,7]]}
     call codeql#panel#printToAuditPanel('Issues:   '.len(s:issues), l:hl)
     call codeql#panel#printToAuditPanel('')
@@ -375,8 +379,6 @@ function! codeql#panel#printIssues() abort
         let s:scaninfo.line_map[l:curline] = l:issue
 
         if !l:is_folded
-            " TODO: sort Issues
-            " call sort(l:issues, "codeql#panel#sortByName")
             " print issues
             call codeql#panel#printNodes(l:issue, 2)
         endif
@@ -417,13 +419,26 @@ endfunction
 " print node
 function! codeql#panel#printNode(node, indent_level) abort
     if a:node.mark == '≔'
-        let l:hlgroup = 'CodeqlAuditPanelLabel'
+        let l:icon_hl = 'CodeqlAuditPanelLabel'
     else
-        let l:hlgroup = a:node.visitable ? 'CodeqlAuditPanelVisitable' : 'CodeqlAuditPanelNonVisitable'
+        let l:icon_hl = a:node.visitable ? 'CodeqlAuditPanelVisitable' : 'CodeqlAuditPanelNonVisitable'
     end
-    let l:text = repeat(' ', a:indent_level).a:node.mark.' '
-    let l:hl = {hlgroup: [[0,len(l:text)]]}
-    call codeql#panel#printToAuditPanel(l:text.a:node.label, l:hl)
+    let l:mark = repeat(' ', a:indent_level).a:node.mark.' '
+    let l:hl = {
+        \ icon_hl: [[0,len(l:mark)]]
+        \ }
+    if a:node.filename != v:null
+        if s:auditpanel_longnames
+            let l:text = l:mark.a:node.filename.':'.a:node.line.' - '.a:node.label
+        else
+            let l:text = l:mark.fnamemodify(a:node.filename, ':p:t').':'.a:node.line.' - '.a:node.label
+        endif
+        let l:hl["CodeqlAuditPanelFile"] = [[len(l:mark), stridx(l:text, '-')]]
+        let l:hl["CodeqlAuditPanelSeparator"] = [[stridx(l:text, '-'), stridx(l:text, '-')+1]]
+    else
+        let l:text = l:mark.'['.a:node.label.']'
+    endif
+    call codeql#panel#printToAuditPanel(l:text, l:hl)
     " save the current issue in scaninfo.sline map
     let l:bufnr = bufnr(s:auditpanel_buffer_name)
     let l:curline = nvim_buf_line_count(l:bufnr)
@@ -433,13 +448,13 @@ endfunction
 " print help 
 function! codeql#panel#printHelp() abort
     if s:auditpanel_short_help
-        call codeql#panel#printToAuditPanel('" Press h for help')
+        call codeql#panel#printToAuditPanel('" Press H for help')
         call codeql#panel#printToAuditPanel('')
     elseif !s:auditpanel_short_help
         call codeql#panel#printToAuditPanel('" --------- General ---------')
         call codeql#panel#printToAuditPanel('" <CR>: Jump to tag definition')
         call codeql#panel#printToAuditPanel('" p: As above, but stay in AuditPane')
-        call codeql#panel#printToAuditPanel('" l: Show long file names')
+        call codeql#panel#printToAuditPanel('" L: Show long file names')
         call codeql#panel#printToAuditPanel('" P: Previous path')
         call codeql#panel#printToAuditPanel('" N: Next path')
         call codeql#panel#printToAuditPanel('"')
@@ -450,7 +465,7 @@ function! codeql#panel#printHelp() abort
         call codeql#panel#printToAuditPanel('"')
         call codeql#panel#printToAuditPanel('" ---------- Misc -----------')
         call codeql#panel#printToAuditPanel('" q: Close window')
-        call codeql#panel#printToAuditPanel('" h: Toggle help')
+        call codeql#panel#printToAuditPanel('" H: Toggle help')
         call codeql#panel#printToAuditPanel('')
     endif
 endfunction
@@ -507,9 +522,15 @@ endfunction
 
 " jump to tag
 function! codeql#panel#jumpToTag(stay_in_pane) abort
+    if !has_key(s:scaninfo.line_map, line('.'))
+        return
+    endif
     let l:node = s:scaninfo.line_map[line('.')]
 
     if !exists('l:node.visitable') || !l:node.visitable
+        if has_key(l:node, 'filename')
+            echom l:node.filename
+        endif
         return
     endif
 
@@ -526,6 +547,20 @@ function! codeql#panel#jumpToTag(stay_in_pane) abort
 
     " jump to the line where the tag is defined
     execute l:node.line
+
+    " highlight node
+    let ns = nvim_create_namespace("codeql")
+    " TODO: clear codeql namespace in all buffers
+    call nvim_buf_clear_namespace(0, ns, 0, -1)
+    if l:node.orig.url.startLine == l:node.orig.url.endLine
+        call nvim_buf_add_highlight(0, ns, "CodeqlRange", l:node.orig.url.startLine-1, l:node.orig.url.startColumn-1, l:node.orig.url.endColumn)
+        " TODO: multi-line range
+    endif
+
+    " TODO: need a way to clear highlights manually (command?)
+    " TODO: when changing line in audit panel (or cursorhold), check if we are over a node and
+    " if so, search for buffer based on filename, if there is one, do
+    " highlighting
 
     " center the tag in the window
     normal! z.
@@ -549,6 +584,7 @@ endfunction
 
 " toggle fold
 function! codeql#panel#toggleFold() abort
+    if !has_key(s:scaninfo.line_map, line('.')) | return | endif
 
     " prevent highlighting from being off after adding/removing the help text
     match none
@@ -556,6 +592,8 @@ function! codeql#panel#toggleFold() abort
     let l:node = s:scaninfo.line_map[line('.')]
     if has_key(l:node, 'is_folded')
         let l:node['is_folded'] = !l:node['is_folded']
+    else
+        return
     endif
     call codeql#panel#renderKeepView(line('.'))
 endfunction
@@ -570,11 +608,10 @@ endfunction
 
 " change path
 function! codeql#panel#changePath(offset) abort
-
-    for [k,v] in items(s:scaninfo.line_map)
-    endfor
-
     let l:line = line('.') - 1
+    if !has_key(s:scaninfo.line_map, l:line)
+        return
+    endif
     let l:issue = s:scaninfo.line_map[l:line]
         
 
