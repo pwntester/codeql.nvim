@@ -21,7 +21,7 @@ highlight default link CodeqlAuditPanelType                 Title
 highlight default link CodeqlAuditPanelBracket              String
 highlight default link CodeqlAuditPanelFile                 NonText
 highlight default link CodeqlAuditPanelSeparator            Function
-highlight CodeqlRange guibg=NONE guifg=#FF0000 cterm=undercurl gui=undercurl
+highlight CodeqlRange guisp=#0088FF gui=undercurl,bold
 
 
 let b:current_syntax = "codeqlauditpanel"
