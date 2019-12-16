@@ -50,7 +50,6 @@ function! codeql#process_results(file) abort
 
     " path query
     if has_key(l:results, 'edges') && has_key(l:results, 'nodes') && has_key(l:results, '#select')
-        call codeql#panel#printToTestPanel('Processing Path Query results')
 
         let l:tuples = l:results['#select']['tuples']
         let l:edges = l:results['edges']['tuples']
