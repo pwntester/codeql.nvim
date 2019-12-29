@@ -23,7 +23,7 @@ function! codeql#job#runCommandsHandler(...)
         let s:commandlist = s:commandlist[1:]
 
         if l:cmd[0] == 'process_results'
-            call codeql#process_results(l:cmd[1])
+            call codeql#show_results(l:cmd[1], l:cmd[2], l:cmd[3], 0)
             call codeql#job#runCommandsHandler()
         else
             " buffer stderr and stdout and flush to TestPanel every 1 seconds

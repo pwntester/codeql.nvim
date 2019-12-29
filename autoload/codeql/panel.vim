@@ -12,6 +12,7 @@ let s:auditpanel_short_help = 1
 let s:issues = {}
 let s:scaninfo = {}
 let s:database = ''
+let s:metadata = {}
 let s:is_maximized = 0
 let s:auditpanel_iconchars = ['▶', '▼']
 let s:icon_closed = s:auditpanel_iconchars[0]
@@ -148,6 +149,7 @@ function! codeql#panel#openAuditPanel() abort
     call nvim_win_set_option(l:win, 'concealcursor', 'nvi')
     call nvim_win_set_option(l:win, 'conceallevel', 3)
     call nvim_win_set_option(l:win, 'signcolumn', 'yes')
+
 endfunction
 
 " close audit panel window
@@ -218,10 +220,6 @@ function! codeql#panel#printToTestPanel(text, ...) abort
     let l:text     = a:text
     let l:filename = a:0 > 0 ? a:1 : ""
     let l:line     = a:0 > 1 ? a:2 : -1
-
-    if empty(l:text)
-        return
-    endif
 
     let l:bufnr = bufnr(s:testpanel_buffer_name)
     if l:bufnr < 0
@@ -298,12 +296,13 @@ function! codeql#panel#jumpToCode(stay_in_pane) abort
 endfunction
 
 " render audit panel
-function! codeql#panel#renderAuditPanel(database, issues) abort
+function! codeql#panel#renderAuditPanel(database, metadata, issues) abort
     if nvim_buf_get_option(0, 'filetype') == s:testpanel_buffer_name
         execute 'wincmd p'
     endif
     call codeql#panel#openAuditPanel()
     let s:database = a:database
+    let s:metadata = a:metadata
     let s:issues = a:issues
     let s:scaninfo = {'line_map': {}}
     call codeql#panel#renderContent()
@@ -322,17 +321,23 @@ function! codeql#panel#renderContent() abort
     endif
     call nvim_buf_set_option(l:bufnr, 'modifiable', v:false)
     let l:win = codeql#panel#getPanelWindow(s:auditpanel_buffer_name)
-    call nvim_win_set_cursor(l:win, [1, 0])
+    call nvim_win_set_cursor(l:win, [8, 0])
 endfunction
 
 " print issues
 function! codeql#panel#printIssues() abort
 
-    let l:hl = {"CodeqlAuditPanelInfo": [[0,9]]}
+    let l:hl = {"CodeqlAuditPanelInfo": [[0,len('Database:')]]}
     let l:dbname = split(s:database, '/')[-1:][0]
     call codeql#panel#printToAuditPanel('Database: '.l:dbname, l:hl)
-    let l:hl = {"CodeqlAuditPanelInfo": [[0,7]]}
+
+    let l:hl = {"CodeqlAuditPanelInfo": [[0,len('Issues:')]]}
     call codeql#panel#printToAuditPanel('Issues:   '.len(s:issues), l:hl)
+
+    if has_key(s:metadata, 'kind')
+        let l:hl = {"CodeqlAuditPanelInfo": [[0,len('Kind:')]]}
+        call codeql#panel#printToAuditPanel('Kind:     '.s:metadata['kind'], l:hl)
+    endif
     call codeql#panel#printToAuditPanel('')
 
     " print issue labels
@@ -528,7 +533,7 @@ function! codeql#panel#jumpToTag(stay_in_pane) abort
     let l:node = s:scaninfo.line_map[line('.')]
 
     if !exists('l:node.visitable') || !l:node.visitable
-        if has_key(l:node, 'filename')
+        if has_key(l:node, 'filename') && l:node.filename != v:null
             echom l:node.filename
         endif
         return

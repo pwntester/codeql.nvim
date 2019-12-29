@@ -11,7 +11,7 @@ syntax match CodeqlAuditPanelLabel                         '[^\[\]]*' contained
 
 highlight default link CodeqlAuditPanelFoldIcon             Title 
 highlight default link CodeqlAuditPanelVisitable            MoreMsg 
-highlight default link CodeqlAuditPanelNonVisitable         ErrorMsg 
+highlight default link CodeqlAuditPanelNonVisitable         WarningMsg 
 highlight default link CodeqlAuditPanelInfo                 Function
 highlight default link CodeqlAuditPanelLabel                Function 
 highlight default link CodeqlAuditPanelHelp                 Comment 
