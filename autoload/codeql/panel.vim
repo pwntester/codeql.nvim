@@ -589,18 +589,21 @@ endfunction
 
 " toggle fold
 function! codeql#panel#toggleFold() abort
-    if !has_key(s:scaninfo.line_map, line('.')) | return | endif
-
     " prevent highlighting from being off after adding/removing the help text
     match none
 
-    let l:node = s:scaninfo.line_map[line('.')]
-    if has_key(l:node, 'is_folded')
-        let l:node['is_folded'] = !l:node['is_folded']
-    else
-        return
-    endif
-    call codeql#panel#renderKeepView(line('.'))
+    let l:c = line('.')
+    while l:c > 7
+        if has_key(s:scaninfo.line_map, l:c)
+            let l:node = s:scaninfo.line_map[l:c]
+            if has_key(l:node, 'is_folded')
+                let l:node['is_folded'] = !l:node['is_folded']
+                call codeql#panel#renderKeepView(l:c)
+                return
+            endif
+        endif
+        let l:c -= 1
+    endwhile
 endfunction
 
 " set fold level
