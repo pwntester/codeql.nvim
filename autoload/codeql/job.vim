@@ -1,3 +1,5 @@
+" TODO port to lua: https://teukka.tech/vimloop.html
+
 " global vars
 let s:testpanel_buffer_timer = 0
 let s:commandlist = []
