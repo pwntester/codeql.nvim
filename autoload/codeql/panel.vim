@@ -317,7 +317,8 @@ function! codeql#panel#renderContent() abort
     if !empty(s:issues)
         call codeql#panel#printIssues()
         let l:win = codeql#panel#getPanelWindow(s:auditpanel_buffer_name)
-        call nvim_win_set_cursor(l:win, [8, 0])
+        let l:curline = nvim_buf_line_count(l:bufnr)
+        call nvim_win_set_cursor(l:win, [l:curline, 0])
     else
         call codeql#panel#printToAuditPanel('" No results found.')
     endif
@@ -593,7 +594,7 @@ function! codeql#panel#toggleFold() abort
     match none
 
     let l:c = line('.')
-    while l:c > 7
+    while l:c >= 7
         if has_key(s:scaninfo.line_map, l:c)
             let l:node = s:scaninfo.line_map[l:c]
             if has_key(l:node, 'is_folded')

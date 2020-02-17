@@ -37,16 +37,24 @@ function! codeql#runQuery(database, query) abort
     call codeql#panel#openTestPanel()
     call codeql#panel#clearTestPanel()
 
+    let search_path = ''
+    if exists('g:codeql_search_path')
+        let search_path = "--search-path "
+        for path in g:codeql_search_path
+            let search_path.=path.':'
+        endfor
+    endif
+
     if !isdirectory(s:database.'/src') && filereadable(s:database.'/src.zip')
         call codeql#job#runCommands([
             \ ['mkdir', s:database.'/src', ';', 'unzip', s:database.'/src.zip', '-d', s:database.'/src'],
-            \ ['codeql', 'query', 'run', '-o='.l:bqrs, '-d='.s:database, l:query],
+            \ ['codeql', 'query', 'run', search_path, '-o='.l:bqrs, '-d='.s:database, l:query],
             \ ['codeql', 'bqrs', 'decode', '-o='.l:results, '--format=json', '--entities=string,url', l:bqrs],
             \ ['process_results', l:results, s:database, l:query]
         \ ])
     else
         call codeql#job#runCommands([
-            \ ['codeql', 'query', 'run', '-o='.l:bqrs, '-d='.s:database, l:query],
+            \ ['codeql', 'query', 'run', search_path, '-o='.l:bqrs, '-d='.s:database, l:query],
             \ ['codeql', 'bqrs', 'decode', '-o='.l:results, '--format=json', '--entities=string,url', l:bqrs],
             \ ['process_results', l:results, s:database, l:query]
         \ ])
@@ -60,8 +68,12 @@ function! codeql#show_results(file, database, query, history) abort
 
     if !has_key(l:results, '#select')
         call codeql#panel#printToTestPanel('No results')
-        return
+        if a:history == 0
+            call s:save_session(a:file, a:database, 0, a:query)
+            return
+        endif
     endif
+
 
     let l:issues = []
 
@@ -333,7 +345,7 @@ function! codeql#show_history(element) abort
 endfunction
 
 function! codeql#history() abort
-    let s:history = filter(s:history, 'isdirectory(v:val.database) && filereadable(v:val.file)')
+    "let s:history = filter(s:history, 'isdirectory(v:val.database) && filereadable(v:val.file)')
 	let l:options = map(copy(s:history), 'v:val.query." (".v:val.issues." results) (".v:val.time.") [".v:val.database."]"')
     if exists("*fzf#run")
         call fzf#run(fzf#wrap({
