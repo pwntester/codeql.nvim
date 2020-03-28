@@ -41,7 +41,7 @@ function! codeql#runQuery(database, query) abort
     if exists('g:codeql_search_path')
         let search_path = "--search-path "
         for path in g:codeql_search_path
-            let search_path.=path.':'
+            let search_path.=expand(path).':'
         endfor
     endif
 

@@ -2,7 +2,7 @@ if exists('b:current_syntax')
     finish
 endif
 
-syntax keyword codeqlKeyword         where select in as order by asc desc module result this super instanceof
+syntax keyword codeqlKeyword         where select in as order by asc desc module result this super instanceof override
 syntax keyword codeqlAnnotation      abstract cached external final library noopt private deprecated query pragma language bindingset noinline nomagic monotonicAggregates transient contained
 syntax keyword codeqlLogic           not and or implies forall forex any none
 syntax keyword codeqlConditional     if then else
@@ -16,7 +16,7 @@ syntax match   codeqlTypeName        '\v[a-zA-Z0-9:_]+' contained
 syntax match   codeqlConstructor     '\v\s*\i+\(\)\s*\{' contains=codeqlConstructorName
 syntax match   codeqlConstructorName '\i' contained
 syntax match   codeqlPredicateDecl   '\v(override)?\s*predicate\s+[a-zA-Z0-9_]+\s*\(\ze.*' contains=codeqlPredicateMod,codeqlPredicateName
-syntax keyword codeqlPredicateMod    override predicate contained
+syntax keyword codeqlPredicateMod    predicate contained
 syntax match   codeqlPredicateName   '\i' contained
 syntax region  codeqlVarDecl1        start=/\v\s*exists\(/ end=/|/ keepend contains=codeqlVarDeclMod,codeqlVarDeclType
 syntax region  codeqlVarDecl2        start=/\v\s*from\s+/ end=/where/ end=/select/ keepend contains=codeqlVarDeclMod,codeqlVarDeclType
