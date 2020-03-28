@@ -1,3 +1,0 @@
-name: my-custom-java-pack
-version: 0.0.0
-libraryPathDependencies: codeql-java

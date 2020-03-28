@@ -209,7 +209,7 @@ function! codeql#panel#printToAuditPanel(text, ...)
     for [hlgroup, groups] in items(l:matches)
         for group in groups
             let linenr = nvim_buf_line_count(l:bufnr)-1
-            call nvim_buf_add_highlight(l:bufnr, g:fortify_auditpane_ns, hlgroup, linenr, group[0], group[1])
+            call nvim_buf_add_highlight(l:bufnr, 0, hlgroup, linenr, group[0], group[1])
         endfor
     endfor
 endfunction
@@ -316,12 +316,13 @@ function! codeql#panel#renderContent() abort
     call codeql#panel#printHelp()
     if !empty(s:issues)
         call codeql#panel#printIssues()
+        let l:win = codeql#panel#getPanelWindow(s:auditpanel_buffer_name)
+        let l:curline = nvim_buf_line_count(l:bufnr)
+        call nvim_win_set_cursor(l:win, [l:curline, 0])
     else
         call codeql#panel#printToAuditPanel('" No results found.')
     endif
     call nvim_buf_set_option(l:bufnr, 'modifiable', v:false)
-    let l:win = codeql#panel#getPanelWindow(s:auditpanel_buffer_name)
-    call nvim_win_set_cursor(l:win, [8, 0])
 endfunction
 
 " print issues
@@ -593,7 +594,7 @@ function! codeql#panel#toggleFold() abort
     match none
 
     let l:c = line('.')
-    while l:c > 7
+    while l:c >= 7
         if has_key(s:scaninfo.line_map, l:c)
             let l:node = s:scaninfo.line_map[l:c]
             if has_key(l:node, 'is_folded')
