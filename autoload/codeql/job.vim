@@ -14,27 +14,42 @@ endfunction
 function! codeql#job#runCommandsHandler(...)
 
     " flush the TestPanel buffer
-    if s:testpanel_buffer_timer != 0
-        call timer_stop(s:testpanel_buffer_timer)
-        call codeql#panel#flushTestPanel()
-        let s:testpanel_buffer_timer = 0
-    endif
+    " if s:testpanel_buffer_timer != 0
+    "     call timer_stop(s:testpanel_buffer_timer)
+    "     call codeql#panel#flushTestPanel()
+    "     let s:testpanel_buffer_timer = 0
+    " endif
 
     if len(s:commandlist) > 0
         let l:cmd = s:commandlist[0]
         let s:commandlist = s:commandlist[1:]
 
-        if l:cmd[0] == 'process_results'
-            call codeql#show_results(l:cmd[1], l:cmd[2], l:cmd[3], 0)
-            call codeql#job#runCommandsHandler()
+        if l:cmd[0] == 'load_json'
+            " ['load_json', results, database, metadata]
+            if filereadable(l:cmd[1])
+                let l:results = codeql#loadJsonResults(l:cmd[1])
+                call codeql#panel#renderAuditPanel(l:cmd[2], l:cmd[3], l:results)
+                call codeql#job#runCommandsHandler()
+            else
+                echom "Cant find JSON results at " . l:cmd[1]
+            endif
+        elseif l:cmd[0] == 'load_sarif'
+            "  ['load_sarif', sarifPath, database, metadata]
+            if filereadable(l:cmd[1])
+                let l:results = luaeval("require('ql.sarif').loadSarifResults(_A)", l:cmd[1])
+                call codeql#panel#renderAuditPanel(l:cmd[2], l:cmd[3], l:results)
+                call codeql#job#runCommandsHandler()
+            else
+                echom "Cant find SARIF results at " . l:cmd[1]
+            endif
         else
             " buffer stderr and stdout and flush to TestPanel every 1 seconds
-            let s:testpanel_buffer = []
-            let s:testpanel_buffer_timer = timer_start(1000, function('codeql#panel#flushTestPanel'), {'repeat':-1})
+            " let s:testpanel_buffer = []
+            " let s:testpanel_buffer_timer = timer_start(1000, function('codeql#panel#flushTestPanel'), {'repeat':-1})
             if type(l:cmd) == v:t_list
                 let l:cmd = join(l:cmd)
             endif
-            call codeql#panel#printToTestPanel('Running: '.l:cmd)
+            " call codeql#panel#printToTestPanel('Running: '.l:cmd)
             call jobstart(l:cmd, {
                 \ 'on_stdout': function('g:codeql#panel#printHandler'),
                 \ 'on_stderr': function('g:codeql#panel#printHandler'),
@@ -43,13 +58,13 @@ function! codeql#job#runCommandsHandler(...)
         endif
     else
         " flush the output buffer
-        if s:testpanel_buffer_timer != 0
-            call timer_stop(s:testpanel_buffer_timer)
-            call codeql#panel#flushTestPanel()
-            let s:testpanel_buffer_timer = 0
-        endif
-        call codeql#panel#printToTestPanel(' ')
-        call codeql#panel#printToTestPanel('Done!')
+        " if s:testpanel_buffer_timer != 0
+        "     call timer_stop(s:testpanel_buffer_timer)
+        "     call codeql#panel#flushTestPanel()
+        "     let s:testpanel_buffer_timer = 0
+        " endif
+        " call codeql#panel#printToTestPanel(' ')
+        " call codeql#panel#printToTestPanel('Done!')
     endif
 endfunction
 

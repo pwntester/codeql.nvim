@@ -318,7 +318,8 @@ function! codeql#panel#renderContent() abort
         call codeql#panel#printIssues()
         let l:win = codeql#panel#getPanelWindow(s:auditpanel_buffer_name)
         let l:curline = nvim_buf_line_count(l:bufnr)
-        call nvim_win_set_cursor(l:win, [l:curline, 0])
+        " TODO: account for metadata
+        call nvim_win_set_cursor(l:win, [6, 0])
     else
         call codeql#panel#printToAuditPanel('" No results found.')
     endif
@@ -357,7 +358,8 @@ function! codeql#panel#printIssues() abort
         if !exists("l:primaryNode")
             " all nodes are labels
             let l:primaryNode = l:paths[0][0]
-            let l:primaryNode.filename = "No file info"
+            let l:primaryNode.filename = v:null
+            let l:primaryNode.line = v:null
         endif
 
         if l:is_folded
@@ -367,7 +369,7 @@ function! codeql#panel#printIssues() abort
         endif
 
         " print primary column label
-        if s:auditpanel_filename
+        if s:auditpanel_filename && l:primaryNode.filename != v:null
             if s:auditpanel_longnames
                 let l:text = l:primaryNode.filename.':'.l:primaryNode.line
             else
@@ -558,10 +560,11 @@ function! codeql#panel#jumpToTag(stay_in_pane) abort
     let ns = nvim_create_namespace("codeql")
     " TODO: clear codeql namespace in all buffers
     call nvim_buf_clear_namespace(0, ns, 0, -1)
-    if l:node.orig.url.startLine == l:node.orig.url.endLine
-        call nvim_buf_add_highlight(0, ns, "CodeqlRange", l:node.orig.url.startLine-1, l:node.orig.url.startColumn-1, l:node.orig.url.endColumn)
-        " TODO: multi-line range
-    endif
+    " TODO: multi-line range
+    let l:startLine = l:node.orig.url.startLine
+    let l:startColumn = l:node.orig.url.startColumn
+    let l:endColumn = l:node.orig.url.endColumn
+    call nvim_buf_add_highlight(0, ns, "CodeqlRange", l:startLine - 1, l:startColumn - 1, l:endColumn)
 
     " TODO: need a way to clear highlights manually (command?)
     " TODO: when changing line in audit panel (or cursorhold), check if we are over a node and
