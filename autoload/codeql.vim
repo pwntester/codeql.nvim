@@ -86,7 +86,7 @@ function! codeql#loadJsonResults(file) abort
             let l:path = []
             for l:element in l:tuple
                 let l:node = {}
-                if type(l:element) == v:t_dict
+                if type(l:element) == v:t_dict && has_key(l:element, 'url')
                     let l:filename = codeql#uriToFname(l:element['url']['uri'])
                     let l:line = l:element['url']['startLine']
                     let l:node = {
@@ -95,6 +95,15 @@ function! codeql#loadJsonResults(file) abort
                         \ 'filename': l:filename,
                         \ 'line': l:line,
                         \ 'visitable': !empty(l:filename) && filereadable(l:filename)? v:true : v:false,
+                        \ 'orig': l:element
+                        \ }
+                elseif type(l:element) == v:t_dict && !has_key(l:element, 'url')
+                    let l:node = {
+                        \ 'label': l:element['label'],
+                        \ 'mark': '≔',
+                        \ 'filename': v:null,
+                        \ 'line': v:null,
+                        \ 'visitable': v:false,
                         \ 'orig': l:element
                         \ }
                 elseif type(l:element) == v:t_string

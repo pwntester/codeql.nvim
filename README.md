@@ -28,7 +28,7 @@ This plugin does not provide any support for the LSP. But in order to have the b
 
 There are many LSP clients in the NeoVim ecosystem. The following clients have been tested with CodeQL Language Server:
 
-### Neovim Build-In LSP
+### Neovim Built-In LSP
 
 It is possible to configure the built-in LSP client without any additional plugins, but a default configuration for the CodeQL Language Server has been added to [Nvim-LSP](https://github.com/neovim/nvim-lsp). Using this client, it is only required to configure the client with:
 
