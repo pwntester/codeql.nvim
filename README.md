@@ -2,6 +2,8 @@
 
 Neovim plugin to help writing and testing CodeQL queries.
 
+[![asciicast](https://asciinema.org/a/318276.svg)](https://asciinema.org/a/318276)
+
 ## Features 
 
 - Syntax highlighting for CodeQL query language
