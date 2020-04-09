@@ -6,8 +6,32 @@ Neovim plugin to help writing and testing CodeQL queries.
 
 - Syntax highlighting for CodeQL query language
 - Query execution
-- Quick Query evaluation
+- Quick query evaluation
 - Result browser
+
+## Usage
+
+### Query pack 
+
+Create `qlpack.yaml` (see [QL packs](https://help.semmle.com/codeql/codeql-cli/reference/qlpack-overview.html)). E.g:
+
+```
+name: test 
+version: 0.0.1
+libraryPathDependencies: [codeql-java]
+```
+
+### Query
+
+Create `.ql` file with query 
+
+### Set Database
+
+Use `SetDatabase <path to db>` to let the plugin know what DB to work with
+
+### Run query or eval predicates
+
+Use `RunQuery` or `QuickEval` commands or `qr`, `qe` shortcuts respectively to run the query or evaluate the predicate under the cursor.
 
 ## Commands
 - `SetDatabase <path to db>`: Required before running any query.
@@ -24,7 +48,7 @@ After running a query or quick evaluating a predicate, results will be rendered 
 - `P` (on a Paths node): Change to previous path
  
 ## Language Server Protocol
-This plugin does not provide any support for the LSP. But in order to have the best CodeQL writing experience it is recommended to configure LSP support.
+This plugin does not provide any support for the Language Server Protocol (LSP). But in order to have the best CodeQL writing experience it is recommended to configure a LSP client to connect to the CodeQL Language Server.
 
 There are many LSP clients in the NeoVim ecosystem. The following clients have been tested with CodeQL Language Server:
 
@@ -70,3 +94,4 @@ nvim_lsp.codeqlls.setup{
 }
 ```
 
+Check my [dotfiles](https://github.com/pwntester/dotfiles/blob/master/config/nvim/lua/lsp-config.lua) for examples on how to configure the NVIM LSP client.
