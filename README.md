@@ -11,6 +11,15 @@ Neovim plugin to help writing and testing CodeQL queries.
 - Quick query evaluation
 - Result browser
 
+## Requirements
+
+This plugin requires `nvim-lsp` to work for NeoVim. If you are using `vim-plug`, it is a matter
+of adding following line
+
+```
+Plug 'neovim/nvim-lsp'
+```
+
 ## Usage
 
 ### Query pack 
