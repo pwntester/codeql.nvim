@@ -23,12 +23,12 @@ function! codeql#runQuery(quick_eval) abort
     endif
 
     if !isdirectory(s:database.'/src') && filereadable(s:database.'/src.zip')
-        execute '!mkdir'.s:database.'/src'
-        execute 'unzip'.s:database.'/src.zip -d '.s:database.'/src'
+        execute '!mkdir '.s:database.'/src'
+        execute 'unzip '.s:database.'/src.zip -d '.s:database.'/src'
     endif
 
-    " TODO: support visual ranges 
- 
+    " TODO: support visual ranges
+
     let l:queryPath = expand('%:p')
 
 	" [bufnum, lnum, col, off, curswant] ~
@@ -42,7 +42,7 @@ function! codeql#runQuery(quick_eval) abort
     endif
 
     "echom "Quickeval at: ".line_start."::".column_start."::".line_end."::".column_end
-    
+
     let l:config = {
         \ 'quick_eval': a:quick_eval,
         \ 'buf': nvim_get_current_buf(),
@@ -76,7 +76,7 @@ function! codeql#loadJsonResults(file) abort
 
     " TODO: support string interpolation on `alert` queries?
     " raw query
- 
+
     if has_key(l:results, '#select')
         " call codeql#panel#printToTestPanel('Processing Raw Query results')
 
@@ -157,12 +157,12 @@ endfunction
 
 function! s:save_session(file, database, issues, query) abort
     let l:dbname = split(a:database, '/')[-1:][0]
-    let l:queryfile = fnamemodify(a:query, ':t') 
+    let l:queryfile = fnamemodify(a:query, ':t')
     call add(s:history, {
-        \ 'file': a:file, 
-        \ 'database': l:dbname, 
-        \ 'epoch': localtime(), 
-        \ 'time': strftime('%c'), 
+        \ 'file': a:file,
+        \ 'database': l:dbname,
+        \ 'epoch': localtime(),
+        \ 'time': strftime('%c'),
         \ 'issues': a:issues,
         \ 'query': l:queryfile
         \ })
