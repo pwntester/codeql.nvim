@@ -27,8 +27,6 @@ function! codeql#runQuery(quick_eval) abort
         execute 'unzip '.s:database.'/src.zip -d '.s:database.'/src'
     endif
 
-    " TODO: support visual ranges
-
     let l:queryPath = expand('%:p')
 
 	" [bufnum, lnum, col, off, curswant] ~
