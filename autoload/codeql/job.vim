@@ -1,24 +1,16 @@
 " TODO port to lua: https://teukka.tech/vimloop.html
 
 " global vars
-let s:testpanel_buffer_timer = 0
 let s:commandlist = []
 
 " run chained commands asynchronously
-function! codeql#job#runCommands(commands)
+function! codeql#job#runCommands(commands) abort
     let s:commandlist = a:commands
     call codeql#job#runCommandsHandler()
 endfunction
 
 " chained command handler
-function! codeql#job#runCommandsHandler(...)
-
-    " flush the TestPanel buffer
-    " if s:testpanel_buffer_timer != 0
-    "     call timer_stop(s:testpanel_buffer_timer)
-    "     call codeql#panel#flushTestPanel()
-    "     let s:testpanel_buffer_timer = 0
-    " endif
+function! codeql#job#runCommandsHandler(...) abort
 
     if len(s:commandlist) > 0
         let l:cmd = s:commandlist[0]
@@ -32,6 +24,7 @@ function! codeql#job#runCommandsHandler(...)
                 call codeql#job#runCommandsHandler()
             else
                 echom "Cant find JSON results at " . l:cmd[1]
+                call codeql#panel#renderAuditPanel(l:cmd[2], l:cmd[3], {})
             endif
         elseif l:cmd[0] == 'load_sarif'
             "  ['load_sarif', sarifPath, database, metadata]
@@ -44,28 +37,11 @@ function! codeql#job#runCommandsHandler(...)
                 call codeql#panel#renderAuditPanel(l:cmd[2], l:cmd[3], {})
             endif
         else
-            " buffer stderr and stdout and flush to TestPanel every 1 seconds
-            " let s:testpanel_buffer = []
-            " let s:testpanel_buffer_timer = timer_start(1000, function('codeql#panel#flushTestPanel'), {'repeat':-1})
             if type(l:cmd) == v:t_list
                 let l:cmd = join(l:cmd)
             endif
-            " call codeql#panel#printToTestPanel('Running: '.l:cmd)
-            call jobstart(l:cmd, {
-                \ 'on_stdout': function('g:codeql#panel#printHandler'),
-                \ 'on_stderr': function('g:codeql#panel#printHandler'),
-                \ 'on_exit': function('g:codeql#job#runCommandsHandler'),
-            \ })
+            call jobstart(l:cmd, {'on_exit': function('g:codeql#job#runCommandsHandler')})
         endif
-    else
-        " flush the output buffer
-        " if s:testpanel_buffer_timer != 0
-        "     call timer_stop(s:testpanel_buffer_timer)
-        "     call codeql#panel#flushTestPanel()
-        "     let s:testpanel_buffer_timer = 0
-        " endif
-        " call codeql#panel#printToTestPanel(' ')
-        " call codeql#panel#printToTestPanel('Done!')
     endif
 endfunction
 
