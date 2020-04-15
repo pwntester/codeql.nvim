@@ -41,6 +41,7 @@ function! codeql#job#runCommandsHandler(...)
                 call codeql#job#runCommandsHandler()
             else
                 echom "Cant find SARIF results at " . l:cmd[1]
+                call codeql#panel#renderAuditPanel(l:cmd[2], l:cmd[3], {})
             endif
         else
             " buffer stderr and stdout and flush to TestPanel every 1 seconds
