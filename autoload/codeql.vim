@@ -9,7 +9,6 @@ endfunction
 function! codeql#setDatabase(database) abort
     let s:database = fnamemodify(a:database, ':p')
     if !isdirectory(s:database)
-        "call codeql#panel#printToTestPanel('Incorrect database')
         echom 'Incorrect database'
         return
     endif
@@ -17,7 +16,6 @@ endfunction
 
 function! codeql#runQuery(quick_eval) abort
     if s:database == ''
-        "call codeql#panel#printToTestPanel('Missing database. Use SetDatabase command')
         echom 'Missing database. Use SetDatabase command'
         return
     endif
@@ -62,7 +60,6 @@ function! codeql#loadJsonResults(file) abort
     let l:results = json_decode(l:json_file)
 
     if !has_key(l:results, '#select')
-        " call codeql#panel#printToTestPanel('No results')
         echom 'No results'
         " if a:history == 0
         "     call s:save_session(a:file, a:database, 0, a:query)
@@ -76,7 +73,6 @@ function! codeql#loadJsonResults(file) abort
     " raw query
 
     if has_key(l:results, '#select')
-        " call codeql#panel#printToTestPanel('Processing Raw Query results')
 
         let l:tuples = l:results['#select']['tuples']
 

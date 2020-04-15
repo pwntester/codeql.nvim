@@ -1,8 +1,5 @@
 " vars
-let s:testpanel_buffer_name = '__TestPanel__'
 let s:auditpanel_buffer_name = '__AuditPanel__'
-let s:testpanel_buffer = []
-let s:testpanel_jumpinfo = {}
 let s:auditpanel_pos = 'right'
 let s:auditpanel_width = 50
 let s:auditpanel_indent = 1
@@ -27,66 +24,6 @@ function! codeql#panel#getPanelWindow(buffer_name) abort
         endif
     endfor
     return v:null
-endfunction
-
-" open test panel window
-function! codeql#panel#openTestPanel() abort
-
-    " check if test pane is already present
-    if bufwinnr(s:testpanel_buffer_name) != -1
-        return
-    endif
-
-    " get current win id
-    let current_window = win_getid()
-
-    " go to main window
-    call codeql#panel#goToMainWindow()
-
-    " split
-    execute 'silent keepalt rightbelow 10 split ' . s:testpanel_buffer_name
-
-    " go to original window
-    call win_gotoid(l:current_window)
-    
-    " buffer options 
-    let l:bufnr = bufnr(s:testpanel_buffer_name)
-    call nvim_buf_set_option(l:bufnr, 'filetype', 'codeqltestpanel')
-    call nvim_buf_set_option(l:bufnr, 'buftype', 'nofile')
-    call nvim_buf_set_option(l:bufnr, 'bufhidden', 'hide')
-    call nvim_buf_set_option(l:bufnr, 'swapfile', v:false)
-    call nvim_buf_set_option(l:bufnr, 'buflisted', v:false)
-    call nvim_buf_set_keymap(l:bufnr, 'n', '<CR>', ':call codeql#panel#jumpToCode(0)<CR>', {'script': v:true, 'silent': v:true})
-    call nvim_buf_set_keymap(l:bufnr, 'n', 'p', ':call codeql#panel#jumpToCode(1)<CR>', {'script': v:true, 'silent': v:true})
-
-    " window options
-    let l:win = codeql#panel#getPanelWindow(s:testpanel_buffer_name)
-    call nvim_win_set_option(l:win, 'wrap', v:false)
-    call nvim_win_set_option(l:win, 'number', v:false)
-    call nvim_win_set_option(l:win, 'foldenable', v:false)
-    call nvim_win_set_option(l:win, 'winfixheight', v:true)
-    call nvim_win_set_option(l:win, 'concealcursor', 'nvi')
-    call nvim_win_set_option(l:win, 'conceallevel', 3)
-    call nvim_win_set_option(l:win, 'signcolumn', 'yes')
-endfunction
-
-" close test panel
-function! codeql#panel#closeTestPanel() abort
-    let l:win = codeql#panel#getPanelWindow(s:testpanel_buffer_name)
-    call nvim_win_close(l:win, v:true)
-endfunction
-
-" clear test panel
-function! codeql#panel#clearTestPanel() abort
-    let s:testpanel_buffer = []
-    let s:testpanel_buffer_timer = 0
-    let l:bufnr = bufnr(s:testpanel_buffer_name)
-    if l:bufnr < 0
-        return
-    endif
-    call nvim_buf_set_lines(l:bufnr, 0, -1, v:false, [""])
-    let l:win = codeql#panel#getPanelWindow(s:testpanel_buffer_name)
-    call nvim_win_set_cursor(l:win, [1, 0])
 endfunction
 
 " open audit panel
@@ -158,12 +95,6 @@ function! codeql#panel#closeAuditPanel() abort
     call nvim_win_close(l:win, v:true)
 endfunction
 
-" flush buffer to test panel
-function! codeql#panel#flushTestPanel(...)
-  call codeql#panel#printToTestPanel(s:testpanel_buffer)
-  let s:testpanel_buffer = []
-endfunction
-
 " show long names
 function! codeql#panel#showLongNames() abort
     let s:auditpanel_longnames = !s:auditpanel_longnames
@@ -174,16 +105,6 @@ endfunction
 function! codeql#panel#showFilename() abort
     let s:auditpanel_filename = !s:auditpanel_filename
     call codeql#panel#renderKeepView(line('.'))
-endfunction
-
-" prints to window
-function! codeql#panel#printHandler(job_id, data, event)
-  if a:event == 'stdout' || a:event == 'stderr'
-    for i in a:data
-        let l:text = substitute(l:i, "\n", "", "g")
-        call add(s:testpanel_buffer, l:text)
-    endfor
-  endif
 endfunction
 
 " goto main window
@@ -214,92 +135,8 @@ function! codeql#panel#printToAuditPanel(text, ...)
     endfor
 endfunction
 
-" prints to Test Panel
-function! codeql#panel#printToTestPanel(text, ...) abort
-    " emulate default argument values
-    let l:text     = a:text
-    let l:filename = a:0 > 0 ? a:1 : ""
-    let l:line     = a:0 > 1 ? a:2 : -1
-
-    let l:bufnr = bufnr(s:testpanel_buffer_name)
-    if l:bufnr < 0
-        call codeql#panel#openTestPanel()
-        let l:bufnr = bufnr(s:testpanel_buffer_name)
-    endif
- 
-    " store line and file info and generate msg to print
-    if !empty(l:filename) && filereadable(l:filename) && l:line > -1
-        let l:curline = nvim_buf_line_count(l:bufnr) + 1
-        let l:jump = {}
-        let l:jump['line'] = l:line
-        let l:jump['filename'] = l:filename
-        let s:testpanel_jumpinfo[l:curline] = l:jump
-    endif
-
-    " print strings
-    if type(l:text) == 1
-        if !empty(l:text)
-            call nvim_buf_set_lines(l:bufnr, -1, -1, v:true, [l:text])
-        endif
-    " print lists
-    elseif type(l:text) == 3
-        call filter(l:text, {idx, val -> !empty(val)})
-        call nvim_buf_set_lines(l:bufnr, -1, -1, v:true, l:text)
-    endif
-
-    " find window holding TestPanel
-    let l:win = codeql#panel#getPanelWindow(s:testpanel_buffer_name)
-    let l:count = nvim_buf_line_count(l:bufnr)
-    if l:count > nvim_win_get_height(l:win) && nvim_win_get_cursor(l:win)[0] < l:count 
-        " scroll to bottom if user has not move cursor
-        call nvim_win_set_cursor(l:win, [l:count, 0])
-    endif
-endfunction
-
-" jump to code 
-function! codeql#panel#jumpToCode(stay_in_pane) abort
-    if !has_key(s:testpanel_jumpinfo, line('.'))
-        echom "No info for current line: " . line('.')
-        return
-    endif
-
-    let l:info = s:testpanel_jumpinfo[line('.')]
-    if empty(l:info) || !has_key(l:info, 'filename')
-        echom "No info for current line: " . line('.')
-        return
-    endif
-
-    " save test window
-    let l:testpanel_window = win_getid()
-
-    " go to main window
-    call codeql#panel#goToMainWindow()
-
-    execute 'e ' . fnameescape(info.filename)
-
-    " Mark current position so it can be jumped back to
-    mark '
-
-    " jump to the line where the tag is defined. Don't use the search pattern
-    " since it doesn't take the scope into account and thus can fail if tags
-    " with the same name are defined in different scopes (e.g. classes)
-    execute info.line
-
-    " center the tag in the window
-    normal! z.
-    normal! zv
-
-    if a:stay_in_pane
-        call win_gotoid(l:testpanel_window)
-        redraw
-    endif
-endfunction
-
 " render audit panel
 function! codeql#panel#renderAuditPanel(database, metadata, issues) abort
-    if nvim_buf_get_option(0, 'filetype') == s:testpanel_buffer_name
-        execute 'wincmd p'
-    endif
     call codeql#panel#openAuditPanel()
     let s:database = a:database
     let s:metadata = a:metadata
