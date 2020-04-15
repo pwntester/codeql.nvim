@@ -11,6 +11,10 @@ Neovim plugin to help writing and testing CodeQL queries.
 - Quick query evaluation
 - Result browser
 
+## Requirements
+
+- Neovim 0.5+
+
 ## Usage
 
 ### Query pack 
