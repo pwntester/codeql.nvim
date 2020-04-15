@@ -11,6 +11,8 @@ function! codeql#setDatabase(database) abort
     if !isdirectory(s:database)
         echom 'Incorrect database'
         return
+    else
+        echom 'Database set to '.s:database
     endif
 endfunction
 
