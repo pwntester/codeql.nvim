@@ -144,10 +144,10 @@ function! codeql#uriToFname(uri) abort
         let l:orig_fname = v:lua.vim.uri_to_fname(a:uri)
     endif
 
-    if isdirectory(s:database.'/src')
-        return s:database.'/src'.l:orig_fname
-    else
+    if filereadable(l:orig_fname)
         return l:orig_fname
+    elseif isdirectory(s:database.'/src')
+        return s:database.'/src'.l:orig_fname
     endif
 endfunction
 
