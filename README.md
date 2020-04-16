@@ -108,3 +108,30 @@ nvim_lsp.codeqlls.setup{
 ```
 
 Check my [dotfiles](https://github.com/pwntester/dotfiles/blob/master/config/nvim/lua/lsp-config.lua) for examples on how to configure the NVIM LSP client.
+
+### Coc.nvim
+
+It is possible to add codeql language server to `coc.nvim` using `coc-settings.json` as an
+[executable language server](https://github.com/neoclide/coc.nvim/wiki/Language-servers)
+
+
+``` json
+{
+	"languageserver": {
+		"codeql" : {
+			"command": "<path to codeql binary>",
+			"args": [
+				"execute",
+				"language-server",
+				"--check-errors=ON_CHANGE",
+				"--search-path=./:<path to semmle/ql repo maybe>:<any more paths>",
+				"-q"
+			],
+			"filetypes": ["codeql"],
+			"rootPatterns": ["qlpack.yml"],
+			"requireRootPattern": true
+		}
+	}
+}
+```
+
