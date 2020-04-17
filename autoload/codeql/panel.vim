@@ -69,7 +69,7 @@ function! codeql#panel#openAuditPanel() abort
     call nvim_buf_set_keymap(l:bufnr, 'n', 'p', ':call codeql#panel#jumpToTag(1)<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'L', ':call codeql#panel#showLongNames()<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'f', ':call codeql#panel#showFilename()<CR>', {'script': v:true, 'silent': v:true})
-    call nvim_buf_set_keymap(l:bufnr, 'n', 'H', ':call codeql#panel#toggleHelp()<CR>', {'script': v:true, 'silent': v:true})
+    call nvim_buf_set_keymap(l:bufnr, 'n', 'h', ':call codeql#panel#toggleHelp()<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'q', ':call codeql#panel#closeAuditPanel()<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'O', ':call codeql#panel#setFoldLevel(0)<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'c', ':call codeql#panel#setFoldLevel(1)<CR>', {'script': v:true, 'silent': v:true})
@@ -185,19 +185,20 @@ function! codeql#panel#printIssues() abort
         let l:paths = l:issue.paths
         let l:is_folded = l:issue.is_folded
 
-        for l:node in l:paths[0]
-            if l:node.filename != v:null
-                " first node with filename info
-                let l:primaryNode = l:node
-                break
-            endif
-        endfor
-        if !exists("l:primaryNode")
+        let l:primaryNode = l:paths[0][0]
+        " for l:node in l:paths[0]
+        "     if l:node.filename != v:null
+        "         " first node with filename info
+        "         let l:primaryNode = l:node
+        "         break
+        "     endif
+        " endfor
+        " if !exists("l:primaryNode")
             " all nodes are labels
-            let l:primaryNode = l:paths[0][0]
-            let l:primaryNode.filename = v:null
-            let l:primaryNode.line = v:null
-        endif
+        "     let l:primaryNode = l:paths[0][0]
+        "     let l:primaryNode.filename = v:null
+        "     let l:primaryNode.line = v:null
+        " endif
 
         if l:is_folded
             let l:foldmarker = s:icon_closed
@@ -205,6 +206,7 @@ function! codeql#panel#printIssues() abort
             let l:foldmarker = s:icon_open
         endif
 
+        let l:text = l:primaryNode.label
         " print primary column label
         if s:auditpanel_filename && l:primaryNode.filename != v:null
             if s:auditpanel_longnames
@@ -212,8 +214,6 @@ function! codeql#panel#printIssues() abort
             else
                 let l:text = fnamemodify(l:primaryNode.filename, ':p:t').':'.l:primaryNode.line
             endif
-        else
-            let l:text = l:primaryNode.label
         endif
         let l:hl = {"CodeqlAuditPanelFoldIcon": [[0,len(l:foldmarker)]]}
         call codeql#panel#printToAuditPanel(l:foldmarker.' '.l:text, l:hl)
