@@ -58,4 +58,37 @@ function M.json_decode(data)
   end
 end
 
+function M.isFile(name)
+    if type(name)~="string" then return false end
+    local f = io.open(name)
+    if f then
+        f:close()
+        return true
+    end
+    return false
+end
+
+function M.isDir(path)
+    if type(path)~="string" then return false end
+    local f = io.open(path, "r")
+    if f then
+        local ok, err, code = f:read(1)
+        f:close()
+        return code == 21
+    end
+    return false
+end
+
+function M.readJsonFile(path)
+    local f = io.open(path, "r")
+    local body = f:read("*all")
+    f:close()
+    local decoded, err = M.json_decode(body)
+    if not decoded then
+        print("Error!! "..err)
+        return nil
+    end
+    return decoded
+end
+
 return M 

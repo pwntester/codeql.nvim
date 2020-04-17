@@ -67,9 +67,9 @@ function! codeql#panel#openAuditPanel() abort
     call nvim_buf_set_keymap(l:bufnr, 'n', 'o', ':call codeql#panel#toggleFold()<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', '<CR>', ':call codeql#panel#jumpToTag(0)<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'p', ':call codeql#panel#jumpToTag(1)<CR>', {'script': v:true, 'silent': v:true})
-    call nvim_buf_set_keymap(l:bufnr, 'n', 'L', ':call codeql#panel#showLongNames()<CR>', {'script': v:true, 'silent': v:true})
+    call nvim_buf_set_keymap(l:bufnr, 'n', 'F', ':call codeql#panel#showLongNames()<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'f', ':call codeql#panel#showFilename()<CR>', {'script': v:true, 'silent': v:true})
-    call nvim_buf_set_keymap(l:bufnr, 'n', 'h', ':call codeql#panel#toggleHelp()<CR>', {'script': v:true, 'silent': v:true})
+    call nvim_buf_set_keymap(l:bufnr, 'n', 's', ':call codeql#panel#toggleHelp()<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'q', ':call codeql#panel#closeAuditPanel()<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'O', ':call codeql#panel#setFoldLevel(0)<CR>', {'script': v:true, 'silent': v:true})
     call nvim_buf_set_keymap(l:bufnr, 'n', 'c', ':call codeql#panel#setFoldLevel(1)<CR>', {'script': v:true, 'silent': v:true})
@@ -208,7 +208,7 @@ function! codeql#panel#printIssues() abort
 
         let l:text = l:primaryNode.label
         " print primary column label
-        if s:auditpanel_filename && l:primaryNode.filename != v:null
+        if s:auditpanel_filename && has_key(l:primaryNode, "filename") && l:primaryNode.filename != v:null
             if s:auditpanel_longnames
                 let l:text = l:primaryNode.filename.':'.l:primaryNode.line
             else
@@ -272,7 +272,7 @@ function! codeql#panel#printNode(node, indent_level) abort
     let l:hl = {
         \ icon_hl: [[0,len(l:mark)]]
         \ }
-    if a:node.filename != v:null
+    if has_key(a:node, "filename") && a:node.filename != v:null
         if s:auditpanel_longnames
             let l:text = l:mark.a:node.filename.':'.a:node.line.' - '.a:node.label
         else
@@ -293,13 +293,14 @@ endfunction
 " print help 
 function! codeql#panel#printHelp() abort
     if s:auditpanel_short_help
-        call codeql#panel#printToAuditPanel('" Press H for help')
+        call codeql#panel#printToAuditPanel('" Press s for help')
         call codeql#panel#printToAuditPanel('')
     elseif !s:auditpanel_short_help
         call codeql#panel#printToAuditPanel('" --------- General ---------')
         call codeql#panel#printToAuditPanel('" <CR>: Jump to tag definition')
         call codeql#panel#printToAuditPanel('" p: As above, but stay in AuditPane')
-        call codeql#panel#printToAuditPanel('" L: Show long file names')
+        call codeql#panel#printToAuditPanel('" f: Show file names')
+        call codeql#panel#printToAuditPanel('" F: Show long file names')
         call codeql#panel#printToAuditPanel('" P: Previous path')
         call codeql#panel#printToAuditPanel('" N: Next path')
         call codeql#panel#printToAuditPanel('"')
@@ -310,7 +311,7 @@ function! codeql#panel#printHelp() abort
         call codeql#panel#printToAuditPanel('"')
         call codeql#panel#printToAuditPanel('" ---------- Misc -----------')
         call codeql#panel#printToAuditPanel('" q: Close window')
-        call codeql#panel#printToAuditPanel('" H: Toggle help')
+        call codeql#panel#printToAuditPanel('" s: Toggle help')
         call codeql#panel#printToAuditPanel('')
     endif
 endfunction
@@ -398,9 +399,9 @@ function! codeql#panel#jumpToTag(stay_in_pane) abort
     " TODO: clear codeql namespace in all buffers
     call nvim_buf_clear_namespace(0, ns, 0, -1)
     " TODO: multi-line range
-    let l:startLine = l:node.orig.url.startLine
-    let l:startColumn = l:node.orig.url.startColumn
-    let l:endColumn = l:node.orig.url.endColumn
+    let l:startLine = l:node.url.startLine
+    let l:startColumn = l:node.url.startColumn
+    let l:endColumn = l:node.url.endColumn
     call nvim_buf_add_highlight(0, ns, "CodeqlRange", l:startLine - 1, l:startColumn - 1, l:endColumn)
 
     " TODO: need a way to clear highlights manually (command?)
