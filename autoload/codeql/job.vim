@@ -19,7 +19,7 @@ function! codeql#job#runCommandsHandler(...) abort
         if l:cmd[0] == 'load_sarif'
             "  ['load_sarif', sarifPath, database, metadata]
             if filereadable(l:cmd[1])
-                let l:results = luaeval("require('ql.sarif').loadSarifResults(_A,'".l:cmd[2]."')", l:cmd[1])
+                let l:results = luaeval("require('ql.loaders').loadSarifResults(_A,'".l:cmd[2]."')", l:cmd[1])
                 call codeql#panel#renderAuditPanel(l:cmd[2], l:cmd[3], l:results)
                 call codeql#job#runCommandsHandler()
             else
@@ -29,7 +29,7 @@ function! codeql#job#runCommandsHandler(...) abort
         elseif l:cmd[0] == 'load_json'
             " ['load_json', results, database, metadata]
             if filereadable(l:cmd[1])
-                let l:results = luaeval("require('ql.sarif').loadJsonResults(_A,'".l:cmd[2]."')", l:cmd[1])
+                let l:results = luaeval("require('ql.loaders').loadJsonResults(_A,'".l:cmd[2]."')", l:cmd[1])
                 call codeql#panel#renderAuditPanel(l:cmd[2], l:cmd[3], l:results)
                 call codeql#job#runCommandsHandler()
             else

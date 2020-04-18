@@ -164,5 +164,3 @@ function M.loadSarifResults(path, database)
 
 end
 return M
---M.loadSarifResults("/Users/pwntester/Research/projects/ssti/freemarker/ofbiz/foo.sarif")
-
