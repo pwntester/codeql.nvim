@@ -1,4 +1,5 @@
 local vim = vim
+local uv = vim.loop
 
 local M = {}
 
@@ -58,25 +59,14 @@ function M.json_decode(data)
   end
 end
 
-function M.isFile(name)
-    if type(name)~="string" then return false end
-    local f = io.open(name)
-    if f then
-        f:close()
-        return true
-    end
-    return false
+function M.isFile(filename)
+  local stat = uv.fs_stat(filename)
+  return stat and stat.type == 'file' or false
 end
 
-function M.isDir(path)
-    if type(path)~="string" then return false end
-    local f = io.open(path, "r")
-    if f then
-        local ok, err, code = f:read(1)
-        f:close()
-        return code == 21
-    end
-    return false
+function M.isDir(filename)
+  local stat = uv.fs_stat(filename)
+  return stat and stat.type == 'directory' or false
 end
 
 function M.readJsonFile(path)
@@ -89,6 +79,15 @@ function M.readJsonFile(path)
         return nil
     end
     return decoded
+end
+
+function M.slice(tbl, s, e)
+    local pos, new = 1, {}
+    for i = s, e do
+        new[pos] = tbl[i]
+        pos = pos + 1
+    end
+    return new
 end
 
 return M 

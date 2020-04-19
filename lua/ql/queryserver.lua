@@ -1,4 +1,5 @@
 local util = require 'ql.util'
+local job = require 'ql.job'
 local rpc = require 'vim.lsp.rpc'
 local vim = vim
 local validate = vim.validate
@@ -239,7 +240,7 @@ function M.run_query(config)
             {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', resultsPath},
             {'load_json', jsonPath, dbPath, config.metadata}
           }
-          vim.fn["codeql#job#runCommands"](cmds)
+          job.runCommands(cmds)
           print("JSON: "..jsonPath)
         elseif config.metadata['kind'] == "path-problem" then
           local sarifPath = vim.fn.tempname() 
@@ -247,7 +248,7 @@ function M.run_query(config)
             {'codeql', 'bqrs', 'interpret', resultsPath, '-t=id='..config.metadata['id'], '-t=kind=path-problem', '-o='..sarifPath, '--format=sarif-latest'},
             {'load_sarif', sarifPath, dbPath, config.metadata}
           }
-          vim.fn["codeql#job#runCommands"](cmds)
+          job.runCommands(cmds)
           print("SARIF: "..sarifPath)
         end
       else

@@ -1,6 +1,6 @@
 local util = require 'ql.util'
+local renderer = require 'ql.renderer'
 local vim = vim
-
 
 local M = {}
 
@@ -90,11 +90,11 @@ function M.loadJsonResults(path, database)
         table.insert(issues, {
             is_folded = true;
             paths = paths;
-            active_path = 0;
+            active_path = 1;
         })
     end
 
-    return issues
+    renderer.render(database, {}, issues)
 end
 
 function M.loadSarifResults(path, database)
@@ -155,12 +155,13 @@ function M.loadSarifResults(path, database)
         local issue = {
             is_folded = true;
             paths = p;
-            active_path = 0;
+            active_path = 1;
         }
         table.insert(issues, issue)
     end 
 
-    return issues
+    renderer.render(database, {}, issues)
 
 end
+
 return M
