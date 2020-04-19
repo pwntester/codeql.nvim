@@ -240,16 +240,18 @@ function M.run_query(config)
             {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', resultsPath},
             {'load_json', jsonPath, dbPath, config.metadata}
           }
-          job.runCommands(cmds)
           print("JSON: "..jsonPath)
+          job.runCommands(cmds)
+          print(' ')
         elseif config.metadata['kind'] == "path-problem" then
           local sarifPath = vim.fn.tempname() 
           local cmds = {
             {'codeql', 'bqrs', 'interpret', resultsPath, '-t=id='..config.metadata['id'], '-t=kind=path-problem', '-o='..sarifPath, '--format=sarif-latest'},
             {'load_sarif', sarifPath, dbPath, config.metadata}
           }
-          job.runCommands(cmds)
           print("SARIF: "..sarifPath)
+          job.runCommands(cmds)
+          print(' ')
         end
       else
         print("BQRS files was not created")
