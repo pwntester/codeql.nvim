@@ -8,9 +8,9 @@ command! -range QuickEval call codeql#runQuery(v:true)
 command! QLHistory call codeql#history()
 
 " mappings
-nnoremap qr :RunQuery<CR>
-nnoremap qe :QuickEval<CR>
-vnoremap qe :QuickEval<CR>
+autocmd FileType codeql nnoremap qr :RunQuery<CR>
+autocmd FileType codeql nnoremap qe :QuickEval<CR>
+autocmd FileType codeql vnoremap qe :QuickEval<CR>
 
 " TODO: CreateDB <lang> <source-root> <db>
 " TODO: CleanDB
