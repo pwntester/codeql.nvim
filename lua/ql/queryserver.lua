@@ -243,7 +243,7 @@ function M.run_query(config)
           print("JSON: "..jsonPath)
           job.runCommands(cmds)
           print(' ')
-        elseif config.metadata['kind'] == "path-problem" then
+        elseif config.metadata['kind'] == "path-problem" and config.metadata['id'] ~= nil then
           local sarifPath = vim.fn.tempname() 
           local cmds = {
             {'codeql', 'bqrs', 'interpret', resultsPath, '-t=id='..config.metadata['id'], '-t=kind=path-problem', '-o='..sarifPath, '--format=sarif-latest'},
@@ -252,9 +252,13 @@ function M.run_query(config)
           print("SARIF: "..sarifPath)
           job.runCommands(cmds)
           print(' ')
+        elseif config.metadata['kind'] == "path-problem" then
+          print("Error: Insuficient Metadata for a Path Problem. Need at least @kind and @id elements")
+        else
+          print("Error: Could not interpret the results")
         end
       else
-        print("BQRS files was not created")
+        print("Error: BQRS file was not created")
         return
       end
     end
