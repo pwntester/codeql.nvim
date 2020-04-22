@@ -23,8 +23,8 @@ function! codeql#runQuery(quick_eval) abort
     endif
 
     if !isdirectory(s:database.'/src') && filereadable(s:database.'/src.zip')
-        execute '!mkdir '.s:database.'/src'
-        execute '!unzip '.s:database.'/src.zip -d '.s:database.'/src'
+        execute 'silent !mkdir '.s:database.'/src'
+        execute 'silent !unzip '.s:database.'/src.zip -d '.s:database.'/src'
     endif
 
     let l:queryPath = expand('%:p')
