@@ -5,11 +5,12 @@ local vim = vim
 local M = {}
 
 function M.uriToFname(uri, database)
-    colon = string.find(uri, ':')
+    local colon = string.find(uri, ':')
     if colon == nil then return uri end
-    scheme = string.sub(uri, 1, colon)
-    path = string.sub(uri, colon+1)
+    local scheme = string.sub(uri, 1, colon)
+    local path = string.sub(uri, colon+1)
 
+    local orig_fname
     if string.sub(uri, colon+1, colon+2) ~= '//' then
         orig_fname = vim.uri_to_fname(scheme..'//'..path)
     else
@@ -24,7 +25,7 @@ end
 
 function M.loadJsonResults(path, database)
     if not util.isFile(path) then return end
-    results = util.readJsonFile(path)
+    local results = util.readJsonFile(path)
     if nil == results['#select'] then
         print('No results')
     end
@@ -61,7 +62,7 @@ function M.loadJsonResults(path, database)
                 }
 
             -- string literal
-            elseif type(element) == "string" then
+            elseif type(element) == "string" or type(element) == "number" then
                 node = {
                     label = element;
                     mark = '≔';
@@ -73,20 +74,13 @@ function M.loadJsonResults(path, database)
 
             -- ???
             else
-                node = {
-                    label = element["label"];
-                    mark = '≔';
-                    filename = nil;
-                    line = nil;
-                    visitable = false;
-                    url = element.url;
-                }
+                print("Error processing node")
             end
             table.insert(path, node)
         end
 
         -- add issue paths to issues list
-        local paths = { path } 
+        local paths = { path }
         table.insert(issues, {
             is_folded = true;
             paths = paths;
@@ -108,7 +102,7 @@ function M.loadSarifResults(path, database)
         -- each result contains a codeflow that groups a source
         for _, c in ipairs(r.codeFlows) do
             for _, t in ipairs(c.threadFlows) do
-                -- each threadFlow contains all reached sinks for 
+                -- each threadFlow contains all reached sinks for
                 -- codeFlow source
                 -- we can treat a threadFlow as a "regular" dataflow
                 -- first element is source, last one is sink
@@ -117,9 +111,9 @@ function M.loadSarifResults(path, database)
                     local node = {}
                     node.label = l.location.message.text
                     if 1 == i then
-                        node.mark = '⭃' 
+                        node.mark = '⭃'
                     elseif #t.locations == i then
-                        node.mark = '⦿' 
+                        node.mark = '⦿'
                     else
                         node.mark = '→'
                     end
@@ -158,7 +152,7 @@ function M.loadSarifResults(path, database)
             active_path = 1;
         }
         table.insert(issues, issue)
-    end 
+    end
 
     renderer.render(database, {}, issues)
 
