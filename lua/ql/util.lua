@@ -3,11 +3,7 @@ local uv = vim.loop
 
 local M = {}
 
-function M.starts_with(str, start)
-   return string.sub(str, 1, #start) == start
-end
-
-function M.runcmd(cmd, raw)
+function M.run_cmd(cmd, raw)
   local f = assert(io.popen(cmd, 'r'))
   local s = assert(f:read('*a'))
   f:close()
@@ -16,12 +12,6 @@ function M.runcmd(cmd, raw)
   s = string.gsub(s, '%s+$', '')
   s = string.gsub(s, '[\n\r]+', ' ')
   return s
-end
-
-function M.table_length(T)
-  local count = 0
-  for _ in pairs(T) do count = count + 1 end
-  return count
 end
 
 function M.dump(o)
@@ -59,17 +49,17 @@ function M.json_decode(data)
   end
 end
 
-function M.isFile(filename)
+function M.is_file(filename)
   local stat = uv.fs_stat(filename)
   return stat and stat.type == 'file' or false
 end
 
-function M.isDir(filename)
+function M.is_dir(filename)
   local stat = uv.fs_stat(filename)
   return stat and stat.type == 'directory' or false
 end
 
-function M.readJsonFile(path)
+function M.read_json_file(path)
     local f = io.open(path, "r")
     local body = f:read("*all")
     f:close()
@@ -81,7 +71,7 @@ function M.readJsonFile(path)
     return decoded
 end
 
-function M.slice(tbl, s, e)
+function M.tbl_slice(tbl, s, e)
     local pos, new = 1, {}
     for i = s, e do
         new[pos] = tbl[i]

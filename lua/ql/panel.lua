@@ -1,8 +1,6 @@
 local vim = vim
 local api = vim.api
 
-local M = {}
-
 local auditpanel_buffer_name = '__CodeQLPanel__'
 local auditpanel_pos = 'right'
 local auditpanel_width = 50
@@ -14,175 +12,21 @@ local database = ''
 local issues = {}
 local scaninfo = {}
 
-function M.render(_database, _issues)
-    M.openAuditPanel()
-
-    scaninfo = { line_map =  {} }
-
-    issues = _issues
-
-    -- sort
-    table.sort(issues, function(a,b)
-        return a.label < b.label
-    end)
-
-    if string.sub(_database, -1) == "/" then
-        database = string.sub(_database, 1, -2)
-    else
-        database = _database
-    end
-
-    M.renderContent()
-end
-
-function M.isFiltered(filter, issue)
-    local f, err = loadstring("return function(issue) return " .. filter .. " end")
-    if f then return f()(issue) else return f, err end
-end
-
-function M.filterIssues(filter_str)
-    for _, issue in ipairs(issues) do
-        if not M.isFiltered(filter_str, issue) then
-            issue.hidden = true
+-- local functions
+local function print_to_panel(text, matches)
+    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
+    api.nvim_buf_set_lines(bufnr, -1, -1, true, {text})
+    if type(matches) == 'table' then
+        for hlgroup, groups in pairs(matches) do
+            for _, group in ipairs(groups) do
+                local linenr = api.nvim_buf_line_count(bufnr) - 1
+                api.nvim_buf_add_highlight(bufnr, 0, hlgroup, linenr, group[1], group[2])
+            end
         end
     end
 end
 
-function M.clearFilter()
-    for _, issue in ipairs(issues) do
-        issue.hidden = false
-    end
-end
-
-function ClearFilter()
-    M.clearFilter()
-    M.renderContent()
-end
-
-function LabelFilter()
-    local pattern = vim.fn.input("Pattern: ")
-    M.clearFilter()
-    M.filterIssues("string.match(issue.label, '"..pattern.."') ~= nil")
-    M.renderContent()
-end
-
-function GenericFilter()
-    local pattern = vim.fn.input("Pattern: ")
-    M.clearFilter()
-    M.filterIssues(pattern)
-    M.renderContent()
-end
-
-function M.renderContent()
-    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
-    if bufnr == -1 then print('Error opening CodeQL panel'); return end
-    api.nvim_buf_set_option(bufnr, 'modifiable', true)
-    api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
-    M.printHelp()
-    if #issues >0 then
-        M.printIssues()
-        local win = M.getPanelWindow(auditpanel_buffer_name)
-        api.nvim_win_set_cursor(win, {7, 0})
-    else
-        M.printToPanel('No results found.')
-    end
-    api.nvim_buf_set_option(bufnr, 'modifiable', false)
-end
-
-
-function M.printHelp()
-    if auditpanel_short_help then
-        M.printToPanel('" Press H for help')
-        M.printToPanel('')
-    else
-        M.printToPanel('" --------- General ---------')
-        M.printToPanel('" <CR>: Jump to tag definition')
-        M.printToPanel('" p: As above, but stay in AuditPane')
-        M.printToPanel('" P: Previous path')
-        M.printToPanel('" n: Next path')
-        M.printToPanel('"')
-        M.printToPanel('" ---------- Folds ----------')
-        M.printToPanel('" f: Label filter')
-        M.printToPanel('" F: Generic filter')
-        M.printToPanel('" c: Clear filter')
-        M.printToPanel('"')
-        M.printToPanel('" ---------- Folds ----------')
-        M.printToPanel('" o: Toggle fold')
-        M.printToPanel('" t: Open all folds')
-        M.printToPanel('" T: Close all folds')
-        M.printToPanel('"')
-        M.printToPanel('" ---------- Misc -----------')
-        M.printToPanel('" q: Close window')
-        M.printToPanel('" H: Toggle help')
-        M.printToPanel('')
-    end
-end
-
-function M.openAuditPanel()
-
-    -- check if audit pane is already opened
-    if vim.fn.bufwinnr(auditpanel_buffer_name) ~= -1 then
-        return
-    end
-
-    -- prepare split arguments
-    local pos = ''
-    if auditpanel_pos == 'right' then
-        pos = 'botright'
-    elseif auditpanel_pos == 'left' then
-        pos = 'topleft'
-    else
-        print('Incorrect auditpanel_pos value')
-        return
-    end
-
-    -- get current win id
-    local current_window = vim.fn.win_getid()
-
-    -- go to main window
-    M.goToMainWindow()
-
-    -- split
-    vim.fn.execute('silent keepalt '..pos..' vertical '..auditpanel_width..'split '..auditpanel_buffer_name)
-
-    -- go to original window
-    vim.fn.win_gotoid(current_window)
-
-    -- buffer options
-    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
-    api.nvim_buf_set_option(bufnr, 'filetype', 'codeqlauditpanel')
-    api.nvim_buf_set_option(bufnr, 'buftype', 'nofile')
-    api.nvim_buf_set_option(bufnr, 'bufhidden', 'hide')
-    api.nvim_buf_set_option(bufnr, 'swapfile', false)
-    api.nvim_buf_set_option(bufnr, 'buflisted', false)
-
-    api.nvim_buf_set_keymap(bufnr, 'n', 'o', '<Cmd>lua ToggleFold()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<CR>', '<Cmd>lua JumpToCode(0)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'p', '<Cmd>lua JumpToCode(1)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-h>', '<Cmd>lua ToggleHelp()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'q', '<Cmd>lua CloseAuditPanel()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 't', '<Cmd>lua SetFoldLevel(false)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-T>', '<Cmd>lua SetFoldLevel(true)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-p>', '<Cmd>lua ChangePath(-1)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'n', '<Cmd>lua ChangePath(1)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'f', '<Cmd>lua LabelFilter()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-f>', '<Cmd>lua GenericFilter()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-c>', '<Cmd>lua ClearFilter()<CR>', { script = true,  silent = true})
-
-    -- window options
-    local win = M.getPanelWindow(auditpanel_buffer_name)
-    api.nvim_win_set_option(win, 'wrap', false)
-    api.nvim_win_set_option(win, 'number', false)
-    api.nvim_win_set_option(win, 'relativenumber', false)
-    api.nvim_win_set_option(win, 'foldenable', false)
-    api.nvim_win_set_option(win, 'winfixwidth', true)
-    api.nvim_win_set_option(win, 'concealcursor', 'nvi')
-    api.nvim_win_set_option(win, 'conceallevel', 3)
-    api.nvim_win_set_option(win, 'signcolumn', 'yes')
-
-end
-
-function M.getPanelWindow(buffer_name)
+local function get_panel_window(buffer_name)
     local bufnr = vim.fn.bufnr(buffer_name)
     for _, w in ipairs(api.nvim_list_wins()) do
         if api.nvim_win_get_buf(w) == bufnr then
@@ -192,7 +36,7 @@ function M.getPanelWindow(buffer_name)
     return nil
 end
 
-function M.goToMainWindow()
+local function go_to_main_window()
     local widerwin = 0
     local widerwidth = 0
     for _, w in ipairs(api.nvim_list_wins()) do
@@ -206,113 +50,54 @@ function M.goToMainWindow()
     end
 end
 
-function M.printToPanel(text, matches)
-    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
-    api.nvim_buf_set_lines(bufnr, -1, -1, true, {text})
-    if type(matches) == 'table' then
-        for hlgroup, groups in pairs(matches) do
-            for _, group in ipairs(groups) do
-                local linenr = api.nvim_buf_line_count(bufnr) - 1
-                api.nvim_buf_add_highlight(bufnr, 0, hlgroup, linenr, group[1], group[2])
-            end
-        end
-    end
+local function is_filtered(filter, issue)
+    local f, err = loadstring("return function(issue) return " .. filter .. " end")
+    if f then return f()(issue) else return f, err end
 end
 
-function M.renderKeepView(line)
-    if line == nil then line = vim.fn.line('.') end
-
-    -- called from ToggleFold commands, so within panel buffer
-    local curcol = vim.fn.col('.')
-    local topline = vim.fn.line('w0')
-
-    M.renderContent()
-
-    local scrolloff_save = api.nvim_get_option('scrolloff')
-    api.nvim_command('set scrolloff=0')
-
-    vim.fn.cursor(topline, 1)
-    api.nvim_command('normal! zt')
-    vim.fn.cursor(line, curcol)
-
-    api.nvim_command('let &scrolloff = '..scrolloff_save)
-    api.nvim_command('redraw')
-end
-
-function M.printIssues()
-
-    local hl = { CodeqlAuditPanelInfo = {{0, string.len('Database:')}} }
-    local index = string.find(database, '/[^/]*$')
-    if nil ~= index then
-        M.printToPanel('Database: '..string.sub(database, index + 1), hl)
-    else
-        M.printToPanel('Database: '..database, hl)
-    end
-
-
-    hl = { CodeqlAuditPanelInfo = {{0, string.len('Issues:')}} }
-    M.printToPanel('Issues:   '..table.getn(issues), hl)
-
-    M.printToPanel('')
-
-    -- print issue labels
+local function filter_issues(filter_str)
     for _, issue in ipairs(issues) do
-        if issue.hidden then goto continue end
-        local is_folded = issue.is_folded
-
-        local foldmarker = icon_closed
-        if not is_folded then
-            foldmarker = icon_open
+        if not is_filtered(filter_str, issue) then
+            issue.hidden = true
         end
-
-        local text = issue.label
-        hl = { CodeqlAuditPanelFoldIcon = {{ 0, string.len(foldmarker) }} }
-        M.printToPanel(foldmarker..' '..text, hl)
-
-        -- save the current issue in scaninfo.line_map
-        local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
-        local curline = api.nvim_buf_line_count(bufnr)
-        scaninfo.line_map[curline] = issue
-
-        -- print nodes
-        if not is_folded then
-            M.printNodes(issue, 2)
-        end
-        ::continue::
     end
 end
 
-function M.printNodes(issue, indent_level)
-
-    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
-    local curline = api.nvim_buf_line_count(bufnr)
-
-    local paths = issue.paths
-
-    -- paths
-    local active_path = 1
-    if #paths > 1 then
-        if nil ~= scaninfo.line_map[curline] and nil ~= scaninfo.line_map[curline]['active_path'] then
-            -- retrieve path info from scaninfo
-            active_path = scaninfo.line_map[curline]['active_path']
-        end
-        local str = active_path..'/'..#paths
-        if nil ~= scaninfo.line_map[curline + 1] then
-            table.remove(scaninfo.line_map, curline + 1)
-        end
-        local text = string.rep(' ', indent_level)..'Path: '
-        local hl = { CodeqlAuditPanelInfo = {{0, string.len(text)}} }
-        M.printToPanel(text..str, hl)
-    end
-    local path = paths[active_path]
-
-    --  print path nodes
-    for _, node in ipairs(path) do
-        M.printNode(node, indent_level)
+local function unhide_issues()
+    for _, issue in ipairs(issues) do
+        issue.hidden = false
     end
 end
 
-function M.printNode(node, indent_level)
+local function print_help()
+    if auditpanel_short_help then
+        print_to_panel('" Press H for help')
+        print_to_panel('')
+    else
+        print_to_panel('" --------- General ---------')
+        print_to_panel('" <CR>: Jump to tag definition')
+        print_to_panel('" p: As above, but stay in AuditPane')
+        print_to_panel('" P: Previous path')
+        print_to_panel('" n: Next path')
+        print_to_panel('"')
+        print_to_panel('" ---------- Folds ----------')
+        print_to_panel('" f: Label filter')
+        print_to_panel('" F: Generic filter')
+        print_to_panel('" c: Clear filter')
+        print_to_panel('"')
+        print_to_panel('" ---------- Folds ----------')
+        print_to_panel('" o: Toggle fold')
+        print_to_panel('" t: Open all folds')
+        print_to_panel('" T: Close all folds')
+        print_to_panel('"')
+        print_to_panel('" ---------- Misc -----------')
+        print_to_panel('" q: Close window')
+        print_to_panel('" H: Toggle help')
+        print_to_panel('')
+    end
+end
+
+local function print_node(node, indent_level)
     local text = ''
     local hl = {}
 
@@ -339,7 +124,7 @@ function M.printNode(node, indent_level)
     else
         text = mark..'['..node.label..']'
     end
-    M.printToPanel(text, hl)
+    print_to_panel(text, hl)
 
     -- save the current issue in scaninfo.sline map
     local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
@@ -347,8 +132,201 @@ function M.printNode(node, indent_level)
     scaninfo.line_map[curline] = node
 end
 
--- Global functions
-function ToggleFold()
+local function print_nodes(issue, indent_level)
+
+    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
+    local curline = api.nvim_buf_line_count(bufnr)
+
+    local paths = issue.paths
+
+    -- paths
+    local active_path = 1
+    if #paths > 1 then
+        if nil ~= scaninfo.line_map[curline] and nil ~= scaninfo.line_map[curline]['active_path'] then
+            -- retrieve path info from scaninfo
+            active_path = scaninfo.line_map[curline]['active_path']
+        end
+        local str = active_path..'/'..#paths
+        if nil ~= scaninfo.line_map[curline + 1] then
+            table.remove(scaninfo.line_map, curline + 1)
+        end
+        local text = string.rep(' ', indent_level)..'Path: '
+        local hl = { CodeqlAuditPanelInfo = {{0, string.len(text)}} }
+        print_to_panel(text..str, hl)
+    end
+    local path = paths[active_path]
+
+    --  print path nodes
+    for _, node in ipairs(path) do
+        print_node(node, indent_level)
+    end
+end
+
+local function print_issues()
+
+    local hl = { CodeqlAuditPanelInfo = {{0, string.len('Database:')}} }
+    local index = string.find(database, '/[^/]*$')
+    if nil ~= index then
+        print_to_panel('Database: '..string.sub(database, index + 1), hl)
+    else
+        print_to_panel('Database: '..database, hl)
+    end
+
+
+    hl = { CodeqlAuditPanelInfo = {{0, string.len('Issues:')}} }
+    print_to_panel('Issues:   '..table.getn(issues), hl)
+
+    print_to_panel('')
+
+    -- print issue labels
+    for _, issue in ipairs(issues) do
+        if issue.hidden then goto continue end
+        local is_folded = issue.is_folded
+
+        local foldmarker = icon_closed
+        if not is_folded then
+            foldmarker = icon_open
+        end
+
+        local text = issue.label
+        hl = { CodeqlAuditPanelFoldIcon = {{ 0, string.len(foldmarker) }} }
+        print_to_panel(foldmarker..' '..text, hl)
+
+        -- save the current issue in scaninfo.line_map
+        local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
+        local curline = api.nvim_buf_line_count(bufnr)
+        scaninfo.line_map[curline] = issue
+
+        -- print nodes
+        if not is_folded then
+            print_nodes(issue, 2)
+        end
+        ::continue::
+    end
+end
+
+local function render_content()
+    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
+    if bufnr == -1 then print('Error opening CodeQL panel'); return end
+    api.nvim_buf_set_option(bufnr, 'modifiable', true)
+    api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
+    print_help()
+    if #issues >0 then
+        print_issues()
+        local win = get_panel_window(auditpanel_buffer_name)
+        local lcount = api.nvim_buf_line_count(bufnr)
+        api.nvim_win_set_cursor(win, {math.min(7,lcount), 0})
+    else
+        print_to_panel('No results found.')
+    end
+    api.nvim_buf_set_option(bufnr, 'modifiable', false)
+end
+
+local function open_codeql_panel()
+
+    -- check if audit pane is already opened
+    if vim.fn.bufwinnr(auditpanel_buffer_name) ~= -1 then
+        return
+    end
+
+    -- prepare split arguments
+    local pos = ''
+    if auditpanel_pos == 'right' then
+        pos = 'botright'
+    elseif auditpanel_pos == 'left' then
+        pos = 'topleft'
+    else
+        print('Incorrect auditpanel_pos value')
+        return
+    end
+
+    -- get current win id
+    local current_window = vim.fn.win_getid()
+
+    -- go to main window
+    go_to_main_window()
+
+    -- split
+    vim.fn.execute('silent keepalt '..pos..' vertical '..auditpanel_width..'split '..auditpanel_buffer_name)
+
+    -- go to original window
+    vim.fn.win_gotoid(current_window)
+
+    -- buffer options
+    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
+    api.nvim_buf_set_option(bufnr, 'filetype', 'codeqlauditpanel')
+    api.nvim_buf_set_option(bufnr, 'buftype', 'nofile')
+    api.nvim_buf_set_option(bufnr, 'bufhidden', 'hide')
+    api.nvim_buf_set_option(bufnr, 'swapfile', false)
+    api.nvim_buf_set_option(bufnr, 'buflisted', false)
+
+    api.nvim_buf_set_keymap(bufnr, 'n', 'o', '<Cmd>lua toggle_fold()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<CR>', '<Cmd>lua jump_to_code(0)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'p', '<Cmd>lua jump_to_code(1)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-h>', '<Cmd>lua toggle_help()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'q', '<Cmd>lua close_codeql_panel()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 't', '<Cmd>lua set_fold_level(false)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-T>', '<Cmd>lua set_fold_level(true)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-p>', '<Cmd>lua change_path(-1)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'n', '<Cmd>lua change_path(1)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'f', '<Cmd>lua label_filter()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-f>', '<Cmd>lua generic_filter()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-c>', '<Cmd>lua clear_filter()<CR>', { script = true,  silent = true})
+
+    -- window options
+    local win = get_panel_window(auditpanel_buffer_name)
+    api.nvim_win_set_option(win, 'wrap', false)
+    api.nvim_win_set_option(win, 'number', false)
+    api.nvim_win_set_option(win, 'relativenumber', false)
+    api.nvim_win_set_option(win, 'foldenable', false)
+    api.nvim_win_set_option(win, 'winfixwidth', true)
+    api.nvim_win_set_option(win, 'concealcursor', 'nvi')
+    api.nvim_win_set_option(win, 'conceallevel', 3)
+    api.nvim_win_set_option(win, 'signcolumn', 'yes')
+
+end
+
+local function render_keep_view(line)
+    if line == nil then line = vim.fn.line('.') end
+
+    -- called from toggle_fold commands, so within panel buffer
+    local curcol = vim.fn.col('.')
+    local topline = vim.fn.line('w0')
+
+    render_content()
+
+    local scrolloff_save = api.nvim_get_option('scrolloff')
+    api.nvim_command('set scrolloff=0')
+
+    vim.fn.cursor(topline, 1)
+    api.nvim_command('normal! zt')
+    vim.fn.cursor(line, curcol)
+
+    api.nvim_command('let &scrolloff = '..scrolloff_save)
+    api.nvim_command('redraw')
+end
+
+-- global functions
+function clear_filter()
+    unhide_issues()
+    render_content()
+end
+
+function label_filter()
+    local pattern = vim.fn.input("Pattern: ")
+    unhide_issues()
+    filter_issues("string.match(string.lower(issue.label), string.lower('"..pattern.."')) ~= nil")
+    render_content()
+end
+
+function generic_filter()
+    local pattern = vim.fn.input("Pattern: ")
+    unhide_issues()
+    filter_issues(pattern)
+    render_content()
+end
+
+function toggle_fold()
     -- prevent highlighting from being off after adding/removing the help text
     api.nvim_command('match none')
 
@@ -358,7 +336,7 @@ function ToggleFold()
             local node = scaninfo.line_map[c]
             if nil ~= node['is_folded'] then
                 node['is_folded'] = not node['is_folded']
-                M.renderKeepView(c)
+                render_keep_view(c)
                 return
             end
         end
@@ -366,20 +344,20 @@ function ToggleFold()
     end
 end
 
-function ToggleHelp()
+function toggle_help()
     auditpanel_short_help = not auditpanel_short_help
     -- prevent highlighting from being off after adding/removing the help text
-    M.renderKeepView()
+    render_keep_view()
 end
 
-function SetFoldLevel(level)
+function set_fold_level(level)
     for k, _ in pairs(scaninfo.line_map) do
         scaninfo.line_map[k]['is_folded'] = level
     end
-    M.renderKeepView()
+    render_keep_view()
 end
 
-function ChangePath(offset)
+function change_path(offset)
     local line = vim.fn.line('.') - 1
     if nil == scaninfo.line_map[line] then
         return
@@ -395,11 +373,11 @@ function ChangePath(offset)
         else
             scaninfo['line_map'][line]['active_path'] = issue['active_path'] + offset
         end
-        M.renderKeepView(line+1)
+        render_keep_view(line+1)
     end
 end
 
-function JumpToCode(stay_in_pane)
+function jump_to_code(stay_in_pane)
     if nil == scaninfo.line_map[vim.fn.line('.')] then
         return
     end
@@ -417,7 +395,7 @@ function JumpToCode(stay_in_pane)
     local auditpanel_window = vim.fn.win_getid()
 
     -- go to main window
-    M.goToMainWindow()
+    go_to_main_window()
 
     api.nvim_command('e '..vim.fn.fnameescape(node.filename))
 
@@ -452,9 +430,34 @@ function JumpToCode(stay_in_pane)
     end
 end
 
-function CloseAuditPanel()
-    local win = M.getPanelWindow(auditpanel_buffer_name)
+function close_codeql_panel()
+    local win = get_panel_window(auditpanel_buffer_name)
     vim.fn.nvim_win_close(win, true)
+end
+
+-- exported functions
+
+local M = {}
+
+function M.render(_database, _issues)
+    open_codeql_panel()
+
+    scaninfo = { line_map =  {} }
+
+    issues = _issues
+
+    -- sort
+    table.sort(issues, function(a,b)
+        return a.label < b.label
+    end)
+
+    if string.sub(_database, -1) == "/" then
+        database = string.sub(_database, 1, -2)
+    else
+        database = _database
+    end
+
+    render_content()
 end
 
 return M

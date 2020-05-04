@@ -33,7 +33,7 @@ function! codeql#runQuery(quick_eval) abort
 
     let l:queryPath = expand('%:p')
 
-	" [bufnum, lnum, col, off, curswant] ~
+	" [bufnum, lnum, col, off, curswant]
     if mode() == "v" || mode() == "V" || mode() == "\<C-V>"
         let [line_start, column_start] = getpos("'<")[1:2]
         let [line_end, column_end] = getpos("'>")[1:2]

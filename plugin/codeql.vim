@@ -15,4 +15,4 @@ autocmd FileType ql vnoremap qe :QuickEval<CR>
 " TODO: CreateDB <lang> <source-root> <db>
 " TODO: CleanDB
 " TODO: RestartQueryServer
-
+" TODO: History

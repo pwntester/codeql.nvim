@@ -6,6 +6,8 @@ local vim = vim
 local api = vim.api
 
 local client_index = 0
+
+-- local functions
 local function next_client_id()
   client_index = client_index + 1
   return client_index
@@ -34,6 +36,7 @@ local function cmd_parts(input)
   return cmd, cmd_args
 end
 
+-- exported functions
 local M = {}
 
 function M.start_client(config)
@@ -127,7 +130,7 @@ function M.run_query(config)
   local qloPath = vim.fn.tempname()
   local resultsPath = vim.fn.tempname()
 
-  local json = util.runcmd('codeql resolve library-path --format=json --query='..queryPath, true)
+  local json = util.run_cmd('codeql resolve library-path --format=json --query='..queryPath, true)
   local decoded, err = util.json_decode(json)
   if not decoded then
       print("Error resolving library path: "..err)
@@ -137,7 +140,7 @@ function M.run_query(config)
 
   local dbDir = dbPath
   for _, dir in ipairs(vim.fn.glob(vim.fn.fnameescape(dbPath)..'*', 1, 1)) do
-    if util.starts_with(dir, dbPath..'db-') then
+    if vim.startswith(dir, dbPath..'db-') then
       dbDir = dir
       break
     end
@@ -197,7 +200,7 @@ function M.run_query(config)
             {'load_json', jsonPath, dbPath, config.metadata}
           }
           print("JSON: "..jsonPath)
-          job.runCommands(cmds)
+          job.run_commands(cmds)
           print(' ')
         elseif config.metadata['kind'] == "path-problem" and config.metadata['id'] ~= nil then
           local sarifPath = vim.fn.tempname()
@@ -206,7 +209,7 @@ function M.run_query(config)
             {'load_sarif', sarifPath, dbPath, config.metadata}
           }
           print("SARIF: "..sarifPath)
-          job.runCommands(cmds)
+          job.run_commands(cmds)
           print(' ')
         elseif config.metadata['kind'] == "path-problem" then
           print("Error: Insuficient Metadata for a Path Problem. Need at least @kind and @id elements")

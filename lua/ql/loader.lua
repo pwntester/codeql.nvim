@@ -2,9 +2,21 @@ local util = require 'ql.util'
 local panel = require 'ql.panel'
 local vim = vim
 
-local M = {}
+-- local functions
+local function generate_issue_label(node)
+    local label = node.label
 
-function M.uriToFname(uri, database)
+    if vim.g.codeql_auditpanel_filename and node['filename'] and node['filename'] ~= nil then
+        if vim.g.codeql_auditpanel_longnames then
+            label = node.filename..':'..node.line
+        else
+            label = vim.fn.fnamemodify(node.filename, ':p:t')..':'..node.line
+        end
+    end
+    return label
+end
+
+local function uri_to_fname(uri, database)
     local colon = string.find(uri, ':')
     if colon == nil then return uri end
     local scheme = string.sub(uri, 1, colon)
@@ -16,16 +28,19 @@ function M.uriToFname(uri, database)
     else
         orig_fname = vim.uri_to_fname(uri)
     end
-    if util.isFile(orig_fname) then
+    if util.is_file(orig_fname) then
         return orig_fname
-    elseif util.isDir(database..'/src') then
+    elseif util.is_dir(database..'/src') then
         return database..'/src'..orig_fname
     end
 end
 
-function M.loadJsonResults(path, database)
-    if not util.isFile(path) then return end
-    local results = util.readJsonFile(path)
+-- exported functions
+local M = {}
+
+function M.load_json_results(path, database)
+    if not util.is_file(path) then return end
+    local results = util.read_json_file(path)
     if nil == results['#select'] then
         print('No results')
     end
@@ -39,14 +54,14 @@ function M.loadJsonResults(path, database)
             local node = {}
             -- objects with url info
             if type(element) == "table" and nil ~= element['url'] then
-                local filename = M.uriToFname(element['url']['uri'], database)
+                local filename = uri_to_fname(element['url']['uri'], database)
                 local line = element['url']['startLine']
                 node = {
                     label = element['label'];
                     mark = '→',
                     filename = filename;
                     line =  line,
-                    visitable = (filename ~= nil and filename ~= '' and util.isFile(filename)) and true or false;
+                    visitable = (filename ~= nil and filename ~= '' and util.is_file(filename)) and true or false;
                     url = element.url;
                 }
 
@@ -83,7 +98,7 @@ function M.loadJsonResults(path, database)
         local paths = { path }
 
         -- issue label
-        local label = M.generateIssueLabel(paths[1][1])
+        local label = generate_issue_label(paths[1][1])
 
         table.insert(issues, {
             is_folded = true;
@@ -97,9 +112,9 @@ function M.loadJsonResults(path, database)
     panel.render(database, issues)
 end
 
-function M.loadSarifResults(path, database)
-    if not util.isFile(path) then return end
-    local decoded = util.readJsonFile(path)
+function M.load_sarif_results(path, database)
+    if not util.is_file(path) then return end
+    local decoded = util.read_json_file(path)
     local results = decoded.runs[1].results
 
     local paths = {}
@@ -123,7 +138,7 @@ function M.loadSarifResults(path, database)
                     else
                         node.mark = '→'
                     end
-                    node.filename = M.uriToFname(l.location.physicalLocation.artifactLocation.uri, database)
+                    node.filename = uri_to_fname(l.location.physicalLocation.artifactLocation.uri, database)
                     node.line = l.location.physicalLocation.region.startLine
                     node.visitable = true
                     node.url = {
@@ -158,7 +173,7 @@ function M.loadSarifResults(path, database)
         if vim.g.codeql_group_by_sink then
             primary_node = p[1][#(p[1])]
         end
-        local label = M.generateIssueLabel(primary_node)
+        local label = generate_issue_label(primary_node)
 
         local issue = {
             is_folded = true;
@@ -172,19 +187,6 @@ function M.loadSarifResults(path, database)
 
     panel.render(database, issues)
 
-end
-
-function M.generateIssueLabel(node)
-    local label = node.label
-
-    if vim.g.codeql_auditpanel_filename and node['filename'] and node['filename'] ~= nil then
-        if vim.g.codeql_auditpanel_longnames then
-            label = node.filename..':'..node.line
-        else
-            label = vim.fn.fnamemodify(node.filename, ':p:t')..':'..node.line
-        end
-    end
-    return label
 end
 
 return M
