@@ -4,7 +4,7 @@ local uv = vim.loop
 local M = {}
 
 function M.starts_with(str, start)
-   return str:sub(1, #start) == start
+   return string.sub(str, 1, #start) == start
 end
 
 function M.runcmd(cmd, raw)
@@ -29,7 +29,7 @@ function M.dump(o)
       local s = '{ '
       for k,v in pairs(o) do
          if type(k) ~= 'number' then k = '"'..k..'"' end
-         s = s .. '['..k..'] = ' .. dump(v) .. ','
+         s = s .. '['..k..'] = ' .. M.dump(v) .. ','
       end
       return s .. '} '
    else
@@ -38,7 +38,7 @@ function M.dump(o)
 end
 
 function M.print_dump(o)
-    print(dump(o))
+    print(M.dump(o))
 end
 
 function M.json_encode(data)
@@ -90,4 +90,4 @@ function M.slice(tbl, s, e)
     return new
 end
 
-return M 
+return M

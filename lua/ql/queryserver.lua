@@ -1,13 +1,19 @@
 local util = require 'ql.util'
 local job = require 'ql.job'
 local rpc = require 'vim.lsp.rpc'
+local protocol = require 'vim.lsp.protocol'
 local vim = vim
-local validate = vim.validate
+local api = vim.api
 
 local client_index = 0
 local function next_client_id()
   client_index = client_index + 1
   return client_index
+end
+
+local function err_message(...)
+  api.nvim_err_writeln(table.concat(vim.tbl_flatten{...}))
+  api.nvim_command("redraw")
 end
 
 local function cmd_parts(input)
@@ -28,47 +34,10 @@ local function cmd_parts(input)
   return cmd, cmd_args
 end
 
-local function optional_validator(fn)
-  return function(v)
-    return v == nil or fn(v)
-  end
-end
-
--- TODO: fix this and use similar validation for start_client
-local function validate_client_config(config)
-  validate {
-    config = { config, 't' };
-  }
-  -- validate {
-  --   root_dir        = { config.root_dir, is_dir, "directory" };
-  --   callbacks       = { config.callbacks, "t", true };
-  --   capabilities    = { config.capabilities, "t", true };
-  --   cmd_cwd         = { config.cmd_cwd, optional_validator(is_dir), "directory" };
-  --   cmd_env         = { config.cmd_env, "t", true };
-  --   name            = { config.name, 's', true };
-  --   on_error        = { config.on_error, "f", true };
-  --   on_exit         = { config.on_exit, "f", true };
-  --   on_init         = { config.on_init, "f", true };
-  --   before_init     = { config.before_init, "f", true };
-  --   offset_encoding = { config.offset_encoding, "s", true };
-  -- }
-  local cmd, cmd_args = cmd_parts(config.cmd)
-  -- local offset_encoding = valid_encodings.UTF16
-  -- if config.offset_encoding then
-  --   offset_encoding = validate_encoding(config.offset_encoding)
-  -- end
-  return {
-    cmd = cmd; 
-    cmd_args = cmd_args;
-    offset_encoding = offset_encoding;
-  }
-end
-
 local M = {}
 
 function M.start_client(config)
-  local cleaned_config = validate_client_config(config)
-  local cmd, cmd_args, offset_encoding = cleaned_config.cmd, cleaned_config.cmd_args, cleaned_config.offset_encoding
+  local cmd, cmd_args = cmd_parts(config.cmd)
 
   local client_id = next_client_id()
 
@@ -120,19 +89,6 @@ function M.start_client(config)
   })
 end
 
-local function err_message(...)
-  nvim_err_writeln(table.concat(vim.tbl_flatten{...}))
-  nvim_command("redraw")
-end
-
-local function validate_encoding(encoding)
-  validate {
-    encoding = { encoding, 's' };
-  }
-  return valid_encodings[encoding:lower()]
-      or error(string.format("Invalid offset encoding %q. Must be one of: 'utf-8', 'utf-16', 'utf-32'", encoding))
-end
-
 local clients = {}
 
 function M.start_server(buf)
@@ -144,10 +100,10 @@ function M.start_server(buf)
       cmd             = {"codeql", "execute", "query-server", "--logdir", "/tmp/codeql"};
       offset_encoding = {"utf-8", "utf-16"};
       callbacks = {
-        ['ql/progressUpdated'] = function(method, params, client_id)
+        ['ql/progressUpdated'] = function(_, params, _)
           print(params.message)
         end;
-        ['evaluation/queryCompleted'] = function(method, params, client_id)
+        ['evaluation/queryCompleted'] = function(_, _, _)
           -- if ok, return {}, else return error (eg rpc.rpc_response_error(protocol.ErrorCodes.MethodNotFound))
           return {}
         end
@@ -171,7 +127,7 @@ function M.run_query(config)
   local qloPath = vim.fn.tempname()
   local resultsPath = vim.fn.tempname()
 
-  local json = util.runcmd('codeql resolve library-path --format=json --query='..queryPath, true) 
+  local json = util.runcmd('codeql resolve library-path --format=json --query='..queryPath, true)
   local decoded, err = util.json_decode(json)
   if not decoded then
       print("Error resolving library path: "..err)
@@ -180,7 +136,7 @@ function M.run_query(config)
   local libraryPath = decoded.libraryPath
 
   local dbDir = dbPath
-  for _, dir in ipairs(vim.fn.glob(vim.fn.fnameescape(dbPath)..'*', 1, 1)) do 
+  for _, dir in ipairs(vim.fn.glob(vim.fn.fnameescape(dbPath)..'*', 1, 1)) do
     if util.starts_with(dir, dbPath..'db-') then
       dbDir = dir
       break
@@ -189,7 +145,7 @@ function M.run_query(config)
   local dbScheme = decoded.dbscheme
 
   -- https://github.com/github/vscode-codeql/blob/master/extensions/ql-vscode/src/messages.ts
-  local params = {
+  local compileQuery_params = {
     body = {
       compilationOptions = {
         computeNoLocationUrls = true;
@@ -226,7 +182,7 @@ function M.run_query(config)
     progressId = 1;
   }
 
-  local runQueries_callback = function(err, result)
+  local runQueries_callback = function(err, _)
     if err then
       util.print_dump(err)
     else
@@ -235,7 +191,7 @@ function M.run_query(config)
         print("BQRS: " .. resultsPath)
         -- process results
         if config.quick_eval or config.metadata['kind'] ~= "path-problem" then
-          local jsonPath = vim.fn.tempname() 
+          local jsonPath = vim.fn.tempname()
           local cmds = {
             {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', resultsPath},
             {'load_json', jsonPath, dbPath, config.metadata}
@@ -244,7 +200,7 @@ function M.run_query(config)
           job.runCommands(cmds)
           print(' ')
         elseif config.metadata['kind'] == "path-problem" and config.metadata['id'] ~= nil then
-          local sarifPath = vim.fn.tempname() 
+          local sarifPath = vim.fn.tempname()
           local cmds = {
             {'codeql', 'bqrs', 'interpret', resultsPath, '-t=id='..config.metadata['id'], '-t=kind=path-problem', '-o='..sarifPath, '--format=sarif-latest'},
             {'load_sarif', sarifPath, dbPath, config.metadata}
@@ -264,12 +220,12 @@ function M.run_query(config)
     end
   end
 
-  local compileQuery_callback = function(err, result)
+  local compileQuery_callback = function(err, _)
     if err then
       util.print_dump(err)
     else
       -- prepare `runQueries` params
-      local params = {
+      local runQueries_params = {
         body = {
           db = {
             dbDir = dbDir;
@@ -292,13 +248,12 @@ function M.run_query(config)
       }
 
       -- run query
-      client.request("evaluation/runQueries", params, runQueries_callback)
+      client.request("evaluation/runQueries", runQueries_params, runQueries_callback)
     end
   end
 
   -- compile query
-  client.request("compilation/compileQuery", params, compileQuery_callback)
-
+  client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
 end
 
 function M.shutdown_server(buf)
@@ -312,4 +267,3 @@ function M.shutdown_server(buf)
 end
 
 return M
--- vim:sw=2 ts=2 et

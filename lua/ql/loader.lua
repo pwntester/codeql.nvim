@@ -1,5 +1,5 @@
 local util = require 'ql.util'
-local renderer = require 'ql.renderer'
+local panel = require 'ql.panel'
 local vim = vim
 
 local M = {}
@@ -81,14 +81,20 @@ function M.loadJsonResults(path, database)
 
         -- add issue paths to issues list
         local paths = { path }
+
+        -- issue label
+        local label = M.generateIssueLabel(paths[1][1])
+
         table.insert(issues, {
             is_folded = true;
             paths = paths;
             active_path = 1;
+            label = label;
+            hidden = false;
         })
     end
 
-    renderer.render(database, {}, issues)
+    panel.render(database, issues)
 end
 
 function M.loadSarifResults(path, database)
@@ -146,16 +152,39 @@ function M.loadSarifResults(path, database)
 
     local issues = {}
     for _, p in pairs(paths) do
+
+        -- issue label
+        local primary_node = p[1][1]
+        if vim.g.codeql_group_by_sink then
+            primary_node = p[1][#(p[1])]
+        end
+        local label = M.generateIssueLabel(primary_node)
+
         local issue = {
             is_folded = true;
             paths = p;
             active_path = 1;
+            label = label;
+            hidden = false;
         }
         table.insert(issues, issue)
     end
 
-    renderer.render(database, {}, issues)
+    panel.render(database, issues)
 
+end
+
+function M.generateIssueLabel(node)
+    local label = node.label
+
+    if vim.g.codeql_auditpanel_filename and node['filename'] and node['filename'] ~= nil then
+        if vim.g.codeql_auditpanel_longnames then
+            label = node.filename..':'..node.line
+        else
+            label = vim.fn.fnamemodify(node.filename, ':p:t')..':'..node.line
+        end
+    end
+    return label
 end
 
 return M

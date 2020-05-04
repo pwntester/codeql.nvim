@@ -1,3 +1,7 @@
+let g:codeql_auditpanel_longnames = v:false
+let g:codeql_auditpanel_filename = v:true
+let g:codeql_group_by_sink = v:true
+
 let s:database = ''
 " let s:history = []
 
@@ -52,6 +56,7 @@ function! codeql#runQuery(quick_eval) abort
         \ 'endColumn': column_end,
         \ 'metadata': codeql#extractQueryMetadata(l:queryPath),
         \ }
+
     let res = luaeval("require('ql.queryserver').run_query(_A)", l:config)
 
 endfunction

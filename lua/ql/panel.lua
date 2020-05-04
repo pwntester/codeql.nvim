@@ -1,34 +1,75 @@
-local util = require 'ql.util'
 local vim = vim
 local api = vim.api
 
 local M = {}
 
-local scaninfo = {}
 local auditpanel_buffer_name = '__CodeQLPanel__'
 local auditpanel_pos = 'right'
 local auditpanel_width = 50
 local auditpanel_short_help = true
-local auditpanel_longnames = false
-local auditpanel_filename = true
-local auditpanel_iconchars = {'▶', '▼'}
-local icon_closed = auditpanel_iconchars[1]
-local icon_open = auditpanel_iconchars[2]
+local icon_closed = '▶'
+local icon_open = '▼'
 
-local issues = {}
-local metadata = {}
 local database = ''
+local issues = {}
+local scaninfo = {}
 
-function M.render(_database, _metadata, _issues)
+function M.render(_database, _issues)
     M.openAuditPanel()
+
+    scaninfo = { line_map =  {} }
+
     issues = _issues
+
+    -- sort
+    table.sort(issues, function(a,b)
+        return a.label < b.label
+    end)
+
     if string.sub(_database, -1) == "/" then
         database = string.sub(_database, 1, -2)
     else
         database = _database
     end
-    metadata = _metadata
-    scaninfo = { line_map =  {} }
+
+    M.renderContent()
+end
+
+function M.isFiltered(filter, issue)
+    local f, err = loadstring("return function(issue) return " .. filter .. " end")
+    if f then return f()(issue) else return f, err end
+end
+
+function M.filterIssues(filter_str)
+    for _, issue in ipairs(issues) do
+        if not M.isFiltered(filter_str, issue) then
+            issue.hidden = true
+        end
+    end
+end
+
+function M.clearFilter()
+    for _, issue in ipairs(issues) do
+        issue.hidden = false
+    end
+end
+
+function ClearFilter()
+    M.clearFilter()
+    M.renderContent()
+end
+
+function LabelFilter()
+    local pattern = vim.fn.input("Pattern: ")
+    M.clearFilter()
+    M.filterIssues("string.match(issue.label, '"..pattern.."') ~= nil")
+    M.renderContent()
+end
+
+function GenericFilter()
+    local pattern = vim.fn.input("Pattern: ")
+    M.clearFilter()
+    M.filterIssues(pattern)
     M.renderContent()
 end
 
@@ -38,14 +79,43 @@ function M.renderContent()
     api.nvim_buf_set_option(bufnr, 'modifiable', true)
     api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
     M.printHelp()
-    if next(issues) ~= nil then
+    if #issues >0 then
         M.printIssues()
         local win = M.getPanelWindow(auditpanel_buffer_name)
-        api.nvim_win_set_cursor(win, {6, 0})
+        api.nvim_win_set_cursor(win, {7, 0})
     else
         M.printToPanel('No results found.')
     end
     api.nvim_buf_set_option(bufnr, 'modifiable', false)
+end
+
+
+function M.printHelp()
+    if auditpanel_short_help then
+        M.printToPanel('" Press H for help')
+        M.printToPanel('')
+    else
+        M.printToPanel('" --------- General ---------')
+        M.printToPanel('" <CR>: Jump to tag definition')
+        M.printToPanel('" p: As above, but stay in AuditPane')
+        M.printToPanel('" P: Previous path')
+        M.printToPanel('" n: Next path')
+        M.printToPanel('"')
+        M.printToPanel('" ---------- Folds ----------')
+        M.printToPanel('" f: Label filter')
+        M.printToPanel('" F: Generic filter')
+        M.printToPanel('" c: Clear filter')
+        M.printToPanel('"')
+        M.printToPanel('" ---------- Folds ----------')
+        M.printToPanel('" o: Toggle fold')
+        M.printToPanel('" t: Open all folds')
+        M.printToPanel('" T: Close all folds')
+        M.printToPanel('"')
+        M.printToPanel('" ---------- Misc -----------')
+        M.printToPanel('" q: Close window')
+        M.printToPanel('" H: Toggle help')
+        M.printToPanel('')
+    end
 end
 
 function M.openAuditPanel()
@@ -89,14 +159,15 @@ function M.openAuditPanel()
     api.nvim_buf_set_keymap(bufnr, 'n', 'o', '<Cmd>lua ToggleFold()<CR>', { script = true,  silent = true})
     api.nvim_buf_set_keymap(bufnr, 'n', '<CR>', '<Cmd>lua JumpToCode(0)<CR>', { script = true,  silent = true})
     api.nvim_buf_set_keymap(bufnr, 'n', 'p', '<Cmd>lua JumpToCode(1)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'F', '<Cmd>lua ShowLongNames()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'f', '<Cmd>lua ShowFilename()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'H', '<Cmd>lua ToggleHelp()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-h>', '<Cmd>lua ToggleHelp()<CR>', { script = true,  silent = true})
     api.nvim_buf_set_keymap(bufnr, 'n', 'q', '<Cmd>lua CloseAuditPanel()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'O', '<Cmd>lua SetFoldLevel(false)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'c', '<Cmd>lua SetFoldLevel(true)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'P', '<Cmd>lua ChangePath(-1)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'N', '<Cmd>lua ChangePath(1)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 't', '<Cmd>lua SetFoldLevel(false)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-T>', '<Cmd>lua SetFoldLevel(true)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-p>', '<Cmd>lua ChangePath(-1)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'n', '<Cmd>lua ChangePath(1)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'f', '<Cmd>lua LabelFilter()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-f>', '<Cmd>lua GenericFilter()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-c>', '<Cmd>lua ClearFilter()<CR>', { script = true,  silent = true})
 
     -- window options
     local win = M.getPanelWindow(auditpanel_buffer_name)
@@ -148,31 +219,6 @@ function M.printToPanel(text, matches)
     end
 end
 
-function M.printHelp()
-    if auditpanel_short_help then
-        M.printToPanel('" Press H for help')
-        M.printToPanel('')
-    else
-        M.printToPanel('" --------- General ---------')
-        M.printToPanel('" <CR>: Jump to tag definition')
-        M.printToPanel('" p: As above, but stay in AuditPane')
-        M.printToPanel('" f: Show file names')
-        M.printToPanel('" F: Show long file names')
-        M.printToPanel('" P: Previous path')
-        M.printToPanel('" N: Next path')
-        M.printToPanel('"')
-        M.printToPanel('" ---------- Folds ----------')
-        M.printToPanel('" o: Toggle fold')
-        M.printToPanel('" O: Open all folds')
-        M.printToPanel('" c: Close all folds')
-        M.printToPanel('"')
-        M.printToPanel('" ---------- Misc -----------')
-        M.printToPanel('" q: Close window')
-        M.printToPanel('" s: Toggle help')
-        M.printToPanel('')
-    end
-end
-
 function M.renderKeepView(line)
     if line == nil then line = vim.fn.line('.') end
 
@@ -211,26 +257,15 @@ function M.printIssues()
 
     -- print issue labels
     for _, issue in ipairs(issues) do
-        local paths = issue.paths
+        if issue.hidden then goto continue end
         local is_folded = issue.is_folded
-        local l = #(paths[1])
-        local primaryNode = paths[1][l]
 
         local foldmarker = icon_closed
         if not is_folded then
             foldmarker = icon_open
         end
 
-        local text = primaryNode.label
-
-        -- print primary column label
-        if auditpanel_filename and nil ~= primaryNode['filename'] and primaryNode.filename ~= nil then
-            if auditpanel_longnames then
-                text = primaryNode.filename..':'..primaryNode.line
-            else
-                text = vim.fn.fnamemodify(primaryNode.filename, ':p:t')..':'..primaryNode.line
-            end
-        end
+        local text = issue.label
         hl = { CodeqlAuditPanelFoldIcon = {{ 0, string.len(foldmarker) }} }
         M.printToPanel(foldmarker..' '..text, hl)
 
@@ -243,6 +278,7 @@ function M.printIssues()
         if not is_folded then
             M.printNodes(issue, 2)
         end
+        ::continue::
     end
 end
 
@@ -292,7 +328,7 @@ function M.printNode(node, indent_level)
 
     -- text
     if nil ~= node['filename'] then
-        if auditpanel_longnames then
+        if vim.g.codeql_auditpanel_longnames then
             text = mark..node.filename..':'..node.line..' - '..node.label
         else
             text = mark..vim.fn.fnamemodify(node.filename, ':p:t')..':'..node.line..' - '..node.label
@@ -419,16 +455,6 @@ end
 function CloseAuditPanel()
     local win = M.getPanelWindow(auditpanel_buffer_name)
     vim.fn.nvim_win_close(win, true)
-end
-
-function ShowLongNames()
-    auditpanel_longnames = not auditpanel_longnames
-    M.renderKeepView(vim.fn.line('.'))
-end
-
-function ShowFilename()
-    auditpanel_filename = not auditpanel_filename
-    M.renderKeepView(vim.fn.line('.'))
 end
 
 return M
