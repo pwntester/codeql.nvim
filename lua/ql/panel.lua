@@ -1,10 +1,10 @@
 local vim = vim
 local api = vim.api
 
-local auditpanel_buffer_name = '__CodeQLPanel__'
-local auditpanel_pos = 'right'
-local auditpanel_width = 50
-local auditpanel_short_help = true
+local panel_buffer_name = '__CodeQLPanel__'
+local panel_pos = 'right'
+local panel_width = 50
+local panel_short_help = true
 local icon_closed = '▶'
 local icon_open = '▼'
 
@@ -14,7 +14,7 @@ local scaninfo = {}
 
 -- local functions
 local function print_to_panel(text, matches)
-    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
+    local bufnr = vim.fn.bufnr(panel_buffer_name)
     api.nvim_buf_set_lines(bufnr, -1, -1, true, {text})
     if type(matches) == 'table' then
         for hlgroup, groups in pairs(matches) do
@@ -70,13 +70,13 @@ local function unhide_issues()
 end
 
 local function print_help()
-    if auditpanel_short_help then
+    if panel_short_help then
         print_to_panel('" Press H for help')
         print_to_panel('')
     else
         print_to_panel('" --------- General ---------')
         print_to_panel('" <CR>: Jump to tag definition')
-        print_to_panel('" p: As above, but stay in AuditPane')
+        print_to_panel('" p: As above, but dont change window')
         print_to_panel('" P: Previous path')
         print_to_panel('" n: Next path')
         print_to_panel('"')
@@ -105,36 +105,36 @@ local function print_node(node, indent_level)
     local mark = string.rep(' ', indent_level)..node.mark..' '
     local mark_hl_name = ''
     if node.mark == '≔' then
-        mark_hl_name = 'CodeqlAuditPanelLabel'
+        mark_hl_name = 'CodeqlPanelLabel'
     else
-        mark_hl_name = node.visitable and 'CodeqlAuditPanelVisitable' or 'CodeqlAuditPanelNonVisitable'
+        mark_hl_name = node.visitable and 'CodeqlPanelVisitable' or 'CodeqlPanelNonVisitable'
     end
     hl[mark_hl_name] = {{0, string.len(mark)}}
 
     -- text
     if nil ~= node['filename'] then
-        if vim.g.codeql_auditpanel_longnames then
+        if vim.g.codeql_panel_longnames then
             text = mark..node.filename..':'..node.line..' - '..node.label
         else
             text = mark..vim.fn.fnamemodify(node.filename, ':p:t')..':'..node.line..' - '..node.label
         end
         local sep_index = string.find(text, ' - ', 1, true)
-        hl['CodeqlAuditPanelFile'] = {{ string.len(mark), sep_index }}
-        hl['CodeqlAuditPanelSeparator'] = {{ sep_index, sep_index + 2 }}
+        hl['CodeqlPanelFile'] = {{ string.len(mark), sep_index }}
+        hl['CodeqlPanelSeparator'] = {{ sep_index, sep_index + 2 }}
     else
         text = mark..'['..node.label..']'
     end
     print_to_panel(text, hl)
 
     -- save the current issue in scaninfo.sline map
-    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
+    local bufnr = vim.fn.bufnr(panel_buffer_name)
     local curline = api.nvim_buf_line_count(bufnr)
     scaninfo.line_map[curline] = node
 end
 
 local function print_nodes(issue, indent_level)
 
-    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
+    local bufnr = vim.fn.bufnr(panel_buffer_name)
     local curline = api.nvim_buf_line_count(bufnr)
 
     local paths = issue.paths
@@ -151,7 +151,7 @@ local function print_nodes(issue, indent_level)
             table.remove(scaninfo.line_map, curline + 1)
         end
         local text = string.rep(' ', indent_level)..'Path: '
-        local hl = { CodeqlAuditPanelInfo = {{0, string.len(text)}} }
+        local hl = { CodeqlPanelInfo = {{0, string.len(text)}} }
         print_to_panel(text..str, hl)
     end
     local path = paths[active_path]
@@ -164,7 +164,7 @@ end
 
 local function print_issues()
 
-    local hl = { CodeqlAuditPanelInfo = {{0, string.len('Database:')}} }
+    local hl = { CodeqlPanelInfo = {{0, string.len('Database:')}} }
     local index = string.find(database, '/[^/]*$')
     if nil ~= index then
         print_to_panel('Database: '..string.sub(database, index + 1), hl)
@@ -173,7 +173,7 @@ local function print_issues()
     end
 
 
-    hl = { CodeqlAuditPanelInfo = {{0, string.len('Issues:')}} }
+    hl = { CodeqlPanelInfo = {{0, string.len('Issues:')}} }
     print_to_panel('Issues:   '..table.getn(issues), hl)
 
     print_to_panel('')
@@ -189,11 +189,11 @@ local function print_issues()
         end
 
         local text = issue.label
-        hl = { CodeqlAuditPanelFoldIcon = {{ 0, string.len(foldmarker) }} }
+        hl = { CodeqlPanelFoldIcon = {{ 0, string.len(foldmarker) }} }
         print_to_panel(foldmarker..' '..text, hl)
 
         -- save the current issue in scaninfo.line_map
-        local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
+        local bufnr = vim.fn.bufnr(panel_buffer_name)
         local curline = api.nvim_buf_line_count(bufnr)
         scaninfo.line_map[curline] = issue
 
@@ -206,14 +206,14 @@ local function print_issues()
 end
 
 local function render_content()
-    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
+    local bufnr = vim.fn.bufnr(panel_buffer_name)
     if bufnr == -1 then print('Error opening CodeQL panel'); return end
     api.nvim_buf_set_option(bufnr, 'modifiable', true)
     api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
     print_help()
     if #issues >0 then
         print_issues()
-        local win = get_panel_window(auditpanel_buffer_name)
+        local win = get_panel_window(panel_buffer_name)
         local lcount = api.nvim_buf_line_count(bufnr)
         api.nvim_win_set_cursor(win, {math.min(7,lcount), 0})
     else
@@ -225,18 +225,18 @@ end
 local function open_codeql_panel()
 
     -- check if audit pane is already opened
-    if vim.fn.bufwinnr(auditpanel_buffer_name) ~= -1 then
+    if vim.fn.bufwinnr(panel_buffer_name) ~= -1 then
         return
     end
 
     -- prepare split arguments
     local pos = ''
-    if auditpanel_pos == 'right' then
+    if panel_pos == 'right' then
         pos = 'botright'
-    elseif auditpanel_pos == 'left' then
+    elseif panel_pos == 'left' then
         pos = 'topleft'
     else
-        print('Incorrect auditpanel_pos value')
+        print('Incorrect panel_pos value')
         return
     end
 
@@ -247,14 +247,17 @@ local function open_codeql_panel()
     go_to_main_window()
 
     -- split
-    vim.fn.execute('silent keepalt '..pos..' vertical '..auditpanel_width..'split '..auditpanel_buffer_name)
+    vim.fn.execute('silent keepalt '..pos..' vertical '..panel_width..'split '..panel_buffer_name)
 
     -- go to original window
     vim.fn.win_gotoid(current_window)
 
     -- buffer options
-    local bufnr = vim.fn.bufnr(auditpanel_buffer_name)
-    api.nvim_buf_set_option(bufnr, 'filetype', 'codeqlauditpanel')
+    local bufnr = vim.fn.bufnr(panel_buffer_name)
+
+    api.nvim_buf_set_option(bufnr, 'number', false)
+    api.nvim_buf_set_option(bufnr, 'norelativenumber', false)
+    api.nvim_buf_set_option(bufnr, 'filetype', 'codeqlpanel')
     api.nvim_buf_set_option(bufnr, 'buftype', 'nofile')
     api.nvim_buf_set_option(bufnr, 'bufhidden', 'hide')
     api.nvim_buf_set_option(bufnr, 'swapfile', false)
@@ -274,7 +277,7 @@ local function open_codeql_panel()
     api.nvim_buf_set_keymap(bufnr, 'n', '<S-c>', '<Cmd>lua clear_filter()<CR>', { script = true,  silent = true})
 
     -- window options
-    local win = get_panel_window(auditpanel_buffer_name)
+    local win = get_panel_window(panel_buffer_name)
     api.nvim_win_set_option(win, 'wrap', false)
     api.nvim_win_set_option(win, 'number', false)
     api.nvim_win_set_option(win, 'relativenumber', false)
@@ -345,7 +348,7 @@ function toggle_fold()
 end
 
 function toggle_help()
-    auditpanel_short_help = not auditpanel_short_help
+    panel_short_help = not panel_short_help
     -- prevent highlighting from being off after adding/removing the help text
     render_keep_view()
 end
@@ -392,7 +395,7 @@ function jump_to_code(stay_in_pane)
     end
 
     -- save audit pane window
-    local auditpanel_window = vim.fn.win_getid()
+    local panel_window = vim.fn.win_getid()
 
     -- go to main window
     go_to_main_window()
@@ -425,13 +428,13 @@ function jump_to_code(stay_in_pane)
     api.nvim_command('normal! zv')
 
     if stay_in_pane then
-        vim.fn.win_gotoid(auditpanel_window)
+        vim.fn.win_gotoid(panel_window)
         api.nvim_command('redraw')
     end
 end
 
 function close_codeql_panel()
-    local win = get_panel_window(auditpanel_buffer_name)
+    local win = get_panel_window(panel_buffer_name)
     vim.fn.nvim_win_close(win, true)
 end
 

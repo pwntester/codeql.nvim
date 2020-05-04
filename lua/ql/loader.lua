@@ -6,8 +6,8 @@ local vim = vim
 local function generate_issue_label(node)
     local label = node.label
 
-    if vim.g.codeql_auditpanel_filename and node['filename'] and node['filename'] ~= nil then
-        if vim.g.codeql_auditpanel_longnames then
+    if vim.g.codeql_panel_filename and node['filename'] and node['filename'] ~= nil then
+        if vim.g.codeql_panel_longnames then
             label = node.filename..':'..node.line
         else
             label = vim.fn.fnamemodify(node.filename, ':p:t')..':'..node.line
