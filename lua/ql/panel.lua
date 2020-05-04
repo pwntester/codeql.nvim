@@ -255,8 +255,6 @@ local function open_codeql_panel()
     -- buffer options
     local bufnr = vim.fn.bufnr(panel_buffer_name)
 
-    api.nvim_buf_set_option(bufnr, 'number', false)
-    api.nvim_buf_set_option(bufnr, 'norelativenumber', false)
     api.nvim_buf_set_option(bufnr, 'filetype', 'codeqlpanel')
     api.nvim_buf_set_option(bufnr, 'buftype', 'nofile')
     api.nvim_buf_set_option(bufnr, 'bufhidden', 'hide')
