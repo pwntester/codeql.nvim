@@ -220,6 +220,7 @@ local function render_content()
         print_to_panel('No results found.')
     end
     api.nvim_buf_set_option(bufnr, 'modifiable', false)
+    print(' ')
 end
 
 local function open_codeql_panel()
@@ -261,18 +262,18 @@ local function open_codeql_panel()
     api.nvim_buf_set_option(bufnr, 'swapfile', false)
     api.nvim_buf_set_option(bufnr, 'buflisted', false)
 
-    api.nvim_buf_set_keymap(bufnr, 'n', 'o', '<Cmd>lua toggle_fold()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<CR>', '<Cmd>lua jump_to_code(0)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'p', '<Cmd>lua jump_to_code(1)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-h>', '<Cmd>lua toggle_help()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'q', '<Cmd>lua close_codeql_panel()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 't', '<Cmd>lua set_fold_level(false)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-T>', '<Cmd>lua set_fold_level(true)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-p>', '<Cmd>lua change_path(-1)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'n', '<Cmd>lua change_path(1)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'f', '<Cmd>lua label_filter()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-f>', '<Cmd>lua generic_filter()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-c>', '<Cmd>lua clear_filter()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'o', '<Cmd>lua require("ql.panel").toggle_fold()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<CR>', '<Cmd>lua require("ql.panel").jump_to_code(0)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'p', '<Cmd>lua require("ql.panel").jump_to_code(1)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-h>', '<Cmd>lua require("ql.panel").toggle_help()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'q', '<Cmd>lua require("ql.panel").close_codeql_panel()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 't', '<Cmd>lua require("ql.panel").set_fold_level(false)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-T>', '<Cmd>lua require("ql.panel").set_fold_level(true)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-p>', '<Cmd>lua require("ql.panel").change_path(-1)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'n', '<Cmd>lua require("ql.panel").change_path(1)<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'f', '<Cmd>lua require("ql.panel").label_filter()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-f>', '<Cmd>lua require("ql.panel").generic_filter()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-c>', '<Cmd>lua require("ql.panel").clear_filter()<CR>', { script = true,  silent = true})
 
     -- window options
     local win = get_panel_window(panel_buffer_name)
@@ -284,7 +285,6 @@ local function open_codeql_panel()
     api.nvim_win_set_option(win, 'concealcursor', 'nvi')
     api.nvim_win_set_option(win, 'conceallevel', 3)
     api.nvim_win_set_option(win, 'signcolumn', 'yes')
-
 end
 
 local function render_keep_view(line)
@@ -307,27 +307,30 @@ local function render_keep_view(line)
     api.nvim_command('redraw')
 end
 
--- global functions
-function clear_filter()
+-- exported functions
+
+local M = {}
+
+function M.clear_filter()
     unhide_issues()
     render_content()
 end
 
-function label_filter()
+function M.label_filter()
     local pattern = vim.fn.input("Pattern: ")
     unhide_issues()
     filter_issues("string.match(string.lower(issue.label), string.lower('"..pattern.."')) ~= nil")
     render_content()
 end
 
-function generic_filter()
+function M.generic_filter()
     local pattern = vim.fn.input("Pattern: ")
     unhide_issues()
     filter_issues(pattern)
     render_content()
 end
 
-function toggle_fold()
+function M.toggle_fold()
     -- prevent highlighting from being off after adding/removing the help text
     api.nvim_command('match none')
 
@@ -345,20 +348,20 @@ function toggle_fold()
     end
 end
 
-function toggle_help()
+function M.toggle_help()
     panel_short_help = not panel_short_help
     -- prevent highlighting from being off after adding/removing the help text
     render_keep_view()
 end
 
-function set_fold_level(level)
+function M.set_fold_level(level)
     for k, _ in pairs(scaninfo.line_map) do
         scaninfo.line_map[k]['is_folded'] = level
     end
     render_keep_view()
 end
 
-function change_path(offset)
+function M.change_path(offset)
     local line = vim.fn.line('.') - 1
     if nil == scaninfo.line_map[line] then
         return
@@ -378,7 +381,7 @@ function change_path(offset)
     end
 end
 
-function jump_to_code(stay_in_pane)
+function M.jump_to_code(stay_in_pane)
     if nil == scaninfo.line_map[vim.fn.line('.')] then
         return
     end
@@ -431,14 +434,10 @@ function jump_to_code(stay_in_pane)
     end
 end
 
-function close_codeql_panel()
+function M.close_codeql_panel()
     local win = get_panel_window(panel_buffer_name)
     vim.fn.nvim_win_close(win, true)
 end
-
--- exported functions
-
-local M = {}
 
 function M.render(_database, _issues)
     open_codeql_panel()

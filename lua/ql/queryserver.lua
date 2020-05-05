@@ -200,8 +200,8 @@ function M.run_query(config)
             {'load_json', jsonPath, dbPath, config.metadata}
           }
           print("JSON: "..jsonPath)
+          print('Decoding BQRS')
           job.run_commands(cmds)
-          print(' ')
         elseif config.metadata['kind'] == "path-problem" and config.metadata['id'] ~= nil then
           local sarifPath = vim.fn.tempname()
           local cmds = {
@@ -209,8 +209,8 @@ function M.run_query(config)
             {'load_sarif', sarifPath, dbPath, config.metadata}
           }
           print("SARIF: "..sarifPath)
+          print('Decoding BQRS')
           job.run_commands(cmds)
-          print(' ')
         elseif config.metadata['kind'] == "path-problem" then
           print("Error: Insuficient Metadata for a Path Problem. Need at least @kind and @id elements")
         else
