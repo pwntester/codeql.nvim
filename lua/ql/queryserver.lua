@@ -109,6 +109,16 @@ function M.resolve_ram()
     end
 end
 
+function M.resolve_library_path(queryPath)
+  local json = util.run_cmd('codeql resolve library-path --format=json --query='..queryPath, true)
+  local decoded, err = util.json_decode(json)
+  if not decoded then
+      print("Error resolving library path: "..err)
+      return {}
+  end
+  return decoded
+end
+
 function M.start_server(buf)
   if clients[buf] then
     print("Query Server already started for buffer "..buf)
@@ -146,23 +156,17 @@ function M.run_query(config)
   local dbPath = config.db
   local qloPath = vim.fn.tempname()
   local resultsPath = vim.fn.tempname()
-
-  local json = util.run_cmd('codeql resolve library-path --format=json --query='..queryPath, true)
-  local decoded, err = util.json_decode(json)
-  if not decoded then
-      print("Error resolving library path: "..err)
-      return
-  end
-  local libraryPath = decoded.libraryPath
-
+  local libPaths = M.resolve_library_path(queryPath)
+  local libraryPath = libPaths.libraryPath
+  local dbScheme = libPaths.dbscheme
   local dbDir = dbPath
+
   for _, dir in ipairs(vim.fn.glob(vim.fn.fnameescape(dbPath)..'*', 1, 1)) do
     if vim.startswith(dir, dbPath..'db-') then
       dbDir = dir
       break
     end
   end
-  local dbScheme = decoded.dbscheme
 
   -- https://github.com/github/vscode-codeql/blob/master/extensions/ql-vscode/src/messages.ts
   local compileQuery_params = {
@@ -209,22 +213,25 @@ function M.run_query(config)
       if vim.fn.glob(resultsPath) ~= '' then
         print("QLO: " .. qloPath)
         print("BQRS: " .. resultsPath)
+
+        local ram_opts = M.resolve_ram()
+
         -- process results
         if config.quick_eval or config.metadata['kind'] ~= "path-problem" then
           local jsonPath = vim.fn.tempname()
-          local cmds = {
-            {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', resultsPath},
-            {'load_json', jsonPath, dbPath, config.metadata}
-          }
+          local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', resultsPath}
+          vim.list_extend(cmd, ram_opts)
+          local cmds = { cmd, {'load_json', jsonPath, dbPath, config.metadata} }
           print("JSON: "..jsonPath)
           print('Decoding BQRS')
           job.run_commands(cmds)
+
+        -- TODO: Cant trust @kind for choosing how to interpret
         elseif config.metadata['kind'] == "path-problem" and config.metadata['id'] ~= nil then
           local sarifPath = vim.fn.tempname()
-          local cmds = {
-            {'codeql', 'bqrs', 'interpret', resultsPath, '-t=id='..config.metadata['id'], '-t=kind=path-problem', '-o='..sarifPath, '--format=sarif-latest'},
-            {'load_sarif', sarifPath, dbPath, config.metadata}
-          }
+          local cmd = {'codeql', 'bqrs', 'interpret', resultsPath, '-t=id='..config.metadata['id'], '-t=kind=path-problem', '-o='..sarifPath, '--format=sarif-latest'}
+          vim.list_extend(cmd, ram_opts)
+          local cmds = { cmd, {'load_sarif', sarifPath, dbPath, config.metadata} }
           print("SARIF: "..sarifPath)
           print('Decoding BQRS')
           job.run_commands(cmds)

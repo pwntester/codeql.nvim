@@ -11,7 +11,6 @@ local function run_commands_handler()
         local cmd = commandlist[1]
         commandlist = util.tbl_slice(commandlist, 2, #commandlist)
 
-
         if cmd[1] == 'load_sarif' then
             --  ['load_sarif', sarifPath, database, metadata]
             if util.is_file(cmd[2]) then
