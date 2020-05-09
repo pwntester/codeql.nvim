@@ -1,10 +1,3 @@
-" opts
-let g:codeql_mem_opts = []
-let g:codeql_panel_longnames = v:false
-let g:codeql_panel_filename = v:true
-let g:codeql_group_by_sink = v:true
-
-
 " commands
 command! -nargs=1 -complete=file SetDatabase lua require('ql.main').set_database(<f-args>)
 command! RunQuery lua require('ql.main').run_query(false)

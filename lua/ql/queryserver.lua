@@ -94,13 +94,30 @@ end
 
 local clients = {}
 
+function M.resolve_ram()
+    local cmd = 'codeql resolve ram --format=json'
+    if vim.g.codeql_max_ram > -1 then
+        cmd = cmd..' -M '..vim.g.codeql_max_ram
+    end
+    local json = util.run_cmd(cmd, true)
+    local ram_opts, err = util.json_decode(json)
+    if not ram_opts then
+        print("Error resolving RAM: "..err)
+        return {}
+    else
+        return ram_opts
+    end
+end
+
 function M.start_server(buf)
   if clients[buf] then
     print("Query Server already started for buffer "..buf)
     return clients[buf]
   end
+  local cmd = {"codeql", "execute", "query-server", "--logdir", "/tmp/codeql"}
+  vim.list_extend(cmd, M.resolve_ram())
   local config = {
-      cmd             = {"codeql", "execute", "query-server", "--logdir", "/tmp/codeql"};
+      cmd             = cmd;
       offset_encoding = {"utf-8", "utf-16"};
       callbacks = {
         ['ql/progressUpdated'] = function(_, params, _)
