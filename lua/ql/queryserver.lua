@@ -220,7 +220,7 @@ function M.run_query(config)
         if config.quick_eval or config.metadata['kind'] ~= "path-problem" then
           local jsonPath = vim.fn.tempname()
           local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', resultsPath}
-          vim.list_extend(cmd, ram_opts)
+          --vim.list_extend(cmd, ram_opts)
           local cmds = { cmd, {'load_json', jsonPath, dbPath, config.metadata} }
           print("JSON: "..jsonPath)
           print('Decoding BQRS')
@@ -230,10 +230,10 @@ function M.run_query(config)
         elseif config.metadata['kind'] == "path-problem" and config.metadata['id'] ~= nil then
           local sarifPath = vim.fn.tempname()
           local cmd = {'codeql', 'bqrs', 'interpret', resultsPath, '-t=id='..config.metadata['id'], '-t=kind=path-problem', '-o='..sarifPath, '--format=sarif-latest'}
-          vim.list_extend(cmd, ram_opts)
+          --vim.list_extend(cmd, ram_opts)
           local cmds = { cmd, {'load_sarif', sarifPath, dbPath, config.metadata} }
           print("SARIF: "..sarifPath)
-          print('Decoding BQRS')
+          print('Interpreting BQRS')
           job.run_commands(cmds)
         elseif config.metadata['kind'] == "path-problem" then
           print("Error: Insuficient Metadata for a Path Problem. Need at least @kind and @id elements")
