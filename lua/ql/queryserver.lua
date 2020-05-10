@@ -94,9 +94,9 @@ end
 
 local clients = {}
 
-function M.resolve_ram()
+function M.resolve_ram(jvm)
     local cmd = 'codeql resolve ram --format=json'
-    if vim.g.codeql_max_ram > -1 then
+    if vim.g.codeql_max_ram and vim.g.codeql_max_ram > -1 then
         cmd = cmd..' -M '..vim.g.codeql_max_ram
     end
     local json = util.run_cmd(cmd, true)
@@ -105,6 +105,13 @@ function M.resolve_ram()
         print("Error resolving RAM: "..err)
         return {}
     else
+        if jvm then
+            util.print_dump(ram_opts)
+            ram_opts = vim.tbl_filter(function(i)
+                return vim.startswith(i, '-J')
+            end, ram_opts)
+            util.print_dump(ram_opts)
+        end
         return ram_opts
     end
 end
@@ -114,6 +121,16 @@ function M.resolve_library_path(queryPath)
   local decoded, err = util.json_decode(json)
   if not decoded then
       print("Error resolving library path: "..err)
+      return {}
+  end
+  return decoded
+end
+
+function M.bqrs_info(bqrsPath)
+  local json = util.run_cmd('codeql bqrs info --format=json '..bqrsPath, true)
+  local decoded, err = util.json_decode(json)
+  if not decoded then
+      print("Error getting BQRS info: "..err)
       return {}
   end
   return decoded
@@ -155,7 +172,7 @@ function M.run_query(config)
   local queryPath = config.query
   local dbPath = config.db
   local qloPath = vim.fn.tempname()
-  local resultsPath = vim.fn.tempname()
+  local bqrsPath = vim.fn.tempname()
   local libPaths = M.resolve_library_path(queryPath)
   local libraryPath = libPaths.libraryPath
   local dbScheme = libPaths.dbscheme
@@ -210,17 +227,20 @@ function M.run_query(config)
     if err then
       util.print_dump(err)
     else
-      if vim.fn.glob(resultsPath) ~= '' then
+      if vim.fn.glob(bqrsPath) ~= '' then
         print("QLO: " .. qloPath)
-        print("BQRS: " .. resultsPath)
+        print("BQRS: " .. bqrsPath)
 
-        local ram_opts = M.resolve_ram()
+        local info = M.bqrs_info(bqrsPath)
+        util.print_dump(info)
+
+        local ram_opts = M.resolve_ram(true)
 
         -- process results
         if config.quick_eval or config.metadata['kind'] ~= "path-problem" then
           local jsonPath = vim.fn.tempname()
-          local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', resultsPath}
-          --vim.list_extend(cmd, ram_opts)
+          local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', bqrsPath}
+          vim.list_extend(cmd, ram_opts)
           local cmds = { cmd, {'load_json', jsonPath, dbPath, config.metadata} }
           print("JSON: "..jsonPath)
           print('Decoding BQRS')
@@ -229,8 +249,8 @@ function M.run_query(config)
         -- TODO: Cant trust @kind for choosing how to interpret
         elseif config.metadata['kind'] == "path-problem" and config.metadata['id'] ~= nil then
           local sarifPath = vim.fn.tempname()
-          local cmd = {'codeql', 'bqrs', 'interpret', resultsPath, '-t=id='..config.metadata['id'], '-t=kind=path-problem', '-o='..sarifPath, '--format=sarif-latest'}
-          --vim.list_extend(cmd, ram_opts)
+          local cmd = {'codeql', 'bqrs', 'interpret', bqrsPath, '-t=id='..config.metadata['id'], '-t=kind='..config.metadata['kind'], '-o='..sarifPath, '--format=sarif-latest'}
+          vim.list_extend(cmd, ram_opts)
           local cmds = { cmd, {'load_sarif', sarifPath, dbPath, config.metadata} }
           print("SARIF: "..sarifPath)
           print('Interpreting BQRS')
@@ -261,7 +281,7 @@ function M.run_query(config)
           evaluateId = 0;
           queries = {
             {
-              resultsPath = resultsPath;
+              resultsPath = bqrsPath;
               qlo = "file://"..qloPath;
               allowUnknownTemplates = true;
               id = 0;
