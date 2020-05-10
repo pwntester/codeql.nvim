@@ -106,11 +106,10 @@ function M.resolve_ram(jvm)
         return {}
     else
         if jvm then
-            util.print_dump(ram_opts)
+            -- --off-heap-ram is not supported by some commands
             ram_opts = vim.tbl_filter(function(i)
                 return vim.startswith(i, '-J')
             end, ram_opts)
-            util.print_dump(ram_opts)
         end
         return ram_opts
     end
@@ -232,12 +231,15 @@ function M.run_query(config)
         print("BQRS: " .. bqrsPath)
 
         local info = M.bqrs_info(bqrsPath)
+        local query_kinds = info['compatible-query-kinds']
         util.print_dump(info)
+        print(table.concat(query_kinds, ', '))
+        print(info['result-sets'][1]['rows'])
 
         local ram_opts = M.resolve_ram(true)
 
         -- process results
-        if config.quick_eval or config.metadata['kind'] ~= "path-problem" then
+        if config.quick_eval or not vim.tbl_contains(query_kinds, 'PathProblem') then
           local jsonPath = vim.fn.tempname()
           local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', bqrsPath}
           vim.list_extend(cmd, ram_opts)
@@ -246,8 +248,10 @@ function M.run_query(config)
           print('Decoding BQRS')
           job.run_commands(cmds)
 
-        -- TODO: Cant trust @kind for choosing how to interpret
-        elseif config.metadata['kind'] == "path-problem" and config.metadata['id'] ~= nil then
+        -- TODO: cant trust @kind for choosing how to interpret
+        elseif vim.tbl_contains(query_kinds, 'PathProblem') and
+               config.metadata['kind'] ~= nil and
+               config.metadata['id'] ~= nil then
           local sarifPath = vim.fn.tempname()
           local cmd = {'codeql', 'bqrs', 'interpret', bqrsPath, '-t=id='..config.metadata['id'], '-t=kind='..config.metadata['kind'], '-o='..sarifPath, '--format=sarif-latest'}
           vim.list_extend(cmd, ram_opts)
