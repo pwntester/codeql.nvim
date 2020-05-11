@@ -252,20 +252,12 @@ function M.run_query(config)
 
         local ram_opts = M.resolve_ram(true)
 
-        -- process results
-        if config.quick_eval or not vim.tbl_contains(query_kinds, 'PathProblem') then
-          local jsonPath = vim.fn.tempname()
-          local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', bqrsPath}
-          vim.list_extend(cmd, ram_opts)
-          local cmds = { cmd, {'load_json', jsonPath, dbPath, config.metadata} }
-          print("JSON: "..jsonPath)
-          print('Decoding BQRS')
-          job.run_commands(cmds)
+        --if config.quick_eval or not vim.tbl_contains(query_kinds, 'PathProblem') then
 
-        -- TODO: cant trust @kind for choosing how to interpret
-        elseif vim.tbl_contains(query_kinds, 'PathProblem') and
-               config.metadata['kind'] ~= nil and
-               config.metadata['id'] ~= nil then
+        -- process results
+        if vim.tbl_contains(query_kinds, 'PathProblem') and
+           config.metadata['kind'] == 'path-problem' and
+           config.metadata['id'] ~= nil then
           local sarifPath = vim.fn.tempname()
           local cmd = {'codeql', 'bqrs', 'interpret', bqrsPath, '-t=id='..config.metadata['id'], '-t=kind='..config.metadata['kind'], '-o='..sarifPath, '--format=sarif-latest'}
           vim.list_extend(cmd, ram_opts)
@@ -273,13 +265,22 @@ function M.run_query(config)
           print("SARIF: "..sarifPath)
           print('Interpreting BQRS')
           job.run_commands(cmds)
-        elseif config.metadata['kind'] == "path-problem" then
+        elseif vim.tbl_contains(query_kinds, 'PathProblem') and
+               config.metadata['kind'] == 'path-problem' and
+               config.metadata['id'] == nil then
           print("Error: Insuficient Metadata for a Path Problem. Need at least @kind and @id elements")
         else
+          local jsonPath = vim.fn.tempname()
+          local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', bqrsPath}
+          vim.list_extend(cmd, ram_opts)
+          local cmds = { cmd, {'load_json', jsonPath, dbPath, config.metadata} }
+          print("JSON: "..jsonPath)
+          print('Decoding BQRS')
+          job.run_commands(cmds)
           print("Error: Could not interpret the results")
         end
       else
-        print("Error: BQRS file was not created")
+        print("Error: runQuery failed")
         return
       end
     end

@@ -13,6 +13,13 @@ local issues = {}
 local scaninfo = {}
 
 -- local functions
+
+local function store_in_scaninfo(node)
+    local bufnr = vim.fn.bufnr(panel_buffer_name)
+    local curline = api.nvim_buf_line_count(bufnr)
+    scaninfo.line_map[curline] = node
+end
+
 local function print_to_panel(text, matches)
     local bufnr = vim.fn.bufnr(panel_buffer_name)
     api.nvim_buf_set_lines(bufnr, -1, -1, true, {text})
@@ -125,11 +132,7 @@ local function print_node(node, indent_level)
         text = mark..'['..node.label..']'
     end
     print_to_panel(text, hl)
-
-    -- save the current issue in scaninfo.sline map
-    local bufnr = vim.fn.bufnr(panel_buffer_name)
-    local curline = api.nvim_buf_line_count(bufnr)
-    scaninfo.line_map[curline] = node
+    store_in_scaninfo(node)
 end
 
 local function print_nodes(issue, indent_level)
@@ -153,6 +156,7 @@ local function print_nodes(issue, indent_level)
         local text = string.rep(' ', indent_level)..'Path: '
         local hl = { CodeqlPanelInfo = {{0, string.len(text)}} }
         print_to_panel(text..str, hl)
+        store_in_scaninfo(nil)
     end
     local path = paths[active_path]
 
@@ -163,7 +167,6 @@ local function print_nodes(issue, indent_level)
 end
 
 local function print_issues()
-
     local hl = { CodeqlPanelInfo = {{0, string.len('Database:')}} }
     local index = string.find(database, '/[^/]*$')
     if nil ~= index then
@@ -172,30 +175,22 @@ local function print_issues()
         print_to_panel('Database: '..database, hl)
     end
 
-
     hl = { CodeqlPanelInfo = {{0, string.len('Issues:')}} }
     print_to_panel('Issues:   '..table.getn(issues), hl)
-
     print_to_panel('')
 
     -- print issue labels
     for _, issue in ipairs(issues) do
         if issue.hidden then goto continue end
-        local is_folded = issue.is_folded
 
+        local is_folded = issue.is_folded
         local foldmarker = icon_closed
-        if not is_folded then
-            foldmarker = icon_open
-        end
+        if not is_folded then foldmarker = icon_open end
 
         local text = issue.label
         hl = { CodeqlPanelFoldIcon = {{ 0, string.len(foldmarker) }} }
         print_to_panel(foldmarker..' '..text, hl)
-
-        -- save the current issue in scaninfo.line_map
-        local bufnr = vim.fn.bufnr(panel_buffer_name)
-        local curline = api.nvim_buf_line_count(bufnr)
-        scaninfo.line_map[curline] = issue
+        store_in_scaninfo(issue)
 
         -- print nodes
         if not is_folded then
@@ -382,16 +377,16 @@ function M.change_path(offset)
 end
 
 function M.jump_to_code(stay_in_pane)
-    if nil == scaninfo.line_map[vim.fn.line('.')] then
-        return
-    end
+    if not scaninfo.line_map[vim.fn.line('.')] then return end
 
     local node = scaninfo.line_map[vim.fn.line('.')]
+    if vim.tbl_contains(vim.tbl_keys(node), 'active_path') then
+        -- scaninfo contains an issue rather than a node
+        node = node.node
+    end
 
-    if nil == node.visitable or not node.visitable then
-        if nil ~= node.filename then
-            print(node.filename)
-        end
+    if not node.visitable then
+        if not not node.filename then print(node.filename) end
         return
     end
 

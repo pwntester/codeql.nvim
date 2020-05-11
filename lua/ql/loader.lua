@@ -106,13 +106,14 @@ function M.load_json_results(path, database)
             active_path = 1;
             label = label;
             hidden = false;
+            node = paths[1][1];
         })
     end
 
     panel.render(database, issues)
 end
 
-function M.load_sarif_results(path, database)
+function M.load_sarif_results(path, database, max_length)
     if not util.is_file(path) then return end
     local decoded = util.read_json_file(path)
     local results = decoded.runs[1].results
@@ -149,18 +150,21 @@ function M.load_sarif_results(path, database)
                     }
                     table.insert(nodes, node)
                 end
-                local source = nodes[1]
-                local sink = nodes[#nodes]
-                local source_key = source.filename..'::'..source.url.startLine..'::'..source.url.startColumn..'::'..source.url.endColumn
-                local sink_key = sink.filename..'::'..sink.url.startLine..'::'..sink.url.startColumn..'::'..sink.url.endColumn
-                local key = source_key..'::'..sink_key
 
-                if nil == paths[key] then
-                    paths[key] = {}
+                if not max_length or #nodes <= max_length then
+                    local source = nodes[1]
+                    local sink = nodes[#nodes]
+                    local source_key = source.filename..'::'..source.url.startLine..'::'..source.url.startColumn..'::'..source.url.endColumn
+                    local sink_key = sink.filename..'::'..sink.url.startLine..'::'..sink.url.startColumn..'::'..sink.url.endColumn
+                    local key = source_key..'::'..sink_key
+
+                    if nil == paths[key] then
+                        paths[key] = {}
+                    end
+                    local l = paths[key]
+                    table.insert(l, nodes)
+                    paths[key] = l
                 end
-                local l = paths[key]
-                table.insert(l, nodes)
-                paths[key] = l
             end
         end
     end
@@ -181,6 +185,7 @@ function M.load_sarif_results(path, database)
             active_path = 1;
             label = label;
             hidden = false;
+            node = primary_node;
         }
         table.insert(issues, issue)
     end
