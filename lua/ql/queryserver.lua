@@ -36,6 +36,16 @@ local function cmd_parts(input)
   return cmd, cmd_args
 end
 
+local clients = {}
+
+local function get_query_client(bufnr)
+    return clients[bufnr]
+end
+
+local function set_query_client(bufnr, client)
+    clients[bufnr] = client
+end
+
 -- exported functions
 local M = {}
 
@@ -92,8 +102,6 @@ function M.start_client(config)
   })
 end
 
-local clients = {}
-
 function M.resolve_ram(jvm)
     local cmd = 'codeql resolve ram --format=json'
     if vim.g.codeql_max_ram and vim.g.codeql_max_ram > -1 then
@@ -136,12 +144,13 @@ function M.bqrs_info(bqrsPath)
 end
 
 function M.start_server(buf)
-  if clients[buf] then
+  if get_query_client(buf) then
     print("Query Server already started for buffer "..buf)
-    return clients[buf]
+    return get_query_client(buf)
   end
+  local ram_opts = M.resolve_ram(true)
   local cmd = {"codeql", "execute", "query-server", "--logdir", "/tmp/codeql"}
-  vim.list_extend(cmd, M.resolve_ram())
+  vim.list_extend(cmd, ram_opts)
   local config = {
       cmd             = cmd;
       offset_encoding = {"utf-8", "utf-16"};
@@ -150,24 +159,27 @@ function M.start_server(buf)
           print(params.message)
         end;
         ['evaluation/queryCompleted'] = function(_, _, _)
-          -- if ok, return {}, else return error (eg rpc.rpc_response_error(protocol.ErrorCodes.MethodNotFound))
+          -- TODO: if ok, return {}, else return error (eg rpc.rpc_response_error(protocol.ErrorCodes.MethodNotFound))
           return {}
         end
       }
   }
   local client = M.start_client(config)
-  clients[buf] = client
+  set_query_client(buf, client)
   return client
 end
 
 function M.run_query(config)
+
+  -- TODO: store clien as buffer var
   local client = nil
-  if clients[config.buf] then
-    client = clients[config.buf]
+  if get_query_client(0) then
+    client = get_query_client(0)
   else
     client = M.start_server(config.buf)
-    clients[config.buf] = client
+    set_query_client(0, client)
   end
+  print('PID: '..client.pid)
   local queryPath = config.query
   local dbPath = config.db
   local qloPath = vim.fn.tempname()
@@ -223,6 +235,8 @@ function M.run_query(config)
   }
 
   local runQueries_callback = function(err, _)
+    print("Finished running query")
+    util.print_dump(err)
     if err then
       util.print_dump(err)
     else
@@ -272,6 +286,7 @@ function M.run_query(config)
   end
 
   local compileQuery_callback = function(err, _)
+    print("Finished compiling query")
     if err then
       util.print_dump(err)
     else
@@ -308,12 +323,12 @@ function M.run_query(config)
 end
 
 function M.shutdown_server(buf)
-  if clients[buf] then
-    local client = clients[buf]
+  if get_query_client(buf) then
+    local client = get_query_client(buf)
     local handle = client.handle
     util.print_dump(handle)
     handle:kill()
-    clients[buf] = nil
+    set_query_client(buf, nil)
   end
 end
 

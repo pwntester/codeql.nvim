@@ -3,8 +3,6 @@ local queryserver = require 'ql.queryserver'
 local vim = vim
 local api = vim.api
 
-database = ''
-
 -- local functions
 
 local function extract_query_metadata(query)
@@ -22,18 +20,25 @@ end
 
 local M = {}
 
-function M.set_database(_database)
-    database = vim.fn.fnamemodify(_database, ':p')
+function M.set_database(dbpath)
+    local database = vim.fn.fnamemodify(dbpath, ':p')
     if not util.is_dir(database) then
         print('Incorrect database')
         return nil
     else
+        api.nvim_buf_set_var(0, 'codeql_database', database)
         print('Database set to '..database)
     end
 end
 
+function M.get_database()
+    local status, database = pcall(api.nvim_buf_get_var, 0, 'codeql_database')
+    return status and database or nil
+end
+
 function M.run_query(quick_eval)
-    if database == '' then
+    local database = M.get_database()
+    if database == nil then
         print('Missing database. Use SetDatabase command')
         return nil
     end
