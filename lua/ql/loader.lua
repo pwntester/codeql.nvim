@@ -151,7 +151,7 @@ function M.load_sarif_results(path, database, max_length)
                     table.insert(nodes, node)
                 end
 
-                if not max_length or #nodes <= max_length then
+                if not max_length or max_length == -1 or #nodes <= max_length then
                     local source = nodes[1]
                     local sink = nodes[#nodes]
                     local source_key = source.filename..'::'..source.url.startLine..'::'..source.url.startColumn..'::'..source.url.endColumn
