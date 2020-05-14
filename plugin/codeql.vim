@@ -2,6 +2,7 @@
 command! -nargs=1 -complete=file SetDatabase lua require('ql.main').set_database(<f-args>)
 command! RunQuery lua require('ql.main').run_query(false)
 command! -range QuickEval lua require('ql.main').run_query(true)
+command! StopServer lua require('ql.queryserver').stop_server()
 
 " mappings
 autocmd FileType ql nnoremap qr :RunQuery<CR>

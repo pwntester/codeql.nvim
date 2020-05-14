@@ -39,10 +39,12 @@ end
 local clients = {}
 
 local function get_query_client(bufnr)
+    if bufnr == 0 then bufnr = vim.fn.bufnr(0) end
     return clients[bufnr]
 end
 
 local function set_query_client(bufnr, client)
+    if bufnr == 0 then bufnr = vim.fn.bufnr(0) end
     clients[bufnr] = client
 end
 
@@ -156,7 +158,7 @@ function M.start_server(buf)
       offset_encoding = {"utf-8", "utf-16"};
       callbacks = {
         ['ql/progressUpdated'] = function(_, params, _)
-          print(params.message)
+            print(params.message)
         end;
         ['evaluation/queryCompleted'] = function(_, _, _)
           -- TODO: if ok, return {}, else return error (eg rpc.rpc_response_error(protocol.ErrorCodes.MethodNotFound))
@@ -171,15 +173,13 @@ end
 
 function M.run_query(config)
 
-  -- TODO: store clien as buffer var
-  local client = nil
-  if get_query_client(0) then
-    client = get_query_client(0)
-  else
+  -- TODO: store client as buffer var
+  local client = get_query_client(0)
+  if not client then
     client = M.start_server(config.buf)
     set_query_client(0, client)
+    print('New Query Server started with PID: '..client.pid)
   end
-  print('PID: '..client.pid)
   local queryPath = config.query
   local dbPath = config.db
   local qloPath = vim.fn.tempname()
@@ -236,7 +236,6 @@ function M.run_query(config)
 
   local runQueries_callback = function(err, _)
     print("Finished running query")
-    util.print_dump(err)
     if err then
       util.print_dump(err)
     else
@@ -246,7 +245,6 @@ function M.run_query(config)
 
         local info = M.bqrs_info(bqrsPath)
         local query_kinds = info['compatible-query-kinds']
-        util.print_dump(info)
         print(table.concat(query_kinds, ', '))
         print(info['result-sets'][1]['rows'])
 
@@ -323,11 +321,13 @@ function M.run_query(config)
   client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
 end
 
-function M.shutdown_server(buf)
+function M.stop_server(buf)
+  if not buf then
+    buf = vim.fn.bufnr()
+  end
   if get_query_client(buf) then
     local client = get_query_client(buf)
     local handle = client.handle
-    util.print_dump(handle)
     handle:kill()
     set_query_client(buf, nil)
   end
