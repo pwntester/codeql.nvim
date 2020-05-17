@@ -1,5 +1,5 @@
 local util = require 'ql.util'
-local job = require 'ql.job'
+local loader = require 'ql.loader'
 local rpc = require 'vim.lsp.rpc'
 local protocol = require 'vim.lsp.protocol'
 local vim = vim
@@ -104,53 +104,12 @@ function M.start_client(config)
   })
 end
 
-function M.resolve_ram(jvm)
-    local cmd = 'codeql resolve ram --format=json'
-    if vim.g.codeql_max_ram and vim.g.codeql_max_ram > -1 then
-        cmd = cmd..' -M '..vim.g.codeql_max_ram
-    end
-    local json = util.run_cmd(cmd, true)
-    local ram_opts, err = util.json_decode(json)
-    if not ram_opts then
-        print("Error resolving RAM: "..err)
-        return {}
-    else
-        if jvm then
-            -- --off-heap-ram is not supported by some commands
-            ram_opts = vim.tbl_filter(function(i)
-                return vim.startswith(i, '-J')
-            end, ram_opts)
-        end
-        return ram_opts
-    end
-end
-
-function M.resolve_library_path(queryPath)
-  local json = util.run_cmd('codeql resolve library-path --format=json --query='..queryPath, true)
-  local decoded, err = util.json_decode(json)
-  if not decoded then
-      print("Error resolving library path: "..err)
-      return {}
-  end
-  return decoded
-end
-
-function M.bqrs_info(bqrsPath)
-  local json = util.run_cmd('codeql bqrs info --format=json '..bqrsPath, true)
-  local decoded, err = util.json_decode(json)
-  if not decoded then
-      print("Error getting BQRS info: "..err)
-      return {}
-  end
-  return decoded
-end
-
 function M.start_server(buf)
   if get_query_client(buf) then
-    print("Query Server already started for buffer "..buf)
+    --print("Query Server already started for buffer "..buf)
     return get_query_client(buf)
   end
-  local ram_opts = M.resolve_ram(true)
+  local ram_opts = util.resolve_ram(true)
   local cmd = {"codeql", "execute", "query-server", "--logdir", "/tmp/codeql"}
   vim.list_extend(cmd, ram_opts)
   local config = {
@@ -158,7 +117,7 @@ function M.start_server(buf)
       offset_encoding = {"utf-8", "utf-16"};
       callbacks = {
         ['ql/progressUpdated'] = function(_, params, _)
-            print(params.message)
+          print(params.message)
         end;
         ['evaluation/queryCompleted'] = function(_, _, _)
           -- TODO: if ok, return {}, else return error (eg rpc.rpc_response_error(protocol.ErrorCodes.MethodNotFound))
@@ -178,13 +137,13 @@ function M.run_query(config)
   if not client then
     client = M.start_server(config.buf)
     set_query_client(0, client)
-    print('New Query Server started with PID: '..client.pid)
+    --print('New Query Server started with PID: '..client.pid)
   end
   local queryPath = config.query
   local dbPath = config.db
-  local qloPath = vim.fn.tempname()
-  local bqrsPath = vim.fn.tempname()
-  local libPaths = M.resolve_library_path(queryPath)
+  local qloPath = vim.fn.tempname()..'.qlo'
+  local bqrsPath = vim.fn.tempname()..'.bqrs'
+  local libPaths = util.resolve_library_path(queryPath)
   local libraryPath = libPaths.libraryPath
   local dbScheme = libPaths.dbscheme
   local dbDir = dbPath
@@ -234,59 +193,23 @@ function M.run_query(config)
     progressId = 1;
   }
 
-  local runQueries_callback = function(err, _)
-    print("Finished running query")
+  local runQueries_callback = function(err, result)
     if err then
+      print("ERROR: runQuery failed")
       util.print_dump(err)
+    end
+
+    if util.is_file(bqrsPath) then
+        loader.process_results(bqrsPath, dbPath, queryPath, config.metadata['kind'], config.metadata['id'], true)
     else
-      if vim.fn.glob(bqrsPath) ~= '' then
-        print("QLO: " .. qloPath)
-        print("BQRS: " .. bqrsPath)
-
-        local info = M.bqrs_info(bqrsPath)
-        local query_kinds = info['compatible-query-kinds']
-        print(table.concat(query_kinds, ', '))
-        print(info['result-sets'][1]['rows'])
-
-        local ram_opts = M.resolve_ram(true)
-
-        --if config.quick_eval or not vim.tbl_contains(query_kinds, 'PathProblem') then
-
-        -- process results
-        if vim.tbl_contains(query_kinds, 'PathProblem') and
-           config.metadata['kind'] == 'path-problem' and
-           config.metadata['id'] ~= nil then
-          local sarifPath = vim.fn.tempname()
-          local cmd = {'codeql', 'bqrs', 'interpret', bqrsPath, '-t=id='..config.metadata['id'], '-t=kind='..config.metadata['kind'], '-o='..sarifPath, '--format=sarif-latest'}
-          vim.list_extend(cmd, ram_opts)
-          local cmds = { cmd, {'load_sarif', sarifPath, dbPath, config.metadata} }
-          print("SARIF: "..sarifPath)
-          print('Interpreting BQRS')
-          job.run_commands(cmds)
-        elseif vim.tbl_contains(query_kinds, 'PathProblem') and
-               config.metadata['kind'] == 'path-problem' and
-               config.metadata['id'] == nil then
-          print("Error: Insuficient Metadata for a Path Problem. Need at least @kind and @id elements")
-        else
-          local jsonPath = vim.fn.tempname()
-          local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', bqrsPath}
-          vim.list_extend(cmd, ram_opts)
-          local cmds = { cmd, {'load_json', jsonPath, dbPath, config.metadata} }
-          print("JSON: "..jsonPath)
-          print('Decoding BQRS')
-          job.run_commands(cmds)
-          print("Error: Could not interpret the results")
-        end
-      else
-        print("Error: runQuery failed")
-        return
-      end
+        print("ERROR: runQuery failed")
+        util.print_dump(result)
     end
   end
 
   local compileQuery_callback = function(err, _)
-    print("Finished compiling query")
     if err then
+      print("ERROR: compileQuery failed")
       util.print_dump(err)
     else
       -- prepare `runQueries` params
@@ -313,11 +236,13 @@ function M.run_query(config)
       }
 
       -- run query
+      print("Running query")
       client.request("evaluation/runQueries", runQueries_params, runQueries_callback)
     end
   end
 
   -- compile query
+  print("Compiling query")
   client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
 end
 

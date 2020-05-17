@@ -17,16 +17,16 @@ local function run_commands_handler()
                 loader.load_sarif_results(cmd[2], cmd[3], vim.g.codeql_path_max_length)
                 run_commands_handler()
             else
-                print('Cant find SARIF results at '..cmd[2])
+                print('ERROR: Cant find SARIF results at '..cmd[2])
                 panel.render(cmd[3], {})
             end
-        elseif cmd[1] == 'load_json' then
-            -- ['load_json', path, database, metadata]
+        elseif cmd[1] == 'load_raw' then
+            -- ['load_raw', path, database, metadata]
             if util.is_file(cmd[2]) then
-                loader.load_json_results(cmd[2], cmd[3])
+                loader.load_raw_results(cmd[2], cmd[3])
                 run_commands_handler()
             else
-                print('Cant find JSON results at '..cmd[2])
+                print('ERROR: Cant find raw results at '..cmd[2])
                 panel.render(cmd[3], {})
             end
         else

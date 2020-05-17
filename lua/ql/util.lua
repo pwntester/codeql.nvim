@@ -3,6 +3,47 @@ local uv = vim.loop
 
 local M = {}
 
+function M.bqrs_info(bqrsPath)
+  local json = M.run_cmd('codeql bqrs info --format=json '..bqrsPath, true)
+  local decoded, err = M.json_decode(json)
+  if not decoded then
+      print("ERROR: Could not get BQRS info: "..err)
+      return {}
+  end
+  return decoded
+end
+
+function M.resolve_ram(jvm)
+    local cmd = 'codeql resolve ram --format=json'
+    if vim.g.codeql_max_ram and vim.g.codeql_max_ram > -1 then
+        cmd = cmd..' -M '..vim.g.codeql_max_ram
+    end
+    local json = M.run_cmd(cmd, true)
+    local ram_opts, err = M.json_decode(json)
+    if not ram_opts then
+        print("ERROR: Could not resolve RAM options: "..err)
+        return {}
+    else
+        if jvm then
+            -- --off-heap-ram is not supported by some commands
+            ram_opts = vim.tbl_filter(function(i)
+                return vim.startswith(i, '-J')
+            end, ram_opts)
+        end
+        return ram_opts
+    end
+end
+
+function M.resolve_library_path(queryPath)
+  local json = M.run_cmd('codeql resolve library-path --format=json --query='..queryPath, true)
+  local decoded, err = M.json_decode(json)
+  if not decoded then
+      print("ERROR: Could not resolve library path: "..err)
+      return {}
+  end
+  return decoded
+end
+
 function M.run_cmd(cmd, raw)
   local f = assert(io.popen(cmd, 'r'))
   local s = assert(f:read('*a'))
@@ -65,7 +106,7 @@ function M.read_json_file(path)
     f:close()
     local decoded, err = M.json_decode(body)
     if not decoded then
-        print("Error!! "..err)
+        print("ERROR: Could not process JSON. "..err)
         return nil
     end
     return decoded
