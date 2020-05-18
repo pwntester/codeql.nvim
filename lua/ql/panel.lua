@@ -1,3 +1,4 @@
+local util = require 'ql.util'
 local vim = vim
 local api = vim.api
 
@@ -202,7 +203,7 @@ end
 
 local function render_content()
     local bufnr = vim.fn.bufnr(panel_buffer_name)
-    if bufnr == -1 then print('Error opening CodeQL panel'); return end
+    if bufnr == -1 then util.err_message('Error opening CodeQL panel'); return end
     api.nvim_buf_set_option(bufnr, 'modifiable', true)
     api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
     print_help()
@@ -232,7 +233,7 @@ local function open_codeql_panel()
     elseif panel_pos == 'left' then
         pos = 'topleft'
     else
-        print('Incorrect panel_pos value')
+        util.err_message('Incorrect panel_pos value')
         return
     end
 

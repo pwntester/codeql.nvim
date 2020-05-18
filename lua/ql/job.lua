@@ -17,7 +17,7 @@ local function run_commands_handler()
                 loader.load_sarif_results(cmd[2], cmd[3], vim.g.codeql_path_max_length)
                 run_commands_handler()
             else
-                print('ERROR: Cant find SARIF results at '..cmd[2])
+                util.err_message('ERROR: Cant find SARIF results at '..cmd[2])
                 panel.render(cmd[3], {})
             end
         elseif cmd[1] == 'load_raw' then
@@ -26,7 +26,7 @@ local function run_commands_handler()
                 loader.load_raw_results(cmd[2], cmd[3])
                 run_commands_handler()
             else
-                print('ERROR: Cant find raw results at '..cmd[2])
+                util.err_message('ERROR: Cant find raw results at '..cmd[2])
                 panel.render(cmd[3], {})
             end
         else

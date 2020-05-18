@@ -3,19 +3,26 @@ local loader = require 'ql.loader'
 local rpc = require 'vim.lsp.rpc'
 local protocol = require 'vim.lsp.protocol'
 local vim = vim
-local api = vim.api
 
 local client_index = 0
+local evaluate_id = 0
+local progress_id = 0
 
 -- local functions
+
 local function next_client_id()
   client_index = client_index + 1
   return client_index
 end
 
-local function err_message(...)
-  api.nvim_err_writeln(table.concat(vim.tbl_flatten{...}))
-  api.nvim_command("redraw")
+local function next_progress_id()
+  progress_id = progress_id + 1
+  return progress_id
+end
+
+local function next_evaluate_id()
+  evaluate_id = evaluate_id + 1
+  return evaluate_id
 end
 
 local function cmd_parts(input)
@@ -58,7 +65,7 @@ function M.start_client(config)
 
   local callbacks = config.callbacks or {}
   local name = config.name or tostring(client_id)
-  local log_prefix = string.format("LSP[%s]", name)
+  local log_prefix = string.format("QueryServer[%s]", name)
   local handlers = {}
 
   local function resolve_callback(method)
@@ -82,11 +89,11 @@ function M.start_client(config)
   end
 
   function handlers.on_error(code, err)
-    err_message(log_prefix, ': Error ', rpc.client_errors[code], ': ', vim.inspect(err))
+    util.err_message(log_prefix, ': Error ', rpc.client_errors[code], ': ', vim.inspect(err))
     if config.on_error then
       local status, usererr = pcall(config.on_error, code, err)
       if not status then
-        err_message(log_prefix, ' user on_error failed: ', tostring(usererr))
+        util.err_message(log_prefix, ' user on_error failed: ', tostring(usererr))
       end
     end
   end
@@ -104,24 +111,43 @@ function M.start_client(config)
   })
 end
 
+local last_message = ''
+
 function M.start_server(buf)
   if get_query_client(buf) then
-    --print("Query Server already started for buffer "..buf)
     return get_query_client(buf)
   end
   local ram_opts = util.resolve_ram(true)
   local cmd = {"codeql", "execute", "query-server", "--logdir", "/tmp/codeql"}
   vim.list_extend(cmd, ram_opts)
   local config = {
-      cmd             = cmd;
+      cmd = cmd;
       offset_encoding = {"utf-8", "utf-16"};
       callbacks = {
         ['ql/progressUpdated'] = function(_, params, _)
-          print(params.message)
+            local message = params.message
+            if message ~= last_message and nil == string.match(message, '^Stage%s%d.*%d%s%-%s*$') then
+                print(message)
+            end
+            last_message = message
         end;
-        ['evaluation/queryCompleted'] = function(_, _, _)
-          -- TODO: if ok, return {}, else return error (eg rpc.rpc_response_error(protocol.ErrorCodes.MethodNotFound))
-          return {}
+        ['evaluation/queryCompleted'] = function(_, result, _)
+          print("Evaluation time: "..result.evaluationTime)
+          if result.resultType == 0 then
+            return {}
+          elseif result.resultType == 1 then
+            util.err_message(result.message or "ERROR: Other")
+            return nil
+          elseif result.resultType == 2 then
+            util.err_message(result.message or "ERROR: OOM")
+            return nil
+          elseif result.resultType == 3 then
+            util.err_message(result.message or "ERROR: Timeout")
+            return nil
+          elseif result.resultType == 4 then
+            util.err_message(result.message or "ERROR: Query was cancelled")
+            return nil
+          end
         end
       }
   }
@@ -137,7 +163,6 @@ function M.run_query(config)
   if not client then
     client = M.start_server(config.buf)
     set_query_client(0, client)
-    --print('New Query Server started with PID: '..client.pid)
   end
   local queryPath = config.query
   local dbPath = config.db
@@ -154,6 +179,10 @@ function M.run_query(config)
       break
     end
   end
+
+  -- if config.quick_eval then
+  --   print("Quickeval at: "..config.startLine.."::"..config.startColumn.."::"..config.endLine.."::"..config.endColumn)
+  -- end
 
   -- https://github.com/github/vscode-codeql/blob/master/extensions/ql-vscode/src/messages.ts
   local compileQuery_params = {
@@ -190,27 +219,32 @@ function M.run_query(config)
         query = {xx = ''}
       };
     };
-    progressId = 1;
+    progressId = next_progress_id();
   }
 
   local runQueries_callback = function(err, result)
     if err then
-      print("ERROR: runQuery failed")
-      util.print_dump(err)
+      util.err_message("ERROR: runQuery failed")
     end
 
     if util.is_file(bqrsPath) then
         loader.process_results(bqrsPath, dbPath, queryPath, config.metadata['kind'], config.metadata['id'], true)
     else
-        print("ERROR: runQuery failed")
-        util.print_dump(result)
+        util.err_message("ERROR: BQRS file cannot be found")
     end
   end
 
-  local compileQuery_callback = function(err, _)
-    if err then
-      print("ERROR: compileQuery failed")
-      util.print_dump(err)
+  local compileQuery_callback = function(_, result)
+    local failed = false
+    if not result then return end
+    for _,msg in ipairs(result.messages) do
+        if msg.severity == 0 then
+            util.err_message(msg.message)
+            failed = true
+        end
+    end
+    if failed then
+        return
     else
       -- prepare `runQueries` params
       local runQueries_params = {
@@ -219,7 +253,7 @@ function M.run_query(config)
             dbDir = dbDir;
             workingSet = "default";
           };
-          evaluateId = 0;
+          evaluateId = next_evaluate_id();
           queries = {
             {
               resultsPath = bqrsPath;
@@ -232,7 +266,7 @@ function M.run_query(config)
           stopOnError = false;
           useSequenceHint = false;
         };
-        progressId = 2;
+        progressId = next_progress_id();
       }
 
       -- run query

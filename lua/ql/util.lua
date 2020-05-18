@@ -1,7 +1,24 @@
 local vim = vim
+local api = vim.api
 local uv = vim.loop
 
 local M = {}
+
+function M.err_message(...)
+  api.nvim_err_writeln(table.concat(vim.tbl_flatten{...}))
+  api.nvim_command("redraw")
+end
+
+function M.extract_query_metadata(query)
+    local json = M.run_cmd('codeql resolve metadata --format=json '..query, true)
+    local metadata, err = M.json_decode(json)
+    if not metadata then
+        print("Error resolving query metadata: "..err)
+        return nil
+    else
+        return metadata
+    end
+end
 
 function M.bqrs_info(bqrsPath)
   local json = M.run_cmd('codeql bqrs info --format=json '..bqrsPath, true)

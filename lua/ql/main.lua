@@ -3,19 +3,6 @@ local queryserver = require 'ql.queryserver'
 local vim = vim
 local api = vim.api
 
--- local functions
-
-local function extract_query_metadata(query)
-    local json = util.run_cmd('codeql resolve metadata --format=json '..query, true)
-    local metadata, err = util.json_decode(json)
-    if not metadata then
-        print("Error resolving query metadata: "..err)
-        return nil
-    else
-        return metadata
-    end
-end
-
 -- exported functions
 
 local M = {}
@@ -23,7 +10,7 @@ local M = {}
 function M.set_database(dbpath)
     local database = vim.fn.fnamemodify(dbpath, ':p')
     if not util.is_dir(database) then
-        print('Incorrect database')
+        util.err_message('Incorrect database')
         return nil
     else
         api.nvim_buf_set_var(0, 'codeql_database', database)
@@ -39,7 +26,7 @@ end
 function M.run_query(quick_eval)
     local database = M.get_database()
     if database == nil then
-        print('Missing database. Use SetDatabase command')
+        util.err_message('Missing database. Use SetDatabase command')
         return nil
     end
 
@@ -52,20 +39,19 @@ function M.run_query(quick_eval)
 
 	-- [bufnum, lnum, col, off, curswant]
     local line_start, column_start, line_end, column_end
-    if vim.fn.mode() == "v" or vim.fn.mode() == "V" or vim.fn.mode() == "\\<C-V>" then
+    if vim.fn.getpos("'<")[2] ~= 0 then
         line_start = vim.fn.getpos("'<")[2]
         column_start = vim.fn.getpos("'<")[3]
         line_end = vim.fn.getpos("'>")[2]
         column_end = vim.fn.getpos("'>")[3]
-        column_end = column_end == 2147483647 and vim.fn.len(vim.fn.getline(line_end)) or column_end
+
+        column_end = column_end == 2147483647 and 1 + vim.fn.len(vim.fn.getline(line_end)) or 1 + column_end
     else
         line_start = vim.fn.getcurpos()[2]
         column_start = vim.fn.getcurpos()[3]
         line_end = vim.fn.getcurpos()[2]
         column_end = vim.fn.getcurpos()[3]
     end
-
-    -- print("Quickeval at: "..line_start.."::"..column_start.."::"..line_end.."::"..column_end)
 
     local config = {
         quick_eval = quick_eval;
@@ -76,7 +62,7 @@ function M.run_query(quick_eval)
         startColumn = column_start;
         endLine = line_end;
         endColumn = column_end;
-        metadata = extract_query_metadata(queryPath);
+        metadata = util.extract_query_metadata(queryPath);
         }
 
     queryserver.run_query(config)
