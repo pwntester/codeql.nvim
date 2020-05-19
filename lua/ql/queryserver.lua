@@ -127,12 +127,12 @@ function M.start_server(buf)
         ['ql/progressUpdated'] = function(_, params, _)
             local message = params.message
             if message ~= last_message and nil == string.match(message, '^Stage%s%d.*%d%s%-%s*$') then
-                print(message)
+                util.message(message)
             end
             last_message = message
         end;
         ['evaluation/queryCompleted'] = function(_, result, _)
-          print("Evaluation time: "..result.evaluationTime)
+          util.message("Evaluation time: "..result.evaluationTime)
           if result.resultType == 0 then
             return {}
           elseif result.resultType == 1 then
@@ -181,7 +181,7 @@ function M.run_query(config)
   end
 
   -- if config.quick_eval then
-  --   print("Quickeval at: "..config.startLine.."::"..config.startColumn.."::"..config.endLine.."::"..config.endColumn)
+  --   util.message("Quickeval at: "..config.startLine.."::"..config.startColumn.."::"..config.endLine.."::"..config.endColumn)
   -- end
 
   -- https://github.com/github/vscode-codeql/blob/master/extensions/ql-vscode/src/messages.ts
@@ -270,13 +270,13 @@ function M.run_query(config)
       }
 
       -- run query
-      print("Running query")
+      util.message("Running query")
       client.request("evaluation/runQueries", runQueries_params, runQueries_callback)
     end
   end
 
   -- compile query
-  print("Compiling query")
+  util.message("Compiling query")
   client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
 end
 

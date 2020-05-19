@@ -9,6 +9,11 @@ function M.err_message(...)
   api.nvim_command("redraw")
 end
 
+function M.message(...)
+  api.nvim_out_write(table.concat(vim.tbl_flatten{...}).."\n")
+  api.nvim_command("redraw")
+end
+
 function M.extract_query_metadata(query)
     local json = M.run_cmd('codeql resolve metadata --format=json '..query, true)
     local metadata, err = M.json_decode(json)

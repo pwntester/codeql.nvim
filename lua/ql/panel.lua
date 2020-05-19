@@ -216,7 +216,7 @@ local function render_content()
         print_to_panel('No results found.')
     end
     api.nvim_buf_set_option(bufnr, 'modifiable', false)
-    print(' ')
+    util.message(' ')
 end
 
 local function open_codeql_panel()
@@ -387,7 +387,7 @@ function M.jump_to_code(stay_in_pane)
     end
 
     if not node.visitable then
-        if not not node.filename then print(node.filename) end
+        if not not node.filename then util.message(node.filename) end
         return
     end
 

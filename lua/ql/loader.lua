@@ -40,12 +40,11 @@ end
 local M = {}
 
 function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
-    api.nvim_command('redraw')
-    print("Processing results: " .. bqrsPath)
+    util.message("Processing results: " .. bqrsPath)
 
     local info = util.bqrs_info(bqrsPath)
     local query_kinds = info['compatible-query-kinds']
-    --print(table.concat(query_kinds, ', '))
+    -- util.message(query_kinds)
 
     local count = info['result-sets'][1]['rows']
     for _, resultset in ipairs(info['result-sets']) do
@@ -53,7 +52,7 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
             count = resultset.rows
         end
     end
-    print(count.." rows found")
+    util.message(count.." rows found")
 
     local ram_opts = util.resolve_ram(true)
 
@@ -65,7 +64,7 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
         local cmd = {'codeql', 'bqrs', 'interpret', bqrsPath, '-t=id='..id, '-t=kind='..kind, '-o='..sarifPath, '--format=sarif-latest'}
         vim.list_extend(cmd, ram_opts)
         local cmds = { cmd, {'load_sarif', sarifPath, dbPath} }
-        print('Decoding BQRS')
+        util.message('Decoding BQRS ...')
         require'ql.job'.run_commands(cmds)
         -- save BQRS if not called by :history
         if save_bqrs then
@@ -74,13 +73,13 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
     elseif vim.tbl_contains(query_kinds, 'PathProblem') and
             kind == 'path-problem' and
             id == nil then
-        print("ERROR: Insuficient Metadata for a Path Problem. Need at least @kind and @id elements")
+        util.err_message("ERROR: Insuficient Metadata for a Path Problem. Need at least @kind and @id elements")
     else
         local jsonPath = vim.fn.tempname()
         local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', bqrsPath}
         vim.list_extend(cmd, ram_opts)
         local cmds = { cmd, {'load_raw', jsonPath, dbPath} }
-        print('Decoding BQRS')
+        util.message('Decoding BQRS ...')
         require'ql.job'.run_commands(cmds)
         -- save BQRS if not called by :history
         if save_bqrs then
@@ -94,7 +93,7 @@ function M.load_raw_results(path, database)
     if not util.is_file(path) then return end
     local results = util.read_json_file(path)
     if nil == results['#select'] then
-        print('ERROR: No #select results')
+        util.err_message('ERROR: No #select results')
     end
 
     local issues = {}
@@ -141,7 +140,7 @@ function M.load_raw_results(path, database)
 
             -- ???
             else
-                print("ERROR: Error processing node")
+                util.err_message("ERROR: Error processing node")
             end
             table.insert(path, node)
         end

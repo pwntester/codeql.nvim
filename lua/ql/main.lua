@@ -14,7 +14,7 @@ function M.set_database(dbpath)
         return nil
     else
         api.nvim_buf_set_var(0, 'codeql_database', database)
-        print('Database set to '..database)
+        util.message('Database set to '..database)
     end
 end
 
