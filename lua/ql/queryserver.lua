@@ -180,9 +180,9 @@ function M.run_query(config)
     end
   end
 
-  -- if config.quick_eval then
-  --   util.message("Quickeval at: "..config.startLine.."::"..config.startColumn.."::"..config.endLine.."::"..config.endColumn)
-  -- end
+  --if config.quick_eval then
+  --  util.message("Quickeval at: "..config.startLine.."::"..config.startColumn.."::"..config.endLine.."::"..config.endColumn)
+  --end
 
   -- https://github.com/github/vscode-codeql/blob/master/extensions/ql-vscode/src/messages.ts
   local compileQuery_params = {

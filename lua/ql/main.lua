@@ -39,7 +39,9 @@ function M.run_query(quick_eval)
 
 	-- [bufnum, lnum, col, off, curswant]
     local line_start, column_start, line_end, column_end
-    if vim.fn.getpos("'<")[2] ~= 0 then
+
+    if vim.fn.getpos("'<")[2] == vim.fn.getcurpos()[2] and
+       vim.fn.getpos("'<")[3] == vim.fn.getcurpos()[3] then
         line_start = vim.fn.getpos("'<")[2]
         column_start = vim.fn.getpos("'<")[3]
         line_end = vim.fn.getpos("'>")[2]
