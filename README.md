@@ -40,6 +40,16 @@ Use `SetDatabase <path to db>` to let the plugin know what DB to work with
 
 Use `RunQuery` or `QuickEval` commands or `qr`, `qe` shortcuts respectively to run the query or evaluate the predicate under the cursor.
 
+## Configuration options
+g:codeql_search_path: Point it to your codeql repo
+g:codeql_max_ram: Max RAM memory to be used by CodeQL
+
+eg:
+```
+let g:codeql_max_ram = 32000
+let g:codeql_search_path = '/Users/pwntester/codeql-home/codeql-repo'
+```
+
 ## Commands
 - `SetDatabase <path to db>`: Required before running any query.
 - `RunQuery`: Runs the query on the current buffer. Requires a DB to be set first.
