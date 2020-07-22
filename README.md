@@ -9,6 +9,7 @@ Neovim plugin to help writing and testing CodeQL queries.
 - Syntax highlighting for CodeQL query language
 - Query execution
 - Quick query evaluation
+- Query history
 - Result browser
 
 ## Requirements
@@ -43,15 +44,23 @@ Use `RunQuery` or `QuickEval` commands or `qr`, `qe` shortcuts respectively to r
 - `SetDatabase <path to db>`: Required before running any query.
 - `RunQuery`: Runs the query on the current buffer. Requires a DB to be set first.
 - `QuickEval`: Quick evals the predicate or selection under cursor. Requires a DB to be set first.
+- `History`: Shows a menu to render results of previous queries (on the same nvim session).
+- `StopServer`: Stops the query server associated with the query buffer. A new one will be started upon query evaluation.
 
 ## Result Browser
 After running a query or quick evaluating a predicate, results will be rendered in a special panel.
 
-- `o`: Collapses/Expands result
-- `Enter` (on a visitable result node): Opens node file in vim and moves cursor to window with source code file 
-- `p`: Similar to `Enter` but does not keep cursor on the results panel
-- `N` (on a Paths node): Change to next path
-- `P` (on a Paths node): Change to previous path
+- `o`: collapses/Expands result
+- `Enter` (on a visitable result node): opens node file in nvim and moves cursor to window with source code file 
+- `p`: similar to `Enter` but does not keep cursor on the results panel
+- `n`: (on a Paths node): change to next path
+- `P`: (on a Paths node): change to previous path
+- `f`: filter issues by issue label
+- `F`: filter issues
+- `c`: clear filter
+- `t`: open all folds
+- `T`: closes all folds
+- `q`: closes result panel
  
 ## Language Server Protocol
 This plugin does not provide any support for the Language Server Protocol (LSP). But in order to have the best CodeQL writing experience it is recommended to configure a LSP client to connect to the CodeQL Language Server.
