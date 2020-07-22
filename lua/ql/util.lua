@@ -56,8 +56,13 @@ function M.resolve_ram(jvm)
     end
 end
 
+
 function M.resolve_library_path(queryPath)
-  local json = M.run_cmd('codeql resolve library-path --format=json --query='..queryPath, true)
+  local searchPathOpt = ''
+  if vim.g.codeql_search_path and vim.g.codeql_search_path ~= '' then
+    searchPathOpt = ' --search-path='..vim.g.codeql_search_path
+  end
+  local json = M.run_cmd('codeql resolve library-path --format=json --query='..queryPath..searchPathOpt, true)
   local decoded, err = M.json_decode(json)
   if not decoded then
       print("ERROR: Could not resolve library path: "..err)
