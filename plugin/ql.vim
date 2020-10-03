@@ -1,3 +1,9 @@
+if exists('loaded_codeql')
+  finish
+endif
+
+let loaded_codeql = 1
+
 " commands
 command! -nargs=1 -complete=file SetDatabase lua require('ql.main').set_database(<f-args>)
 command! RunQuery lua require('ql.main').run_query(false)
