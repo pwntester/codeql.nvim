@@ -1,5 +1,5 @@
-local util = require 'ql.util'
-local panel = require 'ql.panel'
+local util = require'codeql.util'
+local panel = require'codeql.panel'
 local vim = vim
 local api = vim.api
 
@@ -65,10 +65,10 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
         vim.list_extend(cmd, ram_opts)
         local cmds = { cmd, {'load_sarif', sarifPath, dbPath} }
         util.message('Decoding BQRS ...')
-        require'ql.job'.run_commands(cmds)
+        require'codeql.job'.run_commands(cmds)
         -- save BQRS if not called by :history
         if save_bqrs then
-            require'ql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count)
+            require'codeql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count)
         end
     elseif vim.tbl_contains(query_kinds, 'PathProblem') and
             kind == 'path-problem' and
@@ -80,10 +80,10 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
         vim.list_extend(cmd, ram_opts)
         local cmds = { cmd, {'load_raw', jsonPath, dbPath} }
         util.message('Decoding BQRS ...')
-        require'ql.job'.run_commands(cmds)
+        require'codeql.job'.run_commands(cmds)
         -- save BQRS if not called by :history
         if save_bqrs then
-            require'ql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count)
+            require'codeql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count)
         end
     end
     api.nvim_command('redraw')

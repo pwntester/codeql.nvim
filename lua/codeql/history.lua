@@ -1,4 +1,4 @@
-local util = require 'ql.util'
+local util = require'codeql.util'
 local vim = vim
 local api = vim.api
 
@@ -38,7 +38,7 @@ function M.menu()
     elseif choice < 1 + #history then
         local entry = history[choice]
         if entry then
-            require'ql.loader'.process_results(entry.bqrs, entry.database, entry.query, entry.kind, entry.id, false)
+            require'codeql.loader'.process_results(entry.bqrs, entry.database, entry.query, entry.kind, entry.id, false)
         end
     end
 end

@@ -1,6 +1,6 @@
-local util = require 'ql.util'
-local loader = require 'ql.loader'
-local panel = require 'ql.panel'
+local util = require'codeql.util'
+local loader = require'codeql.loader'
+local panel = require'codeql.panel'
 
 local commandlist = {}
 

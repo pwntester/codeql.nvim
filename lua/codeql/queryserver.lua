@@ -1,7 +1,7 @@
-local util = require 'ql.util'
-local loader = require 'ql.loader'
-local rpc = require 'vim.lsp.rpc'
-local protocol = require 'vim.lsp.protocol'
+local util = require'codeql.util'
+local loader = require'codeql.loader'
+local rpc = require'vim.lsp.rpc'
+local protocol = require'vim.lsp.protocol'
 local vim = vim
 
 local client_index = 0

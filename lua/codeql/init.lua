@@ -1,16 +1,14 @@
-local util = require 'ql.util'
-local queryserver = require 'ql.queryserver'
+local util = require'codeql.util'
+local queryserver = require'codeql.queryserver'
 local vim = vim
 local api = vim.api
-
--- exported functions
 
 local M = {}
 
 function M.set_database(dbpath)
-    local database = vim.fn.fnamemodify(dbpath, ':p')
+    local database = vim.fn.fnamemodify(vim.trim(dbpath), ':p')
     if not util.is_dir(database) then
-        util.err_message('Incorrect database')
+        util.err_message('Incorrect database: '..database)
         return nil
     else
         api.nvim_buf_set_var(0, 'codeql_database', database)

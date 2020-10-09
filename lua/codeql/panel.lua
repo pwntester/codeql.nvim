@@ -1,4 +1,4 @@
-local util = require 'ql.util'
+local util = require'codeql.util'
 local vim = vim
 local api = vim.api
 
@@ -258,18 +258,18 @@ local function open_codeql_panel()
     api.nvim_buf_set_option(bufnr, 'swapfile', false)
     api.nvim_buf_set_option(bufnr, 'buflisted', false)
 
-    api.nvim_buf_set_keymap(bufnr, 'n', 'o', '<Cmd>lua require("ql.panel").toggle_fold()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<CR>', '<Cmd>lua require("ql.panel").jump_to_code(false)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'p', '<Cmd>lua require("ql.panel").jump_to_code(true)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-h>', '<Cmd>lua require("ql.panel").toggle_help()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'q', '<Cmd>lua require("ql.panel").close_codeql_panel()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 't', '<Cmd>lua require("ql.panel").set_fold_level(false)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-T>', '<Cmd>lua require("ql.panel").set_fold_level(true)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-p>', '<Cmd>lua require("ql.panel").change_path(-1)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'n', '<Cmd>lua require("ql.panel").change_path(1)<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', 'f', '<Cmd>lua require("ql.panel").label_filter()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-f>', '<Cmd>lua require("ql.panel").generic_filter()<CR>', { script = true,  silent = true})
-    api.nvim_buf_set_keymap(bufnr, 'n', '<S-c>', '<Cmd>lua require("ql.panel").clear_filter()<CR>', { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'o', [[<cmd>lua require'codeql.panel'.toggle_fold()<CR>]], { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<CR>', [[<cmd>lua require'codeql.panel'.jump_to_code(false)<CR>]], { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'p', [[<cmd>lua require'codeql.panel'.jump_to_code(true)<CR>]], { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-h>', [[<cmd>lua require'codeql.panel'.toggle_help()<CR>]], { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'q', [[<cmd>lua require'codeql.panel'.close_codeql_panel()<CR>]], { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 't', [[<cmd>lua require'codeql.panel'.set_fold_level(false)<CR>]], { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-T>', [[<cmd>lua require'codeql.panel'.set_fold_level(true)<CR>]], { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-p>', [[<cmd>lua require'codeql.panel'.change_path(-1)<CR>]], { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'n', [[<cmd>lua require'codeql.panel'.change_path(1)<CR>]], { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', 'f', [[<cmd>lua require'codeql.panel'.label_filter()<CR>]], { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-f>', [[<cmd>lua require'codeql.panel'.generic_filter()<CR>]], { script = true,  silent = true})
+    api.nvim_buf_set_keymap(bufnr, 'n', '<S-c>', [[<cmd>lua require'codeql.panel'.clear_filter()<CR>]], { script = true,  silent = true})
 
     -- window options
     local win = get_panel_window(panel_buffer_name)
