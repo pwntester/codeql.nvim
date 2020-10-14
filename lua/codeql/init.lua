@@ -71,7 +71,7 @@ function M.run_query(quick_eval)
     libraryPath = libPaths.libraryPath;
     dbschemePath = libPaths.dbscheme;
   }
-  print(vim.inspect(opts))
+
   queryserver.run_query(opts)
 end
 
