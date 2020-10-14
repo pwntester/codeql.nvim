@@ -190,6 +190,8 @@ function M.load_sarif_results(path, database, max_length)
   local paths = {}
 
   for _, r in ipairs(results) do
+    -- skip results with no codeFlows
+    if r.codeFlows == nil then goto continue end
     -- each result contains a codeflow that groups a source
     for _, c in ipairs(r.codeFlows) do
       for _, t in ipairs(c.threadFlows) do
@@ -236,6 +238,8 @@ function M.load_sarif_results(path, database, max_length)
         end
       end
     end
+
+    ::continue::
   end
 
   local issues = {}
