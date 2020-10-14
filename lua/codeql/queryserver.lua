@@ -238,7 +238,6 @@ function M.run_query(opts)
 
   local compileQuery_callback = function(_, result)
     local failed = false
-    print(vim.inspect(result))
     if not result then return end
     for _,msg in ipairs(result.messages) do
         if msg.severity == 0 then
