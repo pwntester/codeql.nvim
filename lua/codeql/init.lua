@@ -11,13 +11,13 @@ function M.set_database(dbpath)
     util.err_message('Incorrect database: '..database)
     return nil
   else
-    api.nvim_buf_set_var(0, 'codeql_database', database)
+    api.nvim_set_var('codeql_database', database)
     util.message('Database set to '..database)
   end
 end
 
 function M.get_database()
-  local status, database = pcall(api.nvim_buf_get_var, 0, 'codeql_database')
+  local status, database = pcall(api.nvim_get_var, 'codeql_database')
   if not vim.endswith(database, '/') then
     database = database..'/'
   end
