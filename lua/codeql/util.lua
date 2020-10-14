@@ -4,6 +4,30 @@ local uv = vim.loop
 
 local M = {}
 
+function M.debounce(fn, debounce_time)
+  local timer = vim.loop.new_timer()
+  local is_debounce_fn = type(debounce_time) == 'function'
+
+  return function(...)
+    timer:stop()
+
+    local time = debounce_time
+    local args = {...}
+
+    if is_debounce_fn then
+      time = debounce_time()
+    end
+
+    timer:start(time, 0, vim.schedule_wrap(function() fn(unpack(args)) end))
+  end
+end
+
+function M.for_each_buf_window(bufnr, fn)
+  for _, window in ipairs(vim.fn.win_findbuf(bufnr)) do
+    fn(window)
+  end
+end
+
 function M.err_message(...)
   api.nvim_err_writeln(table.concat(vim.tbl_flatten{...}))
   api.nvim_command("redraw")
@@ -59,8 +83,12 @@ end
 
 function M.resolve_library_path(queryPath)
   local searchPathOpt = ''
-  if vim.g.codeql_search_path and vim.g.codeql_search_path ~= '' then
-    searchPathOpt = ' --search-path='..vim.g.codeql_search_path
+  if vim.g.codeql_search_path and #vim.g.codeql_search_path > 0 then
+    for _, searchPath in ipairs(vim.g.codeql_search_path) do
+      if searchPath ~= '' then
+        searchPathOpt = string.format('%s --search-path=%s', searchPathOpt, searchPath)
+      end
+    end
   end
   local json = M.run_cmd('codeql resolve library-path --format=json --query='..queryPath..searchPathOpt, true)
   local decoded, err = M.json_decode(json)

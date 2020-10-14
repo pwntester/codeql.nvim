@@ -119,6 +119,7 @@ function M.start_server(buf)
   end
   local ram_opts = util.resolve_ram(true)
   local cmd = {"codeql", "execute", "query-server", "--logdir", "/tmp/codeql"}
+
   vim.list_extend(cmd, ram_opts)
   local config = {
       cmd = cmd;
@@ -156,33 +157,34 @@ function M.start_server(buf)
   return client
 end
 
-function M.run_query(config)
+function M.run_query(opts)
 
   -- TODO: store client as buffer var
   local client = get_query_client(0)
   if not client then
-    client = M.start_server(config.buf)
+    client = M.start_server(opts.buf)
     set_query_client(0, client)
   end
-  local queryPath = config.query
-  local dbPath = config.db
+
+  local queryPath = opts.query
   local qloPath = vim.fn.tempname()..'.qlo'
   local bqrsPath = vim.fn.tempname()..'.bqrs'
-  local libPaths = util.resolve_library_path(queryPath)
-  local libraryPath = libPaths.libraryPath
-  local dbScheme = libPaths.dbscheme
-  local dbDir = dbPath
+  local libraryPath = opts.libraryPath
+  local dbschemePath = opts.dbschemePath
+  local dbPath = opts.dbPath
+  if not vim.endswith(dbPath, '/') then dbPath = dbPath .. '/' end
 
+  local dbDir
   for _, dir in ipairs(vim.fn.glob(vim.fn.fnameescape(dbPath)..'*', 1, 1)) do
     if vim.startswith(dir, dbPath..'db-') then
       dbDir = dir
       break
     end
   end
-
-  --if config.quick_eval then
-  --  util.message("Quickeval at: "..config.startLine.."::"..config.startColumn.."::"..config.endLine.."::"..config.endColumn)
-  --end
+  if not dbDir then
+    util.err_message('Cannot find db')
+    return
+  end
 
   -- https://github.com/github/vscode-codeql/blob/master/extensions/ql-vscode/src/messages.ts
   local compileQuery_params = {
@@ -201,18 +203,18 @@ function M.run_query(config)
       };
       queryToCheck = {
         libraryPath = libraryPath;
-        dbschemePath = dbScheme;
+        dbschemePath = dbschemePath;
         queryPath = queryPath;
       };
       resultPath = qloPath;
-      target = config.quick_eval and {
+      target = opts.quick_eval and {
         quickEval = {
           quickEvalPos = {
             fileName = queryPath;
-            line = config.startLine;
-            column = config.startColumn;
-            endLine = config.endLine;
-            endColumn = config.endColumn;
+            line = opts.startLine;
+            column = opts.startColumn;
+            endLine = opts.endLine;
+            endColumn = opts.endColumn;
           };
         };
       } or {
@@ -228,7 +230,7 @@ function M.run_query(config)
     end
 
     if util.is_file(bqrsPath) then
-        loader.process_results(bqrsPath, dbPath, queryPath, config.metadata['kind'], config.metadata['id'], true)
+        loader.process_results(bqrsPath, dbPath, queryPath, opts.metadata['kind'], opts.metadata['id'], true)
     else
         util.err_message("ERROR: BQRS file cannot be found")
     end
@@ -236,6 +238,7 @@ function M.run_query(config)
 
   local compileQuery_callback = function(_, result)
     local failed = false
+    print(vim.inspect(result))
     if not result then return end
     for _,msg in ipairs(result.messages) do
         if msg.severity == 0 then
@@ -259,6 +262,7 @@ function M.run_query(config)
               resultsPath = bqrsPath;
               qlo = "file://"..qloPath;
               allowUnknownTemplates = true;
+              templateValues = opts.templateValues or nil;
               id = 0;
               timeoutSecs = 0;
             }
@@ -277,6 +281,7 @@ function M.run_query(config)
 
   -- compile query
   util.message("Compiling query")
+
   client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
 end
 

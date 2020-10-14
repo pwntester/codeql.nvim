@@ -2,12 +2,12 @@ if exists('b:current_syntax')
     finish
 endif
 
-syntax match CodeqlPanelHelp                          '^".*' contains=CodeqlPanelHelpKey,CodeqlPanelHelpTitle
-syntax match CodeqlPanelHelpKey                       '" \zs.*\ze:' contained
-syntax match CodeqlPanelHelpTitle                     '" \zs-\+ \w\+ -\+' contained
-syntax match CodeqlPanelType                          '\a*\s\zs\[.*\]\ze$'
-syntax match CodeqlPanelBracket                       '\[.*\]' contains=CodeqlPanelLabel
-syntax match CodeqlPanelLabel                         '[^\[\]]*' contained
+syntax match CodeqlPanelHelp '^".*' contains=CodeqlPanelHelpKey,CodeqlPanelHelpTitle
+syntax match CodeqlPanelHelpKey '" \zs.*\ze:' contained
+syntax match CodeqlPanelHelpTitle '" \zs-\+ \w\+ -\+' contained
+syntax match CodeqlPanelType '\a*\s\zs\[.*\]\ze$'
+syntax match CodeqlPanelBracket '\[.*\]' contains=CodeqlPanelLabel
+syntax match CodeqlPanelLabel '[^\[\]]*' contained
 
 highlight default link CodeqlPanelFoldIcon             Function 
 highlight default link CodeqlPanelVisitable            MoreMsg 

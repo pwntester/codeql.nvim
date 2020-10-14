@@ -15,7 +15,7 @@ if !exists(g:codeql_path_max_length)
   let g:codeql_path_max_length = -1
 endif
 if !exists(g:codeql_search_path)
-  let g:codeql_search_path = ""
+  let g:codeql_search_path = []
 endif
 if !exists(g:codeql_fmt_onsave)
   let g:codeql_fmt_onsave = 0

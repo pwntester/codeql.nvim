@@ -14,6 +14,7 @@ local function run_commands_handler()
         if cmd[1] == 'load_sarif' then
             --  ['load_sarif', sarifPath, database, metadata]
             if util.is_file(cmd[2]) then
+                util.message('')
                 loader.load_sarif_results(cmd[2], cmd[3], vim.g.codeql_path_max_length)
                 run_commands_handler()
             else
@@ -23,6 +24,7 @@ local function run_commands_handler()
         elseif cmd[1] == 'load_raw' then
             -- ['load_raw', path, database, metadata]
             if util.is_file(cmd[2]) then
+                util.message('')
                 loader.load_raw_results(cmd[2], cmd[3])
                 run_commands_handler()
             else
