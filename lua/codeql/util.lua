@@ -110,23 +110,6 @@ function M.run_cmd(cmd, raw)
   return s
 end
 
-function M.dump(o)
-   if type(o) == 'table' then
-      local s = '{ '
-      for k,v in pairs(o) do
-         if type(k) ~= 'number' then k = '"'..k..'"' end
-         s = s .. '['..k..'] = ' .. M.dump(v) .. ','
-      end
-      return s .. '} '
-   else
-      return tostring(o)
-   end
-end
-
-function M.print_dump(o)
-    print(M.dump(o))
-end
-
 function M.json_encode(data)
   local status, result = pcall(vim.fn.json_encode, data)
   if status then
