@@ -25,7 +25,7 @@ if !exists('g:codeql_fmt_onsave')
   let g:codeql_fmt_onsave = 0
 endif
 
-highlight default link CodeqlAstFocus Visual
+highlight default link CodeqlAstFocus Error
 
 if executable('codeql')
   " commands

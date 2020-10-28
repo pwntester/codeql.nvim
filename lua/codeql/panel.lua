@@ -397,7 +397,7 @@ function M.jump_to_code(stay_in_pane)
     -- go to main window
     go_to_main_window()
 
-    api.nvim_command('e '..vim.fn.fnameescape(node.filename))
+    api.nvim_command('silent! e '..vim.fn.fnameescape(node.filename))
 
     -- mark current position so it can be jumped back to
     api.nvim_command("mark '")

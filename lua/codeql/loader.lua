@@ -114,7 +114,16 @@ function M.load_raw_results(path, database)
   end
 
   local issues = {}
-  local tuples = results['#select']['tuples']
+  local tuples
+  if results['#select'] then
+    tuples = results['#select']['tuples']
+  else
+    for k, _ in pairs(results) do
+      tuples = results[k]['tuples']
+    end
+  end
+
+  --print("Found "..#tuples.." tuples")
 
   for _, tuple in ipairs(tuples) do
     path = {}
