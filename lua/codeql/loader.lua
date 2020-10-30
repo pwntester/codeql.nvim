@@ -68,7 +68,7 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
     local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=id,url,string', bqrsPath}
     vim.list_extend(cmd, ram_opts)
     local cmds = { cmd, {'load_ast', jsonPath, dbPath} }
-    util.message('Decoding BQRS ...')
+    util.message('Decoding BQRS '..bqrsPath)
     require'codeql.job'.run_commands(cmds)
     -- save BQRS if not called by :history
     if save_bqrs then
@@ -81,7 +81,7 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
     local cmd = {'codeql', 'bqrs', 'interpret', bqrsPath, '-t=id='..id, '-t=kind='..kind, '-o='..sarifPath, '--format=sarif-latest'}
     vim.list_extend(cmd, ram_opts)
     local cmds = { cmd, {'load_sarif', sarifPath, dbPath} }
-    util.message('Decoding BQRS ...')
+    util.message('Decoding BQRS '..bqrsPath)
     require'codeql.job'.run_commands(cmds)
     -- save BQRS if not called by :history
     if save_bqrs then
@@ -96,7 +96,7 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
     local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', bqrsPath}
     vim.list_extend(cmd, ram_opts)
     local cmds = { cmd, {'load_raw', jsonPath, dbPath} }
-    util.message('Decoding BQRS ...')
+    util.message('Decoding BQRS '..bqrsPath)
     require'codeql.job'.run_commands(cmds)
     -- save BQRS if not called by :history
     if save_bqrs then
@@ -109,9 +109,6 @@ end
 function M.load_raw_results(path, database)
   if not util.is_file(path) then return end
   local results = util.read_json_file(path)
-  if nil == results['#select'] then
-    util.err_message('ERROR: No #select results')
-  end
 
   local issues = {}
   local tuples
@@ -122,6 +119,8 @@ function M.load_raw_results(path, database)
       tuples = results[k]['tuples']
     end
   end
+
+  print(path)
 
   --print("Found "..#tuples.." tuples")
 
@@ -196,59 +195,89 @@ function M.load_sarif_results(path, database, max_length)
   local decoded = util.read_json_file(path)
   local results = decoded.runs[1].results
 
+  print(path)
+
   local paths = {}
 
   for _, r in ipairs(results) do
-    -- skip results with no codeFlows
-    if r.codeFlows == nil then goto continue end
-    -- each result contains a codeflow that groups a source
-    for _, c in ipairs(r.codeFlows) do
-      for _, t in ipairs(c.threadFlows) do
-        -- each threadFlow contains all reached sinks for
-        -- codeFlow source
-        -- we can treat a threadFlow as a "regular" dataflow
-        -- first element is source, last one is sink
-        local nodes = {}
-        for i, l in ipairs(t.locations) do
-          local node = {}
-          node.label = l.location.message.text
-          if 1 == i then
-            node.mark = '⭃'
-          elseif #t.locations == i then
-            node.mark = '⦿'
-          else
-            node.mark = '→'
-          end
-          node.filename = uri_to_fname(l.location.physicalLocation.artifactLocation.uri, database)
-          node.line = l.location.physicalLocation.region.startLine
-          node.visitable = true
-          node.url = {
-            uri = l.location.physicalLocation.artifactLocation.uri;
-            startLine   = l.location.physicalLocation.region.startLine;
-            startColumn = l.location.physicalLocation.region.startColumn;
-            endColumn   = l.location.physicalLocation.region.endColumn;
-          }
-          table.insert(nodes, node)
+    if r.codeFlows == nil then
+      -- process results with no codeFlows
+      local nodes = {}
+      local locs = vim.list_extend(r.locations, r.relatedLocations)
+      for i, l in ipairs(locs) do
+        local node = {}
+        if l.message then
+          node.label = l.message.text or 'no text'
+        else
+          node.label = 'no text'
         end
-
-        if not max_length or max_length == -1 or #nodes <= max_length then
-          local source = nodes[1]
-          local sink = nodes[#nodes]
-          local source_key = source.filename..'::'..source.url.startLine..'::'..source.url.startColumn..'::'..source.url.endColumn
-          local sink_key = sink.filename..'::'..sink.url.startLine..'::'..sink.url.startColumn..'::'..sink.url.endColumn
-          local key = source_key..'::'..sink_key
-
-          if nil == paths[key] then
-            paths[key] = {}
+        if 1 == i then
+          node.mark = '⭃'
+        elseif #r.locations == i then
+          node.mark = '⦿'
+        else
+          node.mark = '→'
+        end
+        node.filename = uri_to_fname(l.physicalLocation.artifactLocation.uri, database)
+        node.line = l.physicalLocation.region.startLine
+        node.visitable = true
+        node.url = {
+          uri = l.physicalLocation.artifactLocation.uri;
+          startLine   = l.physicalLocation.region.startLine;
+          startColumn = l.physicalLocation.region.startColumn;
+          endColumn   = l.physicalLocation.region.endColumn;
+        }
+        table.insert(nodes, node)
+      end
+      paths['foo'] = { nodes }
+    else 
+      -- each result contains a codeflow that groups a source
+      for _, c in ipairs(r.codeFlows) do
+        for _, t in ipairs(c.threadFlows) do
+          -- each threadFlow contains all reached sinks for
+          -- codeFlow source
+          -- we can treat a threadFlow as a "regular" dataflow
+          -- first element is source, last one is sink
+          local nodes = {}
+          for i, l in ipairs(t.locations) do
+            local node = {}
+            node.label = l.location.message.text
+            if 1 == i then
+              node.mark = '⭃'
+            elseif #t.locations == i then
+              node.mark = '⦿'
+            else
+              node.mark = '→'
+            end
+            node.filename = uri_to_fname(l.location.physicalLocation.artifactLocation.uri, database)
+            node.line = l.location.physicalLocation.region.startLine
+            node.visitable = true
+            node.url = {
+              uri = l.location.physicalLocation.artifactLocation.uri;
+              startLine   = l.location.physicalLocation.region.startLine;
+              startColumn = l.location.physicalLocation.region.startColumn;
+              endColumn   = l.location.physicalLocation.region.endColumn;
+            }
+            table.insert(nodes, node)
           end
-          local l = paths[key]
-          table.insert(l, nodes)
-          paths[key] = l
+
+          if not max_length or max_length == -1 or #nodes <= max_length then
+            local source = nodes[1]
+            local sink = nodes[#nodes]
+            local source_key = source.filename..'::'..source.url.startLine..'::'..source.url.startColumn..'::'..source.url.endColumn
+            local sink_key = sink.filename..'::'..sink.url.startLine..'::'..sink.url.startColumn..'::'..sink.url.endColumn
+            local key = source_key..'::'..sink_key
+
+            if not paths[key] then paths[key] = {} end
+            local l = paths[key]
+            table.insert(l, nodes)
+            paths[key] = l
+          end
         end
       end
     end
 
-    ::continue::
+   -- ::continue::
   end
 
   local issues = {}

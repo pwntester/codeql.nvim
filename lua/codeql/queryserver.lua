@@ -8,8 +8,6 @@ local client_index = 0
 local evaluate_id = 0
 local progress_id = 0
 
--- local functions
-
 local function next_client_id()
   client_index = client_index + 1
   return client_index
@@ -43,20 +41,9 @@ local function cmd_parts(input)
   return cmd, cmd_args
 end
 
-local clients = {}
-
-local function get_query_client(bufnr)
-    if bufnr == 0 then bufnr = vim.fn.bufnr(0) end
-    return clients[bufnr]
-end
-
-local function set_query_client(bufnr, client)
-    if bufnr == 0 then bufnr = vim.fn.bufnr(0) end
-    clients[bufnr] = client
-end
-
--- exported functions
 local M = {}
+
+M.client = nil
 
 function M.start_client(config)
   local cmd, cmd_args = cmd_parts(config.cmd)
@@ -105,66 +92,66 @@ function M.start_client(config)
   end
 
   -- Start the RPC client.
-  return rpc.start(cmd, cmd_args, handlers, {
+  local client = rpc.start(cmd, cmd_args, handlers, {
     cwd = config.cmd_cwd;
     env = config.cmd_env;
   })
+  client.id = client_id
+  return client
 end
 
-local last_message = ''
 
-function M.start_server(buf)
-  if get_query_client(buf) then
-    return get_query_client(buf)
-  end
-  local ram_opts = util.resolve_ram(true)
+function M.start_server()
+
+  if M.client then return M.client end
+
+  util.message("Starting CodeQL Query Server")
   local cmd = {"codeql", "execute", "query-server", "--logdir", "/tmp/codeql"}
+  vim.list_extend(cmd, util.resolve_ram(true))
 
-  vim.list_extend(cmd, ram_opts)
+  local last_message = ''
+
   local config = {
-      cmd = cmd;
-      offset_encoding = {"utf-8", "utf-16"};
-      callbacks = {
-        ['ql/progressUpdated'] = function(_, params, _)
-            local message = params.message
-            if message ~= last_message and nil == string.match(message, '^Stage%s%d.*%d%s%-%s*$') then
-                util.message(message)
-            end
-            last_message = message
-        end;
-        ['evaluation/queryCompleted'] = function(_, result, _)
-          util.message("Evaluation time: "..result.evaluationTime)
-          if result.resultType == 0 then
-            return {}
-          elseif result.resultType == 1 then
-            util.err_message(result.message or "ERROR: Other")
-            return nil
-          elseif result.resultType == 2 then
-            util.err_message(result.message or "ERROR: OOM")
-            return nil
-          elseif result.resultType == 3 then
-            util.err_message(result.message or "ERROR: Timeout")
-            return nil
-          elseif result.resultType == 4 then
-            util.err_message(result.message or "ERROR: Query was cancelled")
-            return nil
-          end
+    cmd = cmd;
+    offset_encoding = {"utf-8", "utf-16"};
+    callbacks = {
+
+      -- progress update
+      ['ql/progressUpdated'] = function(_, params, _)
+        local message = params.message
+        if message ~= last_message and nil == string.match(message, '^Stage%s%d.*%d%s%-%s*$') then
+          util.message(message)
         end
-      }
+        last_message = message
+      end;
+
+      -- query completed
+      ['evaluation/queryCompleted'] = function(_, result, _)
+        util.message("Evaluation time: "..result.evaluationTime)
+        if result.resultType == 0 then
+          return {}
+        elseif result.resultType == 1 then
+          util.err_message(result.message or "ERROR: Other")
+          return nil
+        elseif result.resultType == 2 then
+          util.err_message(result.message or "ERROR: OOM")
+          return nil
+        elseif result.resultType == 3 then
+          util.err_message(result.message or "ERROR: Timeout")
+          return nil
+        elseif result.resultType == 4 then
+          util.err_message(result.message or "ERROR: Query was cancelled")
+          return nil
+        end
+      end
+    }
   }
-  local client = M.start_client(config)
-  set_query_client(buf, client)
-  return client
+  return M.start_client(config)
 end
 
 function M.run_query(opts)
 
-  -- TODO: store client as buffer var
-  local client = get_query_client(0)
-  if not client then
-    client = M.start_server(opts.buf)
-    set_query_client(0, client)
-  end
+  if not M.client then M.client = M.start_server() end
 
   local queryPath = opts.query
   local qloPath = vim.fn.tempname()..'.qlo'
@@ -224,15 +211,14 @@ function M.run_query(opts)
     progressId = next_progress_id();
   }
 
-  local runQueries_callback = function(err, result)
+  local runQueries_callback = function(err, _)
     if err then
       util.err_message("ERROR: runQuery failed")
     end
-
     if util.is_file(bqrsPath) then
-        loader.process_results(bqrsPath, dbPath, queryPath, opts.metadata['kind'], opts.metadata['id'], true)
+      loader.process_results(bqrsPath, dbPath, queryPath, opts.metadata['kind'], opts.metadata['id'], true)
     else
-        util.err_message("ERROR: BQRS file cannot be found")
+      util.err_message("ERROR: BQRS file cannot be found at "..bqrsPath)
     end
   end
 
@@ -240,13 +226,13 @@ function M.run_query(opts)
     local failed = false
     if not result then return end
     for _,msg in ipairs(result.messages) do
-        if msg.severity == 0 then
-            util.err_message(msg.message)
-            failed = true
-        end
+      if msg.severity == 0 then
+        util.err_message(msg.message)
+        failed = true
+      end
     end
     if failed then
-        return
+      return
     else
       -- prepare `runQueries` params
       local runQueries_params = {
@@ -273,26 +259,22 @@ function M.run_query(opts)
       }
 
       -- run query
-      util.message("Running query")
-      client.request("evaluation/runQueries", runQueries_params, runQueries_callback)
+      util.message(string.format("Running query [%s]", M.client.pid))
+      M.client.request("evaluation/runQueries", runQueries_params, runQueries_callback)
     end
   end
 
   -- compile query
-  util.message("Compiling query")
+  util.message("Compiling query "..queryPath)
 
-  client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
+  M.client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
 end
 
-function M.stop_server(buf)
-  if not buf then
-    buf = vim.fn.bufnr()
-  end
-  if get_query_client(buf) then
-    local client = get_query_client(buf)
-    local handle = client.handle
+function M.stop_server()
+  if M.client then
+    local handle = M.client.handle
     handle:kill()
-    set_query_client(buf, nil)
+    M.client = nil
   end
 end
 
