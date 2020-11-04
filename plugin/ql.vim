@@ -36,6 +36,7 @@ if executable('codeql')
   command! StopServer lua require'codeql.queryserver'.stop_server()
   command! History lua require'codeql.history'.menu()
   command! PrintAST lua require'codeql.ast'.print_ast()
+  command! -nargs=1 -complete=file LoadSarif lua require'codeql.loader'.load_sarif_results(<f-args>)
 
   " mappings
   autocmd FileType ql nnoremap qr :RunQuery<CR>

@@ -5,35 +5,37 @@ local api = vim.api
 
 local M = {}
 
+vim.g.codeql_database = {}
+vim.g.codeql_ram_opts = {}
+
 function M.set_database(dbpath)
   local database = vim.fn.fnamemodify(vim.trim(dbpath), ':p')
-  if not util.is_dir(database) then
-    util.err_message('Incorrect database: '..database)
-    return nil
-  else
-    api.nvim_set_var('codeql_database', database)
-    util.message('Database set to '..database)
-  end
-end
-
-function M.get_database()
-  local status, database = pcall(api.nvim_get_var, 'codeql_database')
   if not vim.endswith(database, '/') then
     database = database..'/'
   end
-  return status and database or nil
+  if not util.is_dir(database) then
+    util.err_message('Incorrect database: '..database)
+  else
+    local metadata = util.database_info(database)
+    metadata.path = database
+    api.nvim_set_var('codeql_database', metadata)
+    util.message('Database set to '..database)
+  end
+  --TODO: print(util.database_upgrades(vim.g.codeql_database.dbscheme))
+  vim.g.codeql_ram_opts = util.resolve_ram(true)
 end
 
 function M.run_query(quick_eval)
-  local dbPath = M.get_database()
+  local dbPath = vim.g.codeql_database.path
   if dbPath == nil then
     util.err_message('Missing database. Use SetDatabase command')
     return nil
   end
 
-  if not util.is_dir(dbPath..'/src') and util.is_file(dbPath..'/src.zip') then
-    util.run_cmd('mkdir '..dbPath..'/src')
-    util.run_cmd('unzip '..dbPath..'/src.zip -d '..dbPath..'/src')
+  if not util.is_dir(vim.g.codeql_database.sourceArchiveRoot) and
+         util.is_file(vim.g.codeql_database.sourceArchiveZip) then
+    util.run_cmd('mkdir '..vim.g.codeql_database.sourceArchiveRoot)
+    util.run_cmd('unzip '..vim.g.codeql_database.sourceArchiveZip..' -d '..vim.g.codeql_database.sourceArchiveRoot)
   end
 
   local queryPath = vim.fn.expand('%:p')
@@ -67,7 +69,7 @@ function M.run_query(quick_eval)
     startColumn = column_start;
     endLine = line_end;
     endColumn = column_end;
-    metadata = util.extract_query_metadata(queryPath);
+    metadata = util.query_info(queryPath);
     libraryPath = libPaths.libraryPath;
     dbschemePath = libPaths.dbscheme;
   }

@@ -9,6 +9,7 @@ syntax match CodeqlPanelType '\a*\s\zs\[.*\]\ze$'
 syntax match CodeqlPanelBracket '\[.*\]' contains=CodeqlPanelLabel
 syntax match CodeqlPanelLabel '[^\[\]]*' contained
 
+highlight default link CodeqlPanelRuleId               Type
 highlight default link CodeqlPanelFoldIcon             Function 
 highlight default link CodeqlPanelVisitable            MoreMsg 
 highlight default link CodeqlPanelNonVisitable         WarningMsg 

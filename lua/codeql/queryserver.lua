@@ -23,30 +23,12 @@ local function next_evaluate_id()
   return evaluate_id
 end
 
-local function cmd_parts(input)
-  local cmd, cmd_args
-  if vim.tbl_islist(input) then
-    cmd = input[1]
-    cmd_args = {}
-    -- Don't mutate our input.
-    for i, v in ipairs(input) do
-      assert(type(v) == 'string', "input arguments must be strings")
-      if i > 1 then
-        table.insert(cmd_args, v)
-      end
-    end
-  else
-    error("cmd type must be list.")
-  end
-  return cmd, cmd_args
-end
-
 local M = {}
 
 M.client = nil
 
 function M.start_client(config)
-  local cmd, cmd_args = cmd_parts(config.cmd)
+  local cmd, cmd_args = util.cmd_parts(config.cmd)
 
   local client_id = next_client_id()
 
@@ -106,8 +88,8 @@ function M.start_server()
   if M.client then return M.client end
 
   util.message("Starting CodeQL Query Server")
-  local cmd = {"codeql", "execute", "query-server", "--logdir", "/tmp/codeql"}
-  vim.list_extend(cmd, util.resolve_ram(true))
+  local cmd = {"codeql", "execute", "query-server", "--logdir", "/tmp/codeql_queryserver"}
+  vim.list_extend(cmd, vim.g.codeql_ram_opts)
 
   local last_message = ''
 
@@ -161,15 +143,16 @@ function M.run_query(opts)
   local dbPath = opts.dbPath
   if not vim.endswith(dbPath, '/') then dbPath = dbPath .. '/' end
 
-  local dbDir
-  for _, dir in ipairs(vim.fn.glob(vim.fn.fnameescape(dbPath)..'*', 1, 1)) do
-    if vim.startswith(dir, dbPath..'db-') then
-      dbDir = dir
-      break
-    end
-  end
+  local dbDir = vim.g.codeql_database.datasetFolder
+  -- for _, dir in ipairs(vim.fn.glob(vim.fn.fnameescape(dbPath)..'*', 1, 1)) do
+  --   -- TODO: use `codeql resolve database` to get src location
+  --   if vim.startswith(dir, dbPath..'db-') then
+  --     dbDir = dir
+  --     break
+  --   end
+  -- end
   if not dbDir then
-    util.err_message('Cannot find db')
+    util.err_message('Cannot find dataset folder')
     return
   end
 

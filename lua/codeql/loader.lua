@@ -1,9 +1,10 @@
 local util = require'codeql.util'
 local panel = require'codeql.panel'
+local cli = require'codeql.cliserver'
 local vim = vim
 local api = vim.api
+local format = string.format
 
--- local functions
 local function generate_issue_label(node)
   local label = node.label
 
@@ -17,11 +18,20 @@ local function generate_issue_label(node)
   return label
 end
 
-local function uri_to_fname(uri, database)
+local function uri_to_fname(uri)
   local colon = string.find(uri, ':')
   if colon == nil then return uri end
   local scheme = string.sub(uri, 1, colon)
   local path = string.sub(uri, colon+1)
+
+  if string.find(string.upper(path), '%%SRCROOT%%') then
+    if vim.g.codeql_database then
+      local sourceLocationPrefix = vim.g.codeql_database.sourceLocationPrefix
+      path = string.gsub(path, '%%SRCROOT%%', sourceLocationPrefix)
+    else
+      -- TODO: request path to user
+    end
+  end
 
   local orig_fname
   if string.sub(uri, colon+1, colon+2) ~= '//' then
@@ -31,12 +41,11 @@ local function uri_to_fname(uri, database)
   end
   if util.is_file(orig_fname) then
     return orig_fname
-  elseif util.is_dir(database..'/src') then
-    return database..'/src'..orig_fname
+  elseif vim.g.codeql_database and util.is_dir(vim.g.codeql_database.sourceArchiveRoot) then
+    return vim.g.codeql_database.sourceArchiveRoot..orig_fname
   end
 end
 
--- exported functions
 local M = {}
 
 function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
@@ -56,34 +65,61 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
       graph_properties = true
     end
   end
+
   util.message(count.." rows found")
 
-  local ram_opts = util.resolve_ram(true)
+  local ram_opts = vim.g.codeql_ram_opts
+  local resultsPath = vim.fn.tempname()
 
-  -- process results
   if vim.tbl_contains(query_kinds, 'Graph') and
     vim.tbl_contains(query_kinds, 'Table') and
     graph_properties then
-    local jsonPath = vim.fn.tempname()
-    local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=id,url,string', bqrsPath}
+
+    -- process printAST results
+    local cmd = {
+      'bqrs', 'decode',
+      '-v', '--log-to-stderr',
+      '--format=json',
+      '-o='..resultsPath,
+      '--entities=id,url,string', bqrsPath
+    }
     vim.list_extend(cmd, ram_opts)
-    local cmds = { cmd, {'load_ast', jsonPath, dbPath} }
     util.message('Decoding BQRS '..bqrsPath)
-    require'codeql.job'.run_commands(cmds)
-    -- save BQRS if not called by :history
+    cli.runAsync(cmd, vim.schedule_wrap(function(_)
+      if util.is_file(resultsPath) then
+        require'codeql.ast'.build_ast(resultsPath)
+      else
+        util.err_message('ERROR: Cant find results at '..resultsPath)
+        panel.render({})
+      end
+    end))
     if save_bqrs then
       require'codeql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count)
     end
   elseif vim.tbl_contains(query_kinds, 'PathProblem') and
+
+    -- process SARIF results
     kind == 'path-problem' and
     id ~= nil then
-    local sarifPath = vim.fn.tempname()
-    local cmd = {'codeql', 'bqrs', 'interpret', bqrsPath, '-t=id='..id, '-t=kind='..kind, '-o='..sarifPath, '--format=sarif-latest'}
+    local cmd = {
+      'bqrs', 'interpret',
+      '-v', '--log-to-stderr',
+      '-t=id='..id,
+      '-t=kind='..kind,
+      '-o='..resultsPath,
+      '--format=sarif-latest',
+      bqrsPath
+    }
     vim.list_extend(cmd, ram_opts)
-    local cmds = { cmd, {'load_sarif', sarifPath, dbPath} }
     util.message('Decoding BQRS '..bqrsPath)
-    require'codeql.job'.run_commands(cmds)
-    -- save BQRS if not called by :history
+    cli.runAsync(cmd, vim.schedule_wrap(function(_)
+      if util.is_file(resultsPath) then
+        M.load_sarif_results(resultsPath)
+      else
+        util.err_message('ERROR: Cant find results at '..resultsPath)
+        panel.render({})
+      end
+    end))
     if save_bqrs then
       require'codeql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count)
     end
@@ -92,21 +128,35 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
     id == nil then
     util.err_message("ERROR: Insuficient Metadata for a Path Problem. Need at least @kind and @id elements")
   else
-    local jsonPath = vim.fn.tempname()
-    local cmd = {'codeql', 'bqrs', 'decode', '-o='..jsonPath, '--format=json', '--entities=string,url', bqrsPath}
+
+    -- process RAW results
+    local cmd = {
+      'bqrs', 'decode',
+      '-v', '--log-to-stderr',
+      '-o='..resultsPath,
+      '--format=json',
+      '--entities=string,url',
+      bqrsPath
+    }
     vim.list_extend(cmd, ram_opts)
-    local cmds = { cmd, {'load_raw', jsonPath, dbPath} }
     util.message('Decoding BQRS '..bqrsPath)
-    require'codeql.job'.run_commands(cmds)
-    -- save BQRS if not called by :history
+    cli.runAsync(cmd, vim.schedule_wrap(function(_)
+      if util.is_file(resultsPath) then
+        M.load_raw_results(resultsPath)
+      else
+        util.err_message('ERROR: Cant find results at '..resultsPath)
+        panel.render({})
+      end
+    end))
     if save_bqrs then
       require'codeql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count)
     end
   end
+
   api.nvim_command('redraw')
 end
 
-function M.load_raw_results(path, database)
+function M.load_raw_results(path)
   if not util.is_file(path) then return end
   local results = util.read_json_file(path)
 
@@ -120,9 +170,7 @@ function M.load_raw_results(path, database)
     end
   end
 
-  print(path)
-
-  --print("Found "..#tuples.." tuples")
+  print("Json: "..path)
 
   for _, tuple in ipairs(tuples) do
     path = {}
@@ -130,7 +178,7 @@ function M.load_raw_results(path, database)
       local node = {}
       -- objects with url info
       if type(element) == "table" and nil ~= element['url'] then
-        local filename = uri_to_fname(element['url']['uri'], database)
+        local filename = uri_to_fname(element['url']['uri'])
         local line = element['url']['startLine']
         node = {
           label = element['label'];
@@ -183,55 +231,88 @@ function M.load_raw_results(path, database)
       label = label;
       hidden = false;
       node = paths[1][1];
+      rule_id = "custom_query";
     })
   end
 
-  panel.render(database, issues)
+  panel.render(issues)
   api.nvim_command('redraw')
 end
 
-function M.load_sarif_results(path, database, max_length)
+function M.load_sarif_results(path)
+
+  local max_length = vim.g.codeql_path_max_length
   if not util.is_file(path) then return end
   local decoded = util.read_json_file(path)
   local results = decoded.runs[1].results
 
-  print(path)
+  print("Sarif: "..path)
+  print("Results: "..#results)
 
-  local paths = {}
+  local issues = {}
 
-  for _, r in ipairs(results) do
+  for i, r in ipairs(results) do
+    local message = r.message.text
+    local rule_id = r.ruleId
+
     if r.codeFlows == nil then
-      -- process results with no codeFlows
+      -- results with NO codeFlows
       local nodes = {}
-      local locs = vim.list_extend(r.locations, r.relatedLocations)
-      for i, l in ipairs(locs) do
+      local locs = {}
+      --- location relevant to understanding the result.
+      if r.relatedLocations then
+        locs = vim.list_extend(locs, r.relatedLocations)
+      end
+      --- location where the result occurred
+      if r.locations then
+        locs = vim.list_extend(locs, r.locations)
+      end
+      for j, l in ipairs(locs) do
         local node = {}
         if l.message then
-          node.label = l.message.text or 'no text'
+          node.label = l.message.text or message
         else
-          node.label = 'no text'
+          node.label = message
         end
-        if 1 == i then
-          node.mark = '⭃'
-        elseif #r.locations == i then
+        if #r.locations == j then
           node.mark = '⦿'
         else
           node.mark = '→'
         end
-        node.filename = uri_to_fname(l.physicalLocation.artifactLocation.uri, database)
-        node.line = l.physicalLocation.region.startLine
+        local uri = l.physicalLocation.artifactLocation.uri
+        local uriBaseId = l.physicalLocation.artifactLocation.uriBaseId
+        if uriBaseId then
+          uri = format('file:%s/%s', uriBaseId, uri)
+        end
+        local region = l.physicalLocation.region
+        node.filename = uri_to_fname(uri) or uri
+        node.line = region and region.startLine or -1
         node.visitable = true
         node.url = {
-          uri = l.physicalLocation.artifactLocation.uri;
-          startLine   = l.physicalLocation.region.startLine;
-          startColumn = l.physicalLocation.region.startColumn;
-          endColumn   = l.physicalLocation.region.endColumn;
+          uri = uri;
+          startLine   = region and region.startLine or -1;
+          startColumn = region and region.startColumn or -1;
+          endColumn   = region and region.endColumn or -1;
         }
         table.insert(nodes, node)
       end
-      paths['foo'] = { nodes }
-    else 
+
+      -- create issue
+      local primary_node = nodes[#nodes]
+      local label = generate_issue_label(primary_node)
+      local issue = {
+        is_folded = true;
+        paths = { nodes };
+        active_path = 1;
+        label = label;
+        hidden = false;
+        node = primary_node;
+        rule_id = rule_id;
+      }
+      table.insert(issues, issue)
+    else
       -- each result contains a codeflow that groups a source
+      local paths = {}
       for _, c in ipairs(r.codeFlows) do
         for _, t in ipairs(c.threadFlows) do
           -- each threadFlow contains all reached sinks for
@@ -239,28 +320,36 @@ function M.load_sarif_results(path, database, max_length)
           -- we can treat a threadFlow as a "regular" dataflow
           -- first element is source, last one is sink
           local nodes = {}
-          for i, l in ipairs(t.locations) do
+          for j, l in ipairs(t.locations) do
             local node = {}
             node.label = l.location.message.text
-            if 1 == i then
+            if 1 == j then
               node.mark = '⭃'
             elseif #t.locations == i then
               node.mark = '⦿'
             else
               node.mark = '→'
             end
-            node.filename = uri_to_fname(l.location.physicalLocation.artifactLocation.uri, database)
-            node.line = l.location.physicalLocation.region.startLine
+            local uri = l.location.physicalLocation.artifactLocation.uri
+            local uriBaseId = l.location.physicalLocation.artifactLocation.uriBaseId
+            if uriBaseId then
+              uri = format('file:%s%s', uriBaseId, uri)
+            end
+            local region = l.location.physicalLocation.region
+            node.filename = uri_to_fname(uri) or uri
+            node.line = region.startLine
             node.visitable = true
             node.url = {
-              uri = l.location.physicalLocation.artifactLocation.uri;
-              startLine   = l.location.physicalLocation.region.startLine;
-              startColumn = l.location.physicalLocation.region.startColumn;
-              endColumn   = l.location.physicalLocation.region.endColumn;
+              uri = uri;
+              startLine   = region.startLine;
+              startColumn = region.startColumn;
+              endColumn   = region.endColumn;
             }
             table.insert(nodes, node)
           end
 
+          -- group code flows with same source and sink
+          -- into a single issue with different paths
           if not max_length or max_length == -1 or #nodes <= max_length then
             local source = nodes[1]
             local sink = nodes[#nodes]
@@ -275,34 +364,32 @@ function M.load_sarif_results(path, database, max_length)
           end
         end
       end
-    end
 
-   -- ::continue::
+      -- create issue
+      --- issue label
+      for _, p in pairs(paths) do
+
+        local primary_node = p[1][1]
+        if vim.g.codeql_group_by_sink then
+          primary_node = p[1][#(p[1])]
+        end
+        local label = generate_issue_label(primary_node)
+
+        local issue = {
+          is_folded = true;
+          paths = p;
+          active_path = 1;
+          label = label;
+          hidden = false;
+          node = primary_node;
+          rule_id = rule_id;
+        }
+        table.insert(issues, issue)
+      end
+    end
   end
 
-  local issues = {}
-  for _, p in pairs(paths) do
-
-    -- issue label
-    local primary_node = p[1][1]
-    if vim.g.codeql_group_by_sink then
-      primary_node = p[1][#(p[1])]
-    end
-    local label = generate_issue_label(primary_node)
-
-    local issue = {
-      is_folded = true;
-      paths = p;
-      active_path = 1;
-      label = label;
-      hidden = false;
-      node = primary_node;
-    }
-    table.insert(issues, issue)
-  end
-
-  panel.render(database, issues)
-
+  panel.render(issues)
   api.nvim_command('redraw')
 end
 
