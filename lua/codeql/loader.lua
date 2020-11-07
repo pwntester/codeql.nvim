@@ -39,11 +39,7 @@ local function uri_to_fname(uri)
   else
     orig_fname = vim.uri_to_fname(uri)
   end
-  if util.is_file(orig_fname) then
-    return orig_fname
-  elseif vim.g.codeql_database and util.is_dir(vim.g.codeql_database.sourceArchiveRoot) then
-    return vim.g.codeql_database.sourceArchiveRoot..orig_fname
-  end
+  return orig_fname
 end
 
 local M = {}

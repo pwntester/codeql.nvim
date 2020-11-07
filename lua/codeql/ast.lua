@@ -182,10 +182,6 @@ local function is_cursor_in_node(cursor, node)
   util.err_message('Error checking cursor position')
 end
 
-local function escape_pattern(text)
-    return text:gsub("([^%w])", "%%%1")
-end
-
 local function get_node_at_cursor(cursor, node, matching_nodes)
   if is_cursor_in_node(cursor, node) then
     table.insert(matching_nodes, node)
@@ -461,11 +457,11 @@ function M.print_ast()
   M.ast_current_bufnr = bufnr
   local dbPath = vim.g.codeql_database.path
   local bufname = vim.fn.expand('%:p')
-  if not dbPath or not util.is_file(bufname) then
+  if not dbPath or not vim.startswith(bufname, 'zipfile:') then
     util.err_message('Missing database or incorrect code buffer')
     return
   end
-  local filePath = string.gsub(bufname, escape_pattern(vim.g.codeql_database.sourceArchiveRoot), '')
+  local filePath = '/'..vim.split(bufname, '::')[2]
   local ft = vim.bo[bufnr]['ft']
   if not ast_queries[ft] then
     util.err_message(format('PrintAST does not support %s file type', ft))

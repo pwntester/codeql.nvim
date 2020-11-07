@@ -32,12 +32,6 @@ function M.run_query(quick_eval)
     return nil
   end
 
-  if not util.is_dir(vim.g.codeql_database.sourceArchiveRoot) and
-         util.is_file(vim.g.codeql_database.sourceArchiveZip) then
-    util.run_cmd('mkdir '..vim.g.codeql_database.sourceArchiveRoot)
-    util.run_cmd('unzip '..vim.g.codeql_database.sourceArchiveZip..' -d '..vim.g.codeql_database.sourceArchiveRoot)
-  end
-
   local queryPath = vim.fn.expand('%:p')
 
   -- [bufnum, lnum, col, off, curswant]

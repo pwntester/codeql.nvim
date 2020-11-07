@@ -413,13 +413,29 @@ function M.jump_to_code(stay_in_pane)
     return
   end
 
+  local fname
+  -- open from src.zip
+  if vim.g.codeql_database and util.is_file(vim.g.codeql_database.sourceArchiveZip) then
+    if string.sub(node.filename, 1, 1) == '/' then
+      fname = format('zipfile:%s::%s', vim.g.codeql_database.sourceArchiveZip, string.sub(node.filename, 2))
+    else
+      fname = format('zipfile:%s::%s', vim.g.codeql_database.sourceArchiveZip, node.filename)
+    end
+  -- source code is uncompressed
+  elseif vim.g.codeql_database and util.is_dir(vim.g.codeql_database.sourceArchiveRoot) then
+    fname = format('%s%s', vim.g.codeql_database.sourceArchiveRoot, fname)
+  -- file exists
+  elseif util.is_file(node.filename) then
+    fname = node.filename
+  end
+
   -- save audit pane window
   local panel_window = vim.fn.win_getid()
 
   -- go to main window
   go_to_main_window()
 
-  api.nvim_command('silent! e '..vim.fn.fnameescape(node.filename))
+  api.nvim_command('silent! e '..vim.fn.fnameescape(fname))
 
   -- mark current position so it can be jumped back to
   api.nvim_command("mark '")
