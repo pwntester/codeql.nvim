@@ -2,16 +2,6 @@ local api = vim.api
 local format = string.format
 local util = require'codeql.util'
 
-local ast_queries = {
-  c          = 'cpp/ql/src/printAst.ql';
-  cpp        = 'cpp/ql/src/printAst.ql';
-  java       = 'java/ql/src/printAst.ql';
-  cs         = 'chsarp/ql/src/printAst.ql';
-  go         = 'ql/src/printAst.ql';
-  javascript = 'javascript/ql/src/printAst.ql';
-  python     = 'python/ql/src/printAst.ql';
-}
-
 local codeql_ast_ns = api.nvim_create_namespace('codeql_ast')
 
 local M = {}
@@ -444,63 +434,12 @@ function M.build_ast(jsonPath)
 
   print("found "..#roots.." roots")
 
-  local bufnr = M.ast_current_bufnr
+  local bufnr = require'codeql'.ast_current_bufnr
   M.attach(bufnr)
   local text_lines = print_tree(bufnr, roots)
   M._entries[bufnr].roots = roots
   M._entries[bufnr].results = { lines = text_lines }
   M.open(bufnr)
-end
-
-function M.print_ast()
-  local bufnr = api.nvim_get_current_buf()
-  M.ast_current_bufnr = bufnr
-  local dbPath = vim.g.codeql_database.path
-  local bufname = vim.fn.expand('%:p')
-  if not dbPath or not vim.startswith(bufname, 'zipfile:') then
-    util.err_message('Missing database or incorrect code buffer')
-    return
-  end
-  local filePath = '/'..vim.split(bufname, '::')[2]
-  local ft = vim.bo[bufnr]['ft']
-  if not ast_queries[ft] then
-    util.err_message(format('PrintAST does not support %s file type', ft))
-    return
-  end
-  local query = ast_queries[ft]
-  local queryPath
-  for _, path in ipairs(vim.g.codeql_search_path) do
-    local candidate = format('%s/%s', path, query)
-    print(candidate)
-    if util.is_file(candidate) then
-      queryPath = candidate
-      break
-    end
-  end
-  if not queryPath then
-    util.err_message('Cannot find a valid printAst query')
-    return
-  end
-
-  local templateValues = {
-    selectedSourceFile = {
-      values = {
-        tuples = { { { stringValue = filePath; } } }
-        }
-      }
-  }
-  local libPaths = util.resolve_library_path(queryPath)
-  local opts = {
-    quick_eval = false;
-    buf = api.nvim_get_current_buf();
-    query = queryPath;
-    dbPath = dbPath;
-    metadata = util.query_info(queryPath);
-    libraryPath = libPaths.libraryPath;
-    dbschemePath = libPaths.dbscheme;
-    templateValues = templateValues;
-  }
-  require'codeql.queryserver'.run_query(opts)
 end
 
 return M
