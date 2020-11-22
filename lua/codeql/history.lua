@@ -8,9 +8,10 @@ local history = {}
 
 local M = {}
 
-function M.save_bqrs(bqrs_path, query_path, db_path, kind, id, count)
+function M.save_bqrs(bqrs_path, query_path, db_path, kind, id, count, bufnr)
     -- should we store quickEval results?
     local entry = {
+        bufnr = bufnr;
         bqrs = bqrs_path;
         query = query_path;
         database = db_path;
@@ -38,7 +39,15 @@ function M.menu()
     elseif choice < 1 + #history then
         local entry = history[choice]
         if entry then
-            require'codeql.loader'.process_results(entry.bqrs, entry.database, entry.query, entry.kind, entry.id, false)
+            require'codeql.loader'.process_results({
+              bqrs_path = entry.bqrs;
+              bufnr = entry.bufnr;
+              db_path = entry.database;
+              query_path = entry.query;
+              query_kind = entry.kind;
+              query_id = entry.id;
+              save_bqrs = false;
+          })
         end
     end
 end

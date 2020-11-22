@@ -135,6 +135,7 @@ function M.run_query(opts)
 
   if not M.client then M.client = M.start_server() end
 
+  local bufnr = opts.bufnr
   local queryPath = opts.query
   local qloPath = vim.fn.tempname()..'.qlo'
   local bqrsPath = vim.fn.tempname()..'.bqrs'
@@ -144,13 +145,6 @@ function M.run_query(opts)
   if not vim.endswith(dbPath, '/') then dbPath = dbPath .. '/' end
 
   local dbDir = vim.g.codeql_database.datasetFolder
-  -- for _, dir in ipairs(vim.fn.glob(vim.fn.fnameescape(dbPath)..'*', 1, 1)) do
-  --   -- TODO: use `codeql resolve database` to get src location
-  --   if vim.startswith(dir, dbPath..'db-') then
-  --     dbDir = dir
-  --     break
-  --   end
-  -- end
   if not dbDir then
     util.err_message('Cannot find dataset folder')
     return
@@ -199,7 +193,15 @@ function M.run_query(opts)
       util.err_message("ERROR: runQuery failed")
     end
     if util.is_file(bqrsPath) then
-      loader.process_results(bqrsPath, dbPath, queryPath, opts.metadata['kind'], opts.metadata['id'], true)
+      loader.process_results({
+        bqrs_path = bqrsPath;
+        bufnr = bufnr;
+        db_path = dbPath;
+        query_path = queryPath;
+        query_kind = opts.metadata['kind'];
+        query_id = opts.metadata['id'];
+        save_bqrs = true;
+      })
     else
       util.err_message("ERROR: BQRS file cannot be found at "..bqrsPath)
     end

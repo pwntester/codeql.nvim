@@ -18,7 +18,9 @@ local function generate_issue_label(node)
   return label
 end
 
-local function uri_to_fname(uri)
+local M = {}
+
+function M.uri_to_fname(uri)
   local colon = string.find(uri, ':')
   if colon == nil then return uri end
   local scheme = string.sub(uri, 1, colon)
@@ -42,36 +44,34 @@ local function uri_to_fname(uri)
   return orig_fname
 end
 
-local M = {}
-
-function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
-  util.message("Processing results: " .. bqrsPath)
-  util.message("dbPath: " .. dbPath)
-
-  local info = util.bqrs_info(bqrsPath)
-  local query_kinds = info['compatible-query-kinds']
-  -- util.message(query_kinds)
-
-  local count = info['result-sets'][1]['rows']
-  local graph_properties = false
-  for _, resultset in ipairs(info['result-sets']) do
-    if resultset.name == "#select" then
-      count = resultset.rows
-    elseif resultset.name == "graphProperties" then
-      graph_properties = true
-    end
-  end
-
-  util.message(count.." rows found")
-
+function M.process_results(opts)
+  local bqrsPath = opts.bqrs_path
+  local dbPath = opts.db_path
+  local queryPath = opts.query_path
+  local kind = opts.query_kind
+  local id = opts.query_id
+  local save_bqrs = opts.save_bqrs
+  local bufnr = opts.bufnr
   local ram_opts = vim.g.codeql_ram_opts
   local resultsPath = vim.fn.tempname()
 
-  if vim.tbl_contains(query_kinds, 'Graph') and
-    vim.tbl_contains(query_kinds, 'Table') and
-    graph_properties then
+  local info = util.bqrs_info(bqrsPath)
+  if not info or not info['result-sets'] then return end
 
-    -- process printAST results
+  local query_kinds = info['compatible-query-kinds']
+
+  local count = info['result-sets'][1]['rows']
+  for _, resultset in ipairs(info['result-sets']) do
+    if resultset.name == "#select" then
+      count = resultset.rows
+    end
+  end
+  util.message(format("Processing %s results", queryPath))
+  util.message(format("%d rows found", count))
+
+
+  -- process definitions
+  if vim.endswith(queryPath, '/localDefinitions.ql') then
     local cmd = {
       'bqrs', 'decode',
       '-v', '--log-to-stderr',
@@ -83,18 +83,58 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
     util.message('Decoding BQRS '..bqrsPath)
     cli.runAsync(cmd, vim.schedule_wrap(function(_)
       if util.is_file(resultsPath) then
-        require'codeql.ast'.build_ast(resultsPath)
+        require'codeql.defs'.process_defs(resultsPath, bufnr)
       else
         util.err_message('ERROR: Cant find results at '..resultsPath)
         panel.render({})
       end
     end))
-    if save_bqrs then
-      require'codeql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count)
-    end
-  elseif vim.tbl_contains(query_kinds, 'PathProblem') and
 
-    -- process SARIF results
+
+  -- process references
+  elseif vim.endswith(queryPath, '/localReferences.ql') then
+    local cmd = {
+      'bqrs', 'decode',
+      '-v', '--log-to-stderr',
+      '--format=json',
+      '-o='..resultsPath,
+      '--entities=id,url,string', bqrsPath
+    }
+    vim.list_extend(cmd, ram_opts)
+    util.message('Decoding BQRS '..bqrsPath)
+    cli.runAsync(cmd, vim.schedule_wrap(function(_)
+      if util.is_file(resultsPath) then
+        require'codeql.defs'.process_refs(resultsPath, bufnr)
+      else
+        util.err_message('ERROR: Cant find results at '..resultsPath)
+        panel.render({})
+      end
+    end))
+
+
+  -- process printAST results
+  elseif vim.endswith(queryPath, '/printAst.ql') then
+    local cmd = {
+      'bqrs', 'decode',
+      '-v', '--log-to-stderr',
+      '--format=json',
+      '-o='..resultsPath,
+      '--entities=id,url,string', bqrsPath
+    }
+    vim.list_extend(cmd, ram_opts)
+    util.message('Decoding BQRS '..bqrsPath)
+    cli.runAsync(cmd, vim.schedule_wrap(function(_)
+      if util.is_file(resultsPath) then
+        require'codeql.ast'.build_ast(resultsPath, bufnr)
+      else
+        util.err_message('ERROR: Cant find results at '..resultsPath)
+        panel.render({})
+      end
+    end))
+
+
+  -- process SARIF results
+  elseif vim.tbl_contains(query_kinds, 'PathProblem') and
     kind == 'path-problem' and
     id ~= nil then
     local cmd = {
@@ -117,15 +157,17 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
       end
     end))
     if save_bqrs then
-      require'codeql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count)
+      require'codeql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count, bufnr)
     end
   elseif vim.tbl_contains(query_kinds, 'PathProblem') and
     kind == 'path-problem' and
     id == nil then
     util.err_message("ERROR: Insuficient Metadata for a Path Problem. Need at least @kind and @id elements")
-  else
 
-    -- process RAW results
+
+
+  -- process RAW results
+  else
     local cmd = {
       'bqrs', 'decode',
       '-v', '--log-to-stderr',
@@ -145,7 +187,7 @@ function M.process_results(bqrsPath, dbPath, queryPath, kind, id, save_bqrs)
       end
     end))
     if save_bqrs then
-      require'codeql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count)
+      require'codeql.history'.save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count, bufnr)
     end
   end
 
@@ -174,14 +216,14 @@ function M.load_raw_results(path)
       local node = {}
       -- objects with url info
       if type(element) == "table" and nil ~= element['url'] then
-        local filename = uri_to_fname(element['url']['uri'])
+        local filename = M.uri_to_fname(element['url']['uri'])
         local line = element['url']['startLine']
         node = {
           label = element['label'];
           mark = '→',
           filename = filename;
           line =  line,
-          visitable = (filename ~= nil and filename ~= '' and util.is_file(filename)) and true or false;
+          visitable = true;
           url = element.url;
         }
 
@@ -281,7 +323,7 @@ function M.load_sarif_results(path)
           uri = format('file:%s/%s', uriBaseId, uri)
         end
         local region = l.physicalLocation.region
-        node.filename = uri_to_fname(uri) or uri
+        node.filename = M.uri_to_fname(uri) or uri
         node.line = region and region.startLine or -1
         node.visitable = true
         node.url = {
@@ -332,7 +374,7 @@ function M.load_sarif_results(path)
               uri = format('file:%s%s', uriBaseId, uri)
             end
             local region = l.location.physicalLocation.region
-            node.filename = uri_to_fname(uri) or uri
+            node.filename = M.uri_to_fname(uri) or uri
             node.line = region.startLine
             node.visitable = true
             node.url = {

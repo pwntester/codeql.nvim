@@ -22,6 +22,5 @@ highlight default link CodeqlPanelType                 Title
 highlight default link CodeqlPanelBracket              String
 highlight default link CodeqlPanelFile                 NonText
 highlight default link CodeqlPanelSeparator            Function
-highlight CodeqlRange guifg=#FF628C gui=bold
 
 let b:current_syntax = "codeqlpanel"

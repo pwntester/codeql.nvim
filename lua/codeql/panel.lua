@@ -14,7 +14,24 @@ local database = ''
 local issues = {}
 local scaninfo = {}
 
+local range_ns = api.nvim_create_namespace("codeql")
+
 -- local functions
+
+local function open_from_archive(zipfile, path)
+  local name = format('codeql:/%s', path)
+  local bufnr = vim.fn.bufnr(name)
+  if bufnr == -1 then
+    vim.cmd('enew')
+    vim.cmd(format('keepalt silent! read! unzip -p -- %s %s', zipfile, path))
+    vim.cmd('normal! ggdd')
+    vim.cmd(format('file %s', name))
+    vim.cmd('filetype detect')
+    vim.cmd('set nomodified')
+  elseif api.nvim_buf_is_loaded(bufnr) then
+    api.nvim_set_current_buf(bufnr)
+  end
+end
 
 local function store_in_scaninfo(node)
   local bufnr = vim.fn.bufnr(panel_buffer_name)
@@ -413,59 +430,41 @@ function M.jump_to_code(stay_in_pane)
     return
   end
 
-  local fname
   -- open from src.zip
   if vim.g.codeql_database and util.is_file(vim.g.codeql_database.sourceArchiveZip) then
+    --local fname = format('codeql:%s::%s', vim.g.codeql_database.sourceArchiveZip, node.filename)
     if string.sub(node.filename, 1, 1) == '/' then
-      fname = format('zipfile:%s::%s', vim.g.codeql_database.sourceArchiveZip, string.sub(node.filename, 2))
-    else
-      fname = format('zipfile:%s::%s', vim.g.codeql_database.sourceArchiveZip, node.filename)
+      --fname = format('codeql:%s::%s', vim.g.codeql_database.sourceArchiveZip, string.sub(node.filename, 2))
+      node.filename = string.sub(node.filename, 2)
     end
-  -- source code is uncompressed
-  elseif vim.g.codeql_database and util.is_dir(vim.g.codeql_database.sourceArchiveRoot) then
-    fname = format('%s%s', vim.g.codeql_database.sourceArchiveRoot, fname)
-  -- file exists
-  elseif util.is_file(node.filename) then
-    fname = node.filename
+
+    -- save audit pane window
+    local panel_window = vim.fn.win_getid()
+
+    -- go to main window
+    go_to_main_window()
+
+    open_from_archive(vim.g.codeql_database.sourceArchiveZip, node.filename)
+    vim.fn.execute(node.line)
+    vim.cmd('normal! z.')
+    vim.cmd('normal! zv')
+    vim.cmd('redraw')
+
+    -- highlight node
+    api.nvim_buf_clear_namespace(0, range_ns, 0, -1)
+    local startLine = node.url.startLine
+    local startColumn = node.url.startColumn
+    local endColumn = node.url.endColumn
+
+    -- TODO: workaround for race conditions with TS
+    for _=1,20 do
+      api.nvim_buf_add_highlight(0, range_ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn-1)
+    end
+
+    if stay_in_pane then vim.fn.win_gotoid(panel_window) end
+
   end
 
-  -- save audit pane window
-  local panel_window = vim.fn.win_getid()
-
-  -- go to main window
-  go_to_main_window()
-
-  api.nvim_command('silent! e '..vim.fn.fnameescape(fname))
-
-  -- mark current position so it can be jumped back to
-  api.nvim_command("mark '")
-
-  -- jump to the line where the tag is defined
-  vim.fn.execute(node.line)
-
-  -- highlight node
-  local ns = api.nvim_create_namespace("codeql")
-  -- TODO: clear codeql namespace in all buffers
-  api.nvim_buf_clear_namespace(0, ns, 0, -1)
-  -- TODO: multi-line range
-  local startLine = node.url.startLine
-  local startColumn = node.url.startColumn
-  local endColumn = node.url.endColumn
-  api.nvim_buf_add_highlight(0, ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn)
-
-  -- TODO: need a way to clear highlights manually (command?)
-  -- TODO: when changing line in audit panel (or cursorhold), check if we are over a node and
-  -- if so, search for buffer based on filename, if there is one, do
-  -- highlighting
-
-  -- center the tag in the window
-  api.nvim_command('normal! z.')
-  api.nvim_command('normal! zv')
-
-  if stay_in_pane then
-    vim.fn.win_gotoid(panel_window)
-    api.nvim_command('redraw')
-  end
 end
 
 function M.close_codeql_panel()

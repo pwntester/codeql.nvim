@@ -9,6 +9,41 @@ local M = {}
 vim.g.codeql_database = {}
 vim.g.codeql_ram_opts = {}
 
+M.count = 0
+
+function M.load_archive_file()
+  print("load archive file")
+  local bufname = vim.fn.bufname()
+  local bufnr = vim.fn.bufnr()
+  M.count = M.count + 1
+  print(M.count, bufnr, bufname)
+  vim.fn['zip#Read'](string.gsub(bufname, 'codeql:', 'zipfile:'), 1)
+end
+
+function M.load_definitions()
+  
+  if true then return end
+
+  local bufnr = vim.api.nvim_get_current_buf()
+  local bufname = vim.fn.bufname(bufnr)
+
+  -- not a codeql:// buffer
+  if not vim.startswith(bufname, 'codeql:/') then return end
+
+  local defs = require'codeql.defs'
+  local fname = format('/%s', vim.split(bufname, '::')[2])
+
+  -- file already processed
+  if defs.processedFiles[fname] then return end
+
+  -- query the buffer for defs and refs
+  M.run_templated_query('localDefinitions')
+  M.run_templated_query('localReferences')
+
+  -- prevent further definition queries from being run on the same buffer
+  defs.processedFiles[fname] = true
+end
+
 function M.set_database(dbpath)
   local database = vim.fn.fnamemodify(vim.trim(dbpath), ':p')
   if not vim.endswith(database, '/') then
@@ -57,7 +92,7 @@ function M.run_query(quick_eval)
 
   local opts = {
     quick_eval = quick_eval;
-    buf = api.nvim_get_current_buf();
+    bufnr = api.nvim_get_current_buf();
     query = queryPath;
     dbPath = dbPath;
     startLine = line_start;
@@ -84,14 +119,13 @@ local templated_queries = {
 
 function M.run_templated_query(query_name)
   local bufnr = api.nvim_get_current_buf()
-  M.ast_current_bufnr = bufnr
   local dbPath = vim.g.codeql_database.path
   local bufname = vim.fn.expand('%:p')
-  if not dbPath or not vim.startswith(bufname, 'zipfile:') then
+  if not dbPath or not vim.startswith(bufname, 'codeql:') then
     util.err_message('Missing database or incorrect code buffer')
     return
   end
-  local filePath = '/'..vim.split(bufname, '::')[2]
+  local fname = format('/%s', vim.split(bufname, '::')[2])
   local ft = vim.bo[bufnr]['ft']
   if not templated_queries[ft] then
     util.err_message(format('%s does not support %s file type', query_name, ft))
@@ -114,14 +148,14 @@ function M.run_templated_query(query_name)
   local templateValues = {
     selectedSourceFile = {
       values = {
-        tuples = { { { stringValue = filePath; } } }
+        tuples = { { { stringValue = fname; } } }
         }
       }
   }
   local libPaths = util.resolve_library_path(queryPath)
   local opts = {
     quick_eval = false;
-    buf = api.nvim_get_current_buf();
+    bufnr = bufnr;
     query = queryPath;
     dbPath = dbPath;
     metadata = util.query_info(queryPath);

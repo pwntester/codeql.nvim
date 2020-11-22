@@ -343,7 +343,7 @@ function M.detach(bufnr)
   vim.cmd(format('autocmd! CodeQLAST_%d BufLeave', bufnr))
 end
 
-function M.build_ast(jsonPath)
+function M.build_ast(jsonPath, bufnr)
   if not util.is_file(jsonPath) then return end
   local results = util.read_json_file(jsonPath)
 
@@ -385,17 +385,17 @@ function M.build_ast(jsonPath)
 
   -- populate parents and children
   for _, tuple in ipairs(nodeTuples.tuples) do
-    local entity, tupleType, orderValue = unpack(tuple)
+    local entity, tupleType, value = unpack(tuple)
     -- local tupleType = tuple[2]
     -- local orderValue = tuple[3]
     local id = entity.id
 
     if tupleType == 'semmle.order' then
-      astOrder[id] = tonumber(orderValue)
+      astOrder[id] = tonumber(value)
     elseif tupleType == 'semmle.label' then
       local item = {
         id = id;
-        label = entity.label;
+        label = value and value or entity.label;
         location = entity.url;
         children = {};
         order = math.huge;
@@ -434,7 +434,6 @@ function M.build_ast(jsonPath)
 
   print("found "..#roots.." roots")
 
-  local bufnr = require'codeql'.ast_current_bufnr
   M.attach(bufnr)
   local text_lines = print_tree(bufnr, roots)
   M._entries[bufnr].roots = roots
