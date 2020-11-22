@@ -42,7 +42,6 @@ if executable('codeql')
   " autocommands 
   "augroup codeql_core
   "au!
-  "au BufReadCmd codeql:/* lua require'codeql'.load_archive_file()
   "au BufEnter codeql:/* lua require'codeql'.load_definitions()
   "augroup END
 

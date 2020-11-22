@@ -11,17 +11,8 @@ vim.g.codeql_ram_opts = {}
 
 M.count = 0
 
-function M.load_archive_file()
-  print("load archive file")
-  local bufname = vim.fn.bufname()
-  local bufnr = vim.fn.bufnr()
-  M.count = M.count + 1
-  print(M.count, bufnr, bufname)
-  vim.fn['zip#Read'](string.gsub(bufname, 'codeql:', 'zipfile:'), 1)
-end
-
 function M.load_definitions()
-  
+
   if true then return end
 
   local bufnr = vim.api.nvim_get_current_buf()
