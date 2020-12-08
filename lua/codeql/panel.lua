@@ -26,7 +26,7 @@ local function open_from_archive(zipfile, path)
     vim.cmd(format('keepalt silent! read! unzip -p -- %s %s', zipfile, path))
     vim.cmd('normal! ggdd')
     vim.cmd(format('file %s', name))
-    vim.cmd('filetype detect')
+    vim.cmd('filetype detect') -- consumes FDs
     vim.cmd('set nomodified')
   elseif api.nvim_buf_is_loaded(bufnr) then
     api.nvim_set_current_buf(bufnr)
@@ -332,14 +332,14 @@ local function render_keep_view(line)
   render_content()
 
   local scrolloff_save = api.nvim_get_option('scrolloff')
-  api.nvim_command('set scrolloff=0')
+  vim.cmd('set scrolloff=0')
 
   vim.fn.cursor(topline, 1)
-  api.nvim_command('normal! zt')
+  vim.cmd('normal! zt')
   vim.fn.cursor(line, curcol)
 
-  api.nvim_command('let &scrolloff = '..scrolloff_save)
-  api.nvim_command('redraw')
+  vim.cmd('let &scrolloff = '..scrolloff_save)
+  vim.cmd('redraw') -- consumes FDs
 end
 
 -- exported functions
@@ -367,7 +367,7 @@ end
 
 function M.toggle_fold()
   -- prevent highlighting from being off after adding/removing the help text
-  api.nvim_command('match none')
+  vim.cmd('match none')
 
   local c = vim.fn.line('.')
   while c >= 7 do
@@ -417,6 +417,7 @@ function M.change_path(offset)
 end
 
 function M.jump_to_code(stay_in_pane)
+  --print('FDs before jumping '..vim.fn.system('lsof -p '..vim.loop.getpid()..' | wc -l'))
   if not scaninfo.line_map[vim.fn.line('.')] then return end
 
   local node = scaninfo.line_map[vim.fn.line('.')]
@@ -432,9 +433,7 @@ function M.jump_to_code(stay_in_pane)
 
   -- open from src.zip
   if vim.g.codeql_database and util.is_file(vim.g.codeql_database.sourceArchiveZip) then
-    --local fname = format('codeql:%s::%s', vim.g.codeql_database.sourceArchiveZip, node.filename)
     if string.sub(node.filename, 1, 1) == '/' then
-      --fname = format('codeql:%s::%s', vim.g.codeql_database.sourceArchiveZip, string.sub(node.filename, 2))
       node.filename = string.sub(node.filename, 2)
     end
 
@@ -448,7 +447,7 @@ function M.jump_to_code(stay_in_pane)
     vim.fn.execute(node.line)
     vim.cmd('normal! z.')
     vim.cmd('normal! zv')
-    vim.cmd('redraw')
+    --vim.cmd('redraw') -- consumes FDs
 
     -- highlight node
     api.nvim_buf_clear_namespace(0, range_ns, 0, -1)
@@ -456,15 +455,13 @@ function M.jump_to_code(stay_in_pane)
     local startColumn = node.url.startColumn
     local endColumn = node.url.endColumn
 
-    -- TODO: workaround for race conditions with TS
-    for _=1,20 do
-      api.nvim_buf_add_highlight(0, range_ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn-1)
-    end
+     api.nvim_buf_add_highlight(0, range_ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn-1)
 
+    -- jump to main window if requested
     if stay_in_pane then vim.fn.win_gotoid(panel_window) end
-
   end
 
+  --print('FDs afget jumping '..vim.fn.system('lsof -p '..vim.loop.getpid()..' | wc -l'))
 end
 
 function M.close_codeql_panel()

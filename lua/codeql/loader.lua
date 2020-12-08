@@ -371,7 +371,7 @@ function M.load_sarif_results(path)
             local uri = l.location.physicalLocation.artifactLocation.uri
             local uriBaseId = l.location.physicalLocation.artifactLocation.uriBaseId
             if uriBaseId then
-              uri = format('file:%s%s', uriBaseId, uri)
+              uri = format('file:%s/%s', uriBaseId, uri)
             end
             local region = l.location.physicalLocation.region
             node.filename = M.uri_to_fname(uri) or uri

@@ -147,6 +147,7 @@ function M.resolve_ram(jvm)
         return vim.startswith(i, '-J')
       end, ram_opts)
     end
+    print(vim.inspect(ram_opts))
     return ram_opts
   end
 end
