@@ -23,11 +23,9 @@ function M.load_definitions()
   local defs = require'codeql.defs'
   local fname = format('%s', vim.split(bufname, ':')[2])
   if defs.processedFiles[fname] then
-    print(fname .. ' has already been processed')
     return
   end
 
-  print('processing '..fname)
   -- query the buffer for defs and refs
   M.run_templated_query('localDefinitions', fname)
   M.run_templated_query('localReferences', fname)
