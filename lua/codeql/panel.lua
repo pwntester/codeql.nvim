@@ -18,21 +18,6 @@ local range_ns = api.nvim_create_namespace("codeql")
 
 -- local functions
 
-local function open_from_archive(zipfile, path)
-  local name = format('codeql:/%s', path)
-  local bufnr = vim.fn.bufnr(name)
-  if bufnr == -1 then
-    vim.cmd('enew')
-    vim.cmd(format('keepalt silent! read! unzip -p -- %s %s', zipfile, path))
-    vim.cmd('normal! ggdd')
-    vim.cmd(format('file %s', name))
-    vim.cmd('filetype detect') -- consumes FDs
-    vim.cmd('set nomodified')
-  elseif api.nvim_buf_is_loaded(bufnr) then
-    api.nvim_set_current_buf(bufnr)
-  end
-end
-
 local function store_in_scaninfo(node)
   local bufnr = vim.fn.bufnr(panel_buffer_name)
   local curline = api.nvim_buf_line_count(bufnr)
@@ -443,7 +428,7 @@ function M.jump_to_code(stay_in_pane)
     -- go to main window
     go_to_main_window()
 
-    open_from_archive(vim.g.codeql_database.sourceArchiveZip, node.filename)
+    util.open_from_archive(vim.g.codeql_database.sourceArchiveZip, node.filename)
     vim.fn.execute(node.line)
     vim.cmd('normal! z.')
     vim.cmd('normal! zv')

@@ -2,8 +2,25 @@ local cli = require'codeql.cliserver'
 local vim = vim
 local api = vim.api
 local uv = vim.loop
+local format = string.format
 
 local M = {}
+
+function M.open_from_archive(zipfile, path)
+  local name = format('codeql:/%s', path)
+  local bufnr = vim.fn.bufnr(name)
+  if bufnr == -1 then
+    vim.cmd('enew')
+    vim.cmd(format('keepalt silent! read! unzip -p -- %s %s', zipfile, path))
+    vim.cmd('normal! ggdd')
+    vim.cmd(format('file %s', name))
+    vim.cmd('filetype detect') -- consumes FDs
+    vim.cmd('set nomodified')
+    vim.cmd('doau BufEnter')
+  elseif api.nvim_buf_is_loaded(bufnr) then
+    api.nvim_set_current_buf(bufnr)
+  end
+end
 
 function M.run_cmd(cmd, raw)
   local f = assert(io.popen(cmd, 'r'))
@@ -147,7 +164,6 @@ function M.resolve_ram(jvm)
         return vim.startswith(i, '-J')
       end, ram_opts)
     end
-    print(vim.inspect(ram_opts))
     return ram_opts
   end
 end

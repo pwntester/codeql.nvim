@@ -40,10 +40,10 @@ if executable('codeql')
   command! -nargs=1 -complete=file LoadSarif lua require'codeql.loader'.load_sarif_results(<f-args>)
 
   " autocommands 
-  "augroup codeql_core
-  "au!
-  "au BufEnter codeql:/* lua require'codeql'.load_definitions()
-  "augroup END
+  augroup codeql_core
+  au!
+  au BufEnter codeql:/* lua require'codeql'.load_definitions()
+  augroup END
 
   " mappings
   nnoremap <Plug>(CodeQLGoToDefinition) <cmd>lua require'codeql.defs'.find_at_cursor('definitions')<CR>

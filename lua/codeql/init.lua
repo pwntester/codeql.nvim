@@ -13,23 +13,24 @@ M.count = 0
 
 function M.load_definitions()
 
-  if true then return end
-
   local bufnr = vim.api.nvim_get_current_buf()
   local bufname = vim.fn.bufname(bufnr)
 
   -- not a codeql:// buffer
   if not vim.startswith(bufname, 'codeql:/') then return end
 
+  -- check if file has already been processed
   local defs = require'codeql.defs'
-  local fname = format('/%s', vim.split(bufname, '::')[2])
+  local fname = format('%s', vim.split(bufname, ':')[2])
+  if defs.processedFiles[fname] then
+    print(fname .. ' has already been processed')
+    return
+  end
 
-  -- file already processed
-  if defs.processedFiles[fname] then return end
-
+  print('processing '..fname)
   -- query the buffer for defs and refs
-  M.run_templated_query('localDefinitions')
-  M.run_templated_query('localReferences')
+  M.run_templated_query('localDefinitions', fname)
+  M.run_templated_query('localReferences', fname)
 
   -- prevent further definition queries from being run on the same buffer
   defs.processedFiles[fname] = true
@@ -108,15 +109,9 @@ local templated_queries = {
   python     = 'python/ql/src/%s.ql';
 }
 
-function M.run_templated_query(query_name)
+function M.run_templated_query(query_name, param)
   local bufnr = api.nvim_get_current_buf()
   local dbPath = vim.g.codeql_database.path
-  local bufname = vim.fn.expand('%:p')
-  if not dbPath or not vim.startswith(bufname, 'codeql:') then
-    util.err_message('Missing database or incorrect code buffer')
-    return
-  end
-  local fname = format('/%s', vim.split(bufname, '::')[2])
   local ft = vim.bo[bufnr]['ft']
   if not templated_queries[ft] then
     util.err_message(format('%s does not support %s file type', query_name, ft))
@@ -139,7 +134,7 @@ function M.run_templated_query(query_name)
   local templateValues = {
     selectedSourceFile = {
       values = {
-        tuples = { { { stringValue = fname; } } }
+        tuples = { { { stringValue = param; } } }
         }
       }
   }
