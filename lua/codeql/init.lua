@@ -21,7 +21,7 @@ function M.load_definitions()
 
   -- check if file has already been processed
   local defs = require'codeql.defs'
-  local fname = format('%s', vim.split(bufname, ':')[2])
+  local fname = vim.split(bufname, ':')[2]
   if defs.processedFiles[fname] then
     return
   end
@@ -106,6 +106,17 @@ local templated_queries = {
   javascript = 'javascript/ql/src/%s.ql';
   python     = 'python/ql/src/%s.ql';
 }
+
+function M.run_print_ast()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local bufname = vim.fn.bufname(bufnr)
+
+  -- not a codeql:// buffer
+  if not vim.startswith(bufname, 'codeql:/') then return end
+
+  local fname = vim.split(bufname, ':')[2]
+  M.run_templated_query('printAst', fname)
+end
 
 function M.run_templated_query(query_name, param)
   local bufnr = api.nvim_get_current_buf()

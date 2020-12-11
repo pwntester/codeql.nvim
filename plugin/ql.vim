@@ -36,7 +36,7 @@ if executable('codeql')
   command! -range QuickEval lua require'codeql'.run_query(true)
   command! StopServer lua require'codeql.queryserver'.stop_server()
   command! History lua require'codeql.history'.menu()
-  command! PrintAST lua require'codeql'.run_templated_query('printAst')
+  command! PrintAST lua require'codeql'.run_print_ast()
   command! -nargs=1 -complete=file LoadSarif lua require'codeql.loader'.load_sarif_results(<f-args>)
 
   " autocommands 

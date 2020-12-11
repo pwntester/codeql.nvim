@@ -56,6 +56,14 @@ let g:codeql_search_path = ['/Users/pwntester/codeql-home/codeql-repo', '/Users/
 - `QuickEval`: Quick evals the predicate or selection under cursor. Requires a DB to be set first.
 - `History`: Shows a menu to render results of previous queries (on the same nvim session).
 - `StopServer`: Stops the query server associated with the query buffer. A new one will be started upon query evaluation.
+- `PrintAST`: On a `codeql:/` buffer, prints the AST of the current file.
+- `LoadSarif`: Loads the issues of a SARIF file. To browse the results, use `SetDatabase` before.
+
+## Mappings
+- `gd`: On a `codeql:/` file, jumps to the symbol definition.
+- `gr`: On a `codeql:/` file, show symbol references in the QuickFix window.
+- `qr`: Runs the current query.
+- `qe`: QuickEvals the selected predicate.
 
 ## Result Browser
 After running a query or quick evaluating a predicate, results will be rendered in a special panel.

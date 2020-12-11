@@ -344,14 +344,18 @@ function M.detach(bufnr)
 end
 
 function M.build_ast(jsonPath, bufnr)
+  print('FOO1')
   if not util.is_file(jsonPath) then return end
   local results = util.read_json_file(jsonPath)
 
+  print('FOO2')
   local nodeTuples = results.nodes
   local edgeTuples = results.edges
   local graphProperties = results.graphProperties
 
+  print('FOO3')
   if not is_valid_graph(graphProperties) then
+    print('FOO3')
     util.err_message('Invalid AST tree')
     return
   end
