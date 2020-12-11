@@ -11,7 +11,7 @@ local function start()
 
   print("Starting CodeQL CLI Server")
 
-  local cmd = "/Users/pwntester/bin/codeql"
+  local cmd = "codeql"
   local cmd_args = {"execute", "cli-server", "--logdir", "/tmp/codeql_queryserver"}
 
   if not (vim.fn.executable(cmd) == 1) then
