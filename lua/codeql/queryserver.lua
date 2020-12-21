@@ -3,6 +3,7 @@ local loader = require'codeql.loader'
 local rpc = require'vim.lsp.rpc'
 local protocol = require'vim.lsp.protocol'
 local vim = vim
+local format = string.format
 
 local client_index = 0
 local evaluate_id = 0
@@ -34,7 +35,7 @@ function M.start_client(config)
 
   local callbacks = config.callbacks or {}
   local name = config.name or tostring(client_id)
-  local log_prefix = string.format("QueryServer[%s]", name)
+  local log_prefix = string.format('QueryServer[%s]', name)
   local handlers = {}
 
   local function resolve_callback(method)
@@ -110,20 +111,20 @@ function M.start_server()
 
       -- query completed
       ['evaluation/queryCompleted'] = function(_, result, _)
-        util.message("Evaluation time: "..result.evaluationTime)
+        util.message(format('Evaluation time: %s', result.evaluationTime))
         if result.resultType == 0 then
           return {}
         elseif result.resultType == 1 then
-          util.err_message(result.message or "ERROR: Other")
+          util.err_message(result.message or 'ERROR: Other')
           return nil
         elseif result.resultType == 2 then
-          util.err_message(result.message or "ERROR: OOM")
+          util.err_message(result.message or 'ERROR: OOM')
           return nil
         elseif result.resultType == 3 then
-          util.err_message(result.message or "ERROR: Timeout")
+          util.err_message(result.message or 'ERROR: Timeout')
           return nil
         elseif result.resultType == 4 then
-          util.err_message(result.message or "ERROR: Query was cancelled")
+          util.err_message(result.message or 'ERROR: Query was cancelled')
           return nil
         end
       end
@@ -138,12 +139,12 @@ function M.run_query(opts)
 
   local bufnr = opts.bufnr
   local queryPath = opts.query
-  local qloPath = vim.fn.tempname()..'.qlo'
-  local bqrsPath = vim.fn.tempname()..'.bqrs'
+  local qloPath = format(vim.fn.tempname(), '.qlo')
+  local bqrsPath = format(vim.fn.tempname(), '.bqrs')
   local libraryPath = opts.libraryPath
   local dbschemePath = opts.dbschemePath
   local dbPath = opts.dbPath
-  if not vim.endswith(dbPath, '/') then dbPath = dbPath .. '/' end
+  if not vim.endswith(dbPath, '/') then dbPath = format('%s/', dbPath) end
 
   local dbDir = vim.g.codeql_database.datasetFolder
   if not dbDir then
@@ -191,7 +192,7 @@ function M.run_query(opts)
 
   local runQueries_callback = function(err, _)
     if err then
-      util.err_message("ERROR: runQuery failed")
+      util.err_message('ERROR: runQuery failed')
     end
     if util.is_file(bqrsPath) then
       loader.process_results({
@@ -204,7 +205,7 @@ function M.run_query(opts)
         save_bqrs = true;
       })
     else
-      util.err_message("ERROR: BQRS file cannot be found at "..bqrsPath)
+      util.err_message('Query run failed. Database may be locked by a different Query Server')
     end
   end
 
@@ -225,13 +226,13 @@ function M.run_query(opts)
         body = {
           db = {
             dbDir = dbDir;
-            workingSet = "default";
+            workingSet = 'default';
           };
           evaluateId = next_evaluate_id();
           queries = {
             {
               resultsPath = bqrsPath;
-              qlo = "file://"..qloPath;
+              qlo = format('file://%s', qloPath);
               allowUnknownTemplates = true;
               templateValues = opts.templateValues or nil;
               id = 0;
