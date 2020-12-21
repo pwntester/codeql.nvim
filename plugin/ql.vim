@@ -32,6 +32,7 @@ highlight default link CodeqlRange    Error
 if executable('codeql')
   " commands
   command! -nargs=1 -complete=file SetDatabase lua require'codeql'.set_database(<f-args>)
+  command! UnsetDatabase lua require'codeql.queryserver'.deregister_database(<f-args>)
   command! RunQuery lua require'codeql'.run_query(false)
   command! -range QuickEval lua require'codeql'.run_query(true)
   command! StopServer lua require'codeql.queryserver'.stop_server()

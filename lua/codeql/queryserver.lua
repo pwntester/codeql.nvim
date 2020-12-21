@@ -87,15 +87,16 @@ function M.start_server()
 
   if M.client then return M.client end
 
-  util.message("Starting CodeQL Query Server")
-  local cmd = {"codeql", "execute", "query-server", "--logdir", "/tmp/codeql_queryserver"}
+  util.message('Starting CodeQL Query Server')
+  -- TODO: make sure we are on 2.4.1 or greater
+  local cmd = {'codeql', 'execute', 'query-server', '--require-db-registration', '-v', '--log-to-stderr'}
   vim.list_extend(cmd, vim.g.codeql_ram_opts)
 
   local last_message = ''
 
   local config = {
     cmd = cmd;
-    offset_encoding = {"utf-8", "utf-16"};
+    offset_encoding = {'utf-8', 'utf-16'};
     callbacks = {
 
       -- progress update
@@ -244,15 +245,70 @@ function M.run_query(opts)
       }
 
       -- run query
-      util.message(string.format("Running query [%s]", M.client.pid))
-      M.client.request("evaluation/runQueries", runQueries_params, runQueries_callback)
+      util.message(string.format('Running query [%s]', M.client.pid))
+      M.client.request('evaluation/runQueries', runQueries_params, runQueries_callback)
     end
   end
 
   -- compile query
-  util.message("Compiling query "..queryPath)
+  util.message(format('Compiling query %s', queryPath))
 
-  M.client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
+  M.client.request('compilation/compileQuery', compileQuery_params, compileQuery_callback)
+end
+
+function M.register_database()
+  if not vim.g.codeql_database then
+    util.err_message('No database specified')
+    return
+  end
+  if not M.client then M.client = M.start_server() end
+  util.message(format('Registering database %s', vim.g.codeql_database.datasetFolder))
+  local params = {
+    body = {
+      databases = {
+        {
+          dbDir = vim.g.codeql_database.datasetFolder;
+          workingSet = 'default';
+        }
+      };
+      progressId = next_progress_id();
+    }
+  }
+  M.client.request('evaluation/registerDatabases', params, function(err, result)
+    if err then
+      util.err_message(format('Error registering database %s', vim.inspect(err)))
+    else
+      util.message(format('Successfully registered %s', result.registeredDatabases[1].dbDir))
+    end
+  end)
+end
+
+function M.deregister_database()
+  if not vim.g.codeql_database then
+    util.err_message('No database registered')
+    return
+  end
+  if not M.client then M.client = M.start_server() end
+  util.message(format('Deregistering database %s', vim.g.codeql_database.datasetFolder))
+  local params = {
+    body = {
+      databases = {
+        {
+          dbDir = vim.g.codeql_database.datasetFolder;
+          workingSet = 'default';
+        }
+      };
+      progressId = next_progress_id();
+    }
+  }
+  M.client.request('evaluation/deregisterDatabases', params, function(err, result)
+    if err then
+      util.err_message(format('Error registering database %s', vim.inspect(err)))
+    elseif #result.registeredDatabases == 0 then
+      util.message(format('Successfully deregistered %s', vim.g.codeql_database.datasetFolder))
+      vim.g.codeql_database = nil
+    end
+  end)
 end
 
 function M.stop_server()
