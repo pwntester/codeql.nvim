@@ -86,25 +86,34 @@ function M.message(...)
 end
 
 function M.database_upgrades(dbscheme)
-  -- "--additional-packs","/Users/pwntester/codeql-home/ctfs/ctf4"
-  local json = cli.runSync({'resolve', 'upgrades', '-v', '--log-to-stderr', '--format=json', '--dbscheme', dbscheme})
-  local metadata, err = M.json_decode(json)
-  if not metadata then
-    print("Error resolving database upgrades: "..err)
-    return nil
+  local status, json = pcall(cli.runSync, {'resolve', 'upgrades', '-v', '--log-to-stderr', '--format=json', '--dbscheme', dbscheme})
+  if status then
+    local metadata, err = M.json_decode(json)
+    if not metadata then
+      print("Error resolving database upgrades: "..err)
+      return nil
+    else
+      return metadata
+    end
   else
-    return metadata
+    print("Error resolving database upgrades")
+    return nil
   end
 end
 
 function M.query_info(query)
-  local json = cli.runSync({'resolve', 'metadata', '-v', '--log-to-stderr', '--format=json', query})
-  local metadata, err = M.json_decode(json)
-  if not metadata then
-    print("Error resolving query metadata: "..err)
-    return nil
+  local status, json = pcall(cli.runSync, {'resolve', 'metadata', '-v', '--log-to-stderr', '--format=json', query})
+  if status then
+    local metadata, err = M.json_decode(json)
+    if not metadata then
+      print("Error resolving query metadata: "..err)
+      return {}
+    else
+      return metadata
+    end
   else
-    return metadata
+    print("Error resolving query metadata")
+    return {}
   end
 end
 

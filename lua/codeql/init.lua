@@ -45,6 +45,7 @@ function M.set_database(dbpath)
     local metadata = util.database_info(database)
     metadata.path = database
     api.nvim_set_var('codeql_database', metadata)
+    queryserver.register_database()
     util.message('Database set to '..database)
   end
   --TODO: print(util.database_upgrades(vim.g.codeql_database.dbscheme))
@@ -52,12 +53,13 @@ function M.set_database(dbpath)
 end
 
 function M.run_query(quick_eval)
-  local dbPath = vim.g.codeql_database.path
-  if dbPath == nil then
-    util.err_message('Missing database. Use SetDatabase command')
-    return nil
+  local db = vim.g.codeql_database
+  if not db then
+    util.err_message('Missing database. Use :SetDatabase command')
+    return
   end
 
+  local dbPath = vim.g.codeql_database.path
   local queryPath = vim.fn.expand('%:p')
 
   -- [bufnum, lnum, col, off, curswant]
