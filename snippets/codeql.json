@@ -2,7 +2,7 @@
   "metadata": {
     "prefix": "metadata",
     "body": [
-        "/*",
+        "/**",
         " * @name $1",
         " * @id ${2:lang/desc}",
         " * @description $3",
@@ -16,10 +16,9 @@
     "description": "Query metadata template."
   },
   "taintconf": {
-    "prefix": "tainttrackingconf",
+    "prefix": "tainconf",
     "body": [
-        "import semmle.code.java.dataflow.TaintTracking",
-        "import semmle.code.java.dataflow.FlowSources",
+        "import java",
         "import DataFlow::PathGraph",
         "",
         "class $1 extends TaintTracking::Configuration {",
