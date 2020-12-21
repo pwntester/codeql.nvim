@@ -106,7 +106,8 @@ nvim_lsp.codeqlls.setup{
     };
 }
 ```
-NOTE: change `search_path` to the path where the [QL](https://github.com/Semmle/ql) repo has been installed to.
+
+NOTE: change `search_path` to the path where the [CodeQL](https://github.com/github/codeql) repo has been installed to.
 
 It is also recommended to add an `on_attach` callback to define LSP mappings. E.g:
 
