@@ -15,9 +15,13 @@
     ],
     "description": "Query metadata template."
   },
-  "tainttrackingconf": {
+  "taintconf": {
     "prefix": "tainttrackingconf",
     "body": [
+        "import semmle.code.java.dataflow.TaintTracking",
+        "import semmle.code.java.dataflow.FlowSources",
+        "import DataFlow::PathGraph",
+        "",
         "class $1 extends TaintTracking::Configuration {",
         "\t$1() { this = \"$1\" }",
         "",
@@ -28,8 +32,12 @@
         "\toverride predicate isSink(DataFlow::Node sink) {",
         "\t\t$3",
         "\t}",
-        "}"
-    ],
+        "}",
+        "",
+        "from $1 conf, DataFlow::PathNode source, DataFlow::PathNode sink",
+        "where conf.hasFlowPath(source, sink)",
+        "select sink, source, sink, \"$4\""
+     ],
     "description": "TaintTracking Configuration"
   }
 }
