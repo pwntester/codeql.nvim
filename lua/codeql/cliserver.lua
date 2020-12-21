@@ -82,7 +82,7 @@ function M.runAsync(cmd, callback)
 end
 
 function M.runSync(cmd)
-  local timeout = 10000
+  local timeout = 5000
   local done = false
   local result
   M.runAsync(cmd, function (res)
