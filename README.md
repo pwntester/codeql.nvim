@@ -134,7 +134,7 @@ nvim_lsp.codeqlls.setup{
 }
 ```
 
-Check my [dotfiles](https://github.com/pwntester/dotfiles/blob/master/config/nvim/lua/lsp-config.lua) for examples on how to configure the NVIM LSP client.
+Check my [dotfiles](https://github.com/pwntester/dotfiles/blob/master/config/nvim/lua/lsp_config.lua) for examples on how to configure the NVIM LSP client.
 
 ### Coc.nvim
 
