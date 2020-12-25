@@ -38,5 +38,69 @@
         "select sink, source, sink, \"$4\""
      ],
     "description": "TaintTracking Configuration"
+  },
+  "Basic Structure": {
+    "prefix": "from",
+    "body": [
+      "from \n\t$1",
+      "where \n\t${2:any()}",
+      "select \n\t${3:\"Hello World!\"}"
+    ]
+  },
+  "Exists": {
+    "prefix": "exists",
+    "body":[
+      "exists ($1 |",
+        "\t${2:none()}",
+      ")"
+    ]
+  },
+  "Predicates": {
+    "prefix": "predicate",
+    "body": [
+      "predicate $1($2) {",
+        "\t${3:none()}",
+      "}"
+    ]
+  },
+  "Overriden Predicates": {
+    "prefix": "override",
+    "body": [
+      "override predicate $1($2) {",
+        "\t${3:none()}",
+      "}"
+    ]
+  },
+  "Basic Class": {
+    "prefix": "class",
+    "body": [
+      "class $1 extends $2 {",
+        "\t$1() {",
+          "\t\t${3:none()}",
+        "\t}",
+      "}"
+    ]
+  },
+  "RemoteFlowSource": {
+    "prefix": "rfs",
+    "body": [
+      "class $1 extends RemoteFlowSource {",
+        "\t$1() {",
+          "\t\tthis = $2",
+        "\t}\n",
+
+        "\toverride string getSourceType() { result = \"$3\" }",
+      "}"
+    ]
+  },
+  "TaintTracking::AdditionalTaintStep ": {
+    "prefix": "taintadd",
+    "body": [
+      "class $1 extends TaintTracking::AdditionalTaintStep {",
+        "\toverride predicate step(DataFlow::Node ${2:n1}, DataFlow::Node ${3:n2}) {",
+          "\t\t${4:none()}",
+        "\t}",
+      "}"
+    ]
   }
 }
