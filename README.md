@@ -32,9 +32,10 @@ libraryPathDependencies: [codeql-java]
 
 Create `.ql` file with query 
 
-### Set Database
+### Database
 
-Use `SetDatabase <path to db>` to let the plugin know what DB to work with
+Use `SetDatabase <path to db>` to let the plugin know what DB to work with.
+Use `UnsetDatabase` to deregister the current registered database.
 
 ### Run query or eval predicates
 
