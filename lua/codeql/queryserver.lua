@@ -135,6 +135,12 @@ end
 
 function M.run_query(opts)
 
+  local dbDir = vim.g.codeql_database.datasetFolder
+  if not dbDir then
+    util.err_message('Cannot find dataset folder. Did you :SetDatabase?')
+    return
+  end
+
   if not M.client then M.client = M.start_server() end
 
   local bufnr = opts.bufnr
@@ -145,12 +151,6 @@ function M.run_query(opts)
   local dbschemePath = opts.dbschemePath
   local dbPath = opts.dbPath
   if not vim.endswith(dbPath, '/') then dbPath = format('%s/', dbPath) end
-
-  local dbDir = vim.g.codeql_database.datasetFolder
-  if not dbDir then
-    util.err_message('Cannot find dataset folder')
-    return
-  end
 
   -- https://github.com/github/vscode-codeql/blob/master/extensions/ql-vscode/src/messages.ts
   local compileQuery_params = {

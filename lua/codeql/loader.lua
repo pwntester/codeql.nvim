@@ -69,7 +69,6 @@ function M.process_results(opts)
   util.message(format("Processing %s results", queryPath))
   util.message(format("%d rows found", count))
 
-
   -- process definitions
   if vim.endswith(queryPath, '/localDefinitions.ql') then
     local cmd = {

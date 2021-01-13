@@ -249,7 +249,7 @@ function M.goto_node(bufnr)
 end
 
 function M.open(bufnr)
-  local bufnr = bufnr or api.nvim_get_current_buf()
+  bufnr = bufnr or api.nvim_get_current_buf()
   local display_buf = setup_buf(bufnr)
   local current_window = api.nvim_get_current_win()
 
@@ -268,7 +268,7 @@ function M.open(bufnr)
 end
 
 function M.update(bufnr)
-  local bufnr = bufnr or api.nvim_get_current_buf()
+  bufnr = bufnr or api.nvim_get_current_buf()
   local display_buf = M._entries[bufnr].display_bufnr
 
   -- Don't bother updating if the playground isn't shown
@@ -283,7 +283,7 @@ function M.update(bufnr)
 end
 
 function M.toggle(bufnr)
-  local bufnr = bufnr or api.nvim_get_current_buf()
+  bufnr = bufnr or api.nvim_get_current_buf()
   local display_buf = M._entries[bufnr].display_bufnr
 
   if display_buf and is_buf_visible(display_buf) then
@@ -344,18 +344,14 @@ function M.detach(bufnr)
 end
 
 function M.build_ast(jsonPath, bufnr)
-  print('FOO1')
   if not util.is_file(jsonPath) then return end
   local results = util.read_json_file(jsonPath)
 
-  print('FOO2')
   local nodeTuples = results.nodes
   local edgeTuples = results.edges
   local graphProperties = results.graphProperties
 
-  print('FOO3')
   if not is_valid_graph(graphProperties) then
-    print('FOO3')
     util.err_message('Invalid AST tree')
     return
   end

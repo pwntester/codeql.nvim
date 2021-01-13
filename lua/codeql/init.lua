@@ -125,7 +125,7 @@ function M.run_templated_query(query_name, param)
   local dbPath = vim.g.codeql_database.path
   local ft = vim.bo[bufnr]['ft']
   if not templated_queries[ft] then
-    util.err_message(format('%s does not support %s file type', query_name, ft))
+    --util.err_message(format('%s does not support %s file type', query_name, ft))
     return
   end
   local query = format(templated_queries[ft], query_name)
