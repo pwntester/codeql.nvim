@@ -440,7 +440,7 @@ function M.jump_to_code(stay_in_pane)
     local startColumn = node.url.startColumn
     local endColumn = node.url.endColumn
 
-     api.nvim_buf_add_highlight(0, range_ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn-1)
+     api.nvim_buf_add_highlight(0, range_ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn)
 
     -- jump to main window if requested
     if stay_in_pane then vim.fn.win_gotoid(panel_window) end

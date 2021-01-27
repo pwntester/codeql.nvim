@@ -10,7 +10,7 @@ function M.open_from_archive(zipfile, path)
   local name = format('codeql:/%s', path)
   local bufnr = vim.fn.bufnr(name)
   if bufnr == -1 then
-    local zip_bufnr = api.nvim_create_buf(false, true)
+    local zip_bufnr = api.nvim_create_buf(true, false)
     api.nvim_set_current_buf(zip_bufnr)
     vim.cmd(format('keepalt silent! read! unzip -p -- %s %s', zipfile, path))
     vim.cmd('normal! ggdd')
@@ -20,7 +20,7 @@ function M.open_from_archive(zipfile, path)
     api.nvim_buf_set_option(zip_bufnr, "modifiable", false)
     vim.cmd('doau BufEnter')
   else
-      -- TODO: show that buf?
+    api.nvim_set_current_buf(bufnr)
   end
 end
 
