@@ -15,7 +15,7 @@ function M.open_from_archive(zipfile, path)
     vim.cmd(format('keepalt silent! read! unzip -p -- %s %s', zipfile, path))
     vim.cmd('normal! ggdd')
     api.nvim_buf_set_name(zip_bufnr, name)
-    vim.cmd('filetype detect') -- consumes FDs
+    pcall(vim.cmd, 'filetype detect') -- consumes FDs
     api.nvim_buf_set_option(zip_bufnr, "modified", false)
     api.nvim_buf_set_option(zip_bufnr, "modifiable", false)
     vim.cmd('doau BufEnter')

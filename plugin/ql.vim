@@ -46,9 +46,15 @@ if executable('codeql')
   au BufEnter codeql:/* lua require'codeql'.load_definitions()
   augroup END
 
+  augroup codeql_panel
+  au!
+  autocmd BufEnter * if &ft ==# 'codeqlpanel' | execute("lua require'codeql.panel'.apply_mappings()") | endif
+  augroup END
+
   " mappings
   nnoremap <Plug>(CodeQLGoToDefinition) <cmd>lua require'codeql.defs'.find_at_cursor('definitions')<CR>
   nnoremap <Plug>(CodeQLFindReferences) <cmd>lua require'codeql.defs'.find_at_cursor('references')<CR>
+
   augroup codeql_mappings
   au!
   au FileType ql nnoremap qr :RunQuery<CR>

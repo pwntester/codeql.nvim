@@ -10,11 +10,17 @@ local function generate_issue_label(node)
 
   if vim.g.codeql_panel_filename and node['filename'] and node['filename'] ~= nil then
     if vim.g.codeql_panel_longnames then
-      label = node.filename..':'..node.line
+      label = node.filename
+    elseif #vim.fn.fnamemodify(node.filename, ':p:t') > 0 then
+      label = vim.fn.fnamemodify(node.filename, ':p:t')
     else
-      label = vim.fn.fnamemodify(node.filename, ':p:t')..':'..node.line
+      label = node.label
+    end
+    if node.line and node.line > 0 then
+      label = label .. ":" .. node.line
     end
   end
+
   return label
 end
 
@@ -193,14 +199,26 @@ function M.process_results(opts)
   api.nvim_command('redraw')
 end
 
+--[[ DEBUG
+  ["#select"] = {
+    columns = { {
+        kind = "Entity"
+      }, {
+        kind = "Entity",
+        name = "t"
+      }, {
+        kind = "Entity",
+        name = "s"
+      } },
+  ]]--
 function M.load_raw_results(path)
   if not util.is_file(path) then return end
   local results = util.read_json_file(path)
-
   local issues = {}
-  local tuples
+  local tuples, columns
   if results['#select'] then
     tuples = results['#select']['tuples']
+    columns = results['#select']['columns']
   else
     for k, _ in pairs(results) do
       tuples = results[k]['tuples']
@@ -272,7 +290,16 @@ function M.load_raw_results(path)
     })
   end
 
-  panel.render(issues)
+  local col_names = {}
+  for _, col in ipairs(columns) do
+    if col.name then
+      table.insert(col_names, col.name)
+    else
+      table.insert(col_names, "---")
+    end
+  end
+
+  panel.render(issues, "raw", col_names)
   api.nvim_command('redraw')
 end
 
@@ -305,16 +332,16 @@ function M.load_sarif_results(path)
         locs = vim.list_extend(locs, r.locations)
       end
       for j, l in ipairs(locs) do
-        local node = {}
+        local label, mark
         if l.message then
-          node.label = l.message.text or message
+          label = l.message.text or message
         else
-          node.label = message
+          label = message
         end
         if #r.locations == j then
-          node.mark = '⦿'
+          mark = '⦿'
         else
-          node.mark = '→'
+          mark = '→'
         end
         local uri = l.physicalLocation.artifactLocation.uri
         local uriBaseId = l.physicalLocation.artifactLocation.uriBaseId
@@ -322,14 +349,19 @@ function M.load_sarif_results(path)
           uri = format('file:%s/%s', uriBaseId, uri)
         end
         local region = l.physicalLocation.region
-        node.filename = M.uri_to_fname(uri) or uri
-        node.line = region and region.startLine or -1
-        node.visitable = true
-        node.url = {
-          uri = uri;
-          startLine   = region and region.startLine or -1;
-          startColumn = region and region.startColumn or -1;
-          endColumn   = region and region.endColumn or -1;
+
+        local node = {
+          label = label,
+          mark = mark,
+          filename = M.uri_to_fname(uri) or uri,
+          line = region and region.startLine or -1,
+          visitable = region or false,
+          url = {
+            uri = uri,
+            startLine   = region and region.startLine or -1,
+            startColumn = region and region.startColumn or -1,
+            endColumn   = region and region.endColumn or -1
+          }
         }
         table.insert(nodes, node)
       end
@@ -358,14 +390,13 @@ function M.load_sarif_results(path)
           -- first element is source, last one is sink
           local nodes = {}
           for j, l in ipairs(t.locations) do
-            local node = {}
-            node.label = l.location.message.text
+            local mark
             if 1 == j then
-              node.mark = '⭃'
+              mark = '⭃'
             elseif #t.locations == i then
-              node.mark = '⦿'
+              mark = '⦿'
             else
-              node.mark = '→'
+              mark = '→'
             end
             local uri = l.location.physicalLocation.artifactLocation.uri
             local uriBaseId = l.location.physicalLocation.artifactLocation.uriBaseId
@@ -373,15 +404,21 @@ function M.load_sarif_results(path)
               uri = format('file:%s/%s', uriBaseId, uri)
             end
             local region = l.location.physicalLocation.region
-            node.filename = M.uri_to_fname(uri) or uri
-            node.line = region.startLine
-            node.visitable = true
-            node.url = {
-              uri = uri;
-              startLine   = region.startLine;
-              startColumn = region.startColumn;
-              endColumn   = region.endColumn;
+
+            local node = {
+              label = l.location.message.text,
+              mark = mark,
+              filename = M.uri_to_fname(uri) or uri,
+              line = region and region.startLine or -1,
+              visitable = region or false,
+              url = {
+                uri = uri,
+                startLine   = region and region.startLine or -1,
+                startColumn = region and region.startColumn or -1,
+                endColumn   = region and region.endColumn or -1
+              }
             }
+
             table.insert(nodes, node)
           end
 
@@ -395,9 +432,18 @@ function M.load_sarif_results(path)
             local key = source_key..'::'..sink_key
 
             if not paths[key] then paths[key] = {} end
-            local l = paths[key]
-            table.insert(l, nodes)
-            paths[key] = l
+            local _path = paths[key]
+            local message_node = {
+              label = string.gsub(r.message.text, "\n", " ");
+              mark = '≔';
+              filename = nil;
+              line = nil;
+              visitable = false;
+              url = nil;
+            }
+            table.insert(nodes, message_node)
+            table.insert(_path, nodes)
+            paths[key] = _path
           end
         end
       end
@@ -408,7 +454,8 @@ function M.load_sarif_results(path)
 
         local primary_node = p[1][1]
         if vim.g.codeql_group_by_sink then
-          primary_node = p[1][#(p[1])]
+          -- last node is the message node, so sink is #nodes - 1
+          primary_node = p[1][#(p[1]) - 1]
         end
         local label = generate_issue_label(primary_node)
 
@@ -426,7 +473,7 @@ function M.load_sarif_results(path)
     end
   end
 
-  panel.render(issues)
+  panel.render(issues, "sarif")
   api.nvim_command('redraw')
 end
 

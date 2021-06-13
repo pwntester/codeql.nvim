@@ -3,6 +3,7 @@ local vim = vim
 local api = vim.api
 local format = string.format
 
+local range_ns = api.nvim_create_namespace("codeql")
 local panel_buffer_name = '__CodeQLPanel__'
 local panel_pos = 'right'
 local panel_width = 50
@@ -10,18 +11,20 @@ local panel_short_help = true
 local icon_closed = '▶'
 local icon_open = '▼'
 
-local database = ''
+-- global variables
 local issues = {}
-local scaninfo = {}
+local columns = {}
+local kind
+local mode
+local line_map = {}
 
-local range_ns = api.nvim_create_namespace("codeql")
 
 -- local functions
 
-local function store_in_scaninfo(node)
+local function register(obj)
   local bufnr = vim.fn.bufnr(panel_buffer_name)
   local curline = api.nvim_buf_line_count(bufnr)
-  scaninfo.line_map[curline] = node
+  line_map[curline] = obj
 end
 
 local function print_to_panel(text, matches)
@@ -48,12 +51,15 @@ local function get_panel_window(buffer_name)
 end
 
 local function go_to_main_window()
+  -- go to the wider window
   local widerwin = 0
   local widerwidth = 0
   for _, w in ipairs(api.nvim_list_wins()) do
     if api.nvim_win_get_width(w) > widerwidth then
-      widerwin = w
-      widerwidth = api.nvim_win_get_width(w)
+      if vim.api.nvim_win_get_buf(w) ~= vim.fn.bufnr(panel_buffer_name) then
+        widerwin = w
+        widerwidth = api.nvim_win_get_width(w)
+      end
     end
   end
   if widerwin > -1 then
@@ -89,26 +95,46 @@ local function print_help()
     print_to_panel('" <CR>: Jump to tag definition')
     print_to_panel('" p: As above, but dont change window')
     print_to_panel('" P: Previous path')
-    print_to_panel('" n: Next path')
+    print_to_panel('" N: Next path')
     print_to_panel('"')
     print_to_panel('" ---------- Folds ----------')
     print_to_panel('" f: Label filter')
     print_to_panel('" F: Generic filter')
-    print_to_panel('" c: Clear filter')
+    print_to_panel('" x: Clear filter')
     print_to_panel('"')
     print_to_panel('" ---------- Folds ----------')
     print_to_panel('" o: Toggle fold')
-    print_to_panel('" t: Open all folds')
-    print_to_panel('" T: Close all folds')
+    print_to_panel('" O: Open all folds')
+    print_to_panel('" C: Close all folds')
     print_to_panel('"')
     print_to_panel('" ---------- Misc -----------')
+    print_to_panel('" m: Toggle mode')
     print_to_panel('" q: Close window')
     print_to_panel('" H: Toggle help')
     print_to_panel('')
   end
 end
 
-local function print_node(node, indent_level)
+local function get_node_location(node)
+  if node.line and node.filename then
+    local line = ""
+    if node.line > -1 then
+      line = format(":%d", node.line)
+    end
+
+    local filename
+    if vim.g.codeql_panel_longnames then
+      filename = node.filename
+    else
+      filename = vim.fn.fnamemodify(node.filename, ':p:t')
+    end
+    return filename..line
+  else
+    return ""
+  end
+end
+
+local function print_tree_node(node, indent_level)
   local text = ''
   local hl = {}
 
@@ -123,23 +149,50 @@ local function print_node(node, indent_level)
   hl[mark_hl_name] = {{0, string.len(mark)}}
 
   -- text
-  if nil ~= node['filename'] then
-    if vim.g.codeql_panel_longnames then
-      text = mark..node.filename..':'..node.line..' - '..node.label
-    else
-      text = mark..vim.fn.fnamemodify(node.filename, ':p:t')..':'..node.line..' - '..node.label
-    end
+  if node.filename then
+
+    local location = get_node_location(node)
+    text = format("%s%s - %s", mark, location, node.label)
+
     local sep_index = string.find(text, ' - ', 1, true)
+
     hl['CodeqlPanelFile'] = {{ string.len(mark), sep_index }}
     hl['CodeqlPanelSeparator'] = {{ sep_index, sep_index + 2 }}
   else
     text = mark..'['..node.label..']'
   end
   print_to_panel(text, hl)
-  store_in_scaninfo(node)
+
+  -- register the node in the line_map
+  register({
+    kind = "node",
+    obj = node
+  })
 end
 
-local function print_nodes(issue, indent_level)
+local function right_align(text, size)
+  return string.rep(" ", size - vim.fn.strdisplaywidth(text)) .. text
+end
+
+local function center_align(text, size)
+  local pad = size - vim.fn.strdisplaywidth(text)
+  local left_pad = math.floor(pad/2)
+  local right_pad = pad - left_pad
+  return string.rep(" ", left_pad) .. text .. string.rep(" ", right_pad)
+end
+
+local function get_table_nodes(issue, max_lengths)
+  local path = issue.paths[1]
+  local labels = {}
+  local locations = {}
+  for i, node in ipairs(path) do
+    table.insert(labels, center_align(node.label, max_lengths[i]))
+    table.insert(locations, center_align(get_node_location(node), max_lengths[i]))
+  end
+  return {labels, locations}
+end
+
+local function print_tree_nodes(issue, indent_level)
 
   local bufnr = vim.fn.bufnr(panel_buffer_name)
   local curline = api.nvim_buf_line_count(bufnr)
@@ -149,72 +202,167 @@ local function print_nodes(issue, indent_level)
   -- paths
   local active_path = 1
   if #paths > 1 then
-    if nil ~= scaninfo.line_map[curline] and nil ~= scaninfo.line_map[curline]['active_path'] then
-      -- retrieve path info from scaninfo
-      active_path = scaninfo.line_map[curline]['active_path']
+    if line_map[curline] and line_map[curline].kind == "issue" then
+      -- retrieve path info from the line_map
+      active_path = line_map[curline].obj.active_path
     end
     local str = active_path..'/'..#paths
-    if nil ~= scaninfo.line_map[curline + 1] then
-      table.remove(scaninfo.line_map, curline + 1)
+    if line_map[curline + 1] then
+      table.remove(line_map, curline + 1)
     end
     local text = string.rep(' ', indent_level)..'Path: '
     local hl = { CodeqlPanelInfo = {{0, string.len(text)}} }
     print_to_panel(text..str, hl)
-    store_in_scaninfo(nil)
+    register(nil)
   end
   local path = paths[active_path]
 
   --  print path nodes
   for _, node in ipairs(path) do
-    print_node(node, indent_level)
+    print_tree_node(node, indent_level)
   end
 end
 
 local function print_header()
   local hl = { CodeqlPanelInfo = {{0, string.len('Database:')}} }
-  local index = string.find(database, '/[^/]*$')
-  if nil ~= index then
-    print_to_panel('Database: '..string.sub(database, index + 1), hl)
-  else
-    print_to_panel('Database: '..database, hl)
-  end
-
+  local database = vim.g.codeql_database.path
+  print_to_panel('Database: '..database, hl)
   hl = { CodeqlPanelInfo = {{0, string.len('Issues:')}} }
   print_to_panel('Issues:   '..table.getn(issues), hl)
   --print_to_panel('')
 end
 
+local function get_column_names(max_lengths)
+  local result = {}
+  for i, column in ipairs(columns) do
+    table.insert(result, center_align(column, max_lengths[i]))
+  end
+  return result
+end
+
 local function print_issues()
   local last_rule_id
 
-  -- print issue labels
-  for _, issue in ipairs(issues) do
-    if issue.hidden then goto continue end
+  if mode == "tree" then
+    -- print issue labels
+    for _, issue in ipairs(issues) do
 
-    local is_folded = issue.is_folded
-    local foldmarker = not is_folded and icon_open or icon_closed
+      -- print nodes
+      if issue.hidden then goto continue end
 
-    if last_rule_id ~= issue.rule_id then
-      print_to_panel('')
+      local is_folded = issue.is_folded
+      local foldmarker = not is_folded and icon_open or icon_closed
+
+      if last_rule_id ~= issue.rule_id then
+        print_to_panel('')
+        print_to_panel(
+          issue.rule_id,
+          { CodeqlPanelRuleId = {{ 0, string.len(issue.rule_id) }} }
+        )
+        last_rule_id = issue.rule_id
+      end
+
       print_to_panel(
-      issue.rule_id,
-      { CodeqlPanelRuleId = {{ 0, string.len(issue.rule_id) }} }
+        format('%s %s', foldmarker, issue.label),
+        { CodeqlPanelFoldIcon = {{ 0, string.len(foldmarker) }} }
       )
-      last_rule_id = issue.rule_id
+
+      -- register the issue in the line_map
+      register({
+        kind = "issue",
+        obj = issue
+      })
+
+      if not is_folded then
+        print_tree_nodes(issue, 2)
+      end
+      ::continue::
     end
 
-    print_to_panel(
-    format('%s %s', foldmarker, issue.label),
-    { CodeqlPanelFoldIcon = {{ 0, string.len(foldmarker) }} }
-    )
+  elseif mode == "table" then
 
-    store_in_scaninfo(issue)
-
-    -- print nodes
-    if not is_folded then
-      print_nodes(issue, 2)
+    local max_lengths = {}
+    for _, issue in ipairs(issues) do
+      local path = issue.paths[1]
+      for i, node in ipairs(path) do
+        max_lengths[i] = math.max(vim.fn.strdisplaywidth(node.label), max_lengths[i] or -1)
+        max_lengths[i] = math.max(vim.fn.strdisplaywidth(get_node_location(node)), max_lengths[i] or -1)
+      end
     end
-    ::continue::
+    local total_length = 4
+    for _, len in ipairs(max_lengths) do
+      total_length = total_length + len + 3
+    end
+    print_to_panel('')
+
+    local rows = {}
+    for _, issue in ipairs(issues) do
+      table.insert(rows, get_table_nodes(issue, max_lengths))
+    end
+
+    local bars = {}
+    for _, len in ipairs(max_lengths) do
+      table.insert(bars, string.rep("─", len))
+    end
+
+    local column_names = get_column_names(max_lengths)
+
+    local header1 = string.format("┌─%s─┐", table.concat(bars, "─┬─"))
+    print_to_panel(header1, {CodeqlPanelSeparator = {{0,-1}}})
+    local header2 = string.format("│ %s │", table.concat(column_names, " │ "))
+    print_to_panel(header2, {CodeqlPanelSeparator = {{0,-1}}})
+    local header3 = string.format("├─%s─┤", table.concat(bars, "─┼─"))
+    print_to_panel(header3, {CodeqlPanelSeparator = {{0,-1}}})
+
+    local separator_hls = { {0, vim.fn.len("│ ")} }
+    local acc = vim.fn.len("│ ")
+    for _, len in ipairs(max_lengths) do
+      table.insert(separator_hls, { acc + len, acc + len + vim.fn.len(" │ ")})
+      acc = acc + len + vim.fn.len(" │ ")
+    end
+
+    local location_hls = {}
+    acc = vim.fn.len("│ ")
+    for _, len in ipairs(max_lengths) do
+      table.insert(location_hls, { acc,  acc + len})
+      acc = acc + len + vim.fn.len(" │ ")
+    end
+
+    local hl_labels = {CodeqlPanelSeparator = separator_hls}
+    local hl_locations = {CodeqlPanelSeparator = separator_hls; Comment = location_hls}
+    for i, row in ipairs(rows) do
+
+      -- labels
+      local r = string.format("│ %s │", table.concat(row[1], " │ "))
+      print_to_panel(r, hl_labels)
+      -- register the issue in the line_map
+      register({
+        kind = "row",
+        obj = {
+          ranges = location_hls,
+          columns = issues[i].paths[1]
+        }
+      })
+
+      -- locations
+      r = string.format("│ %s │", table.concat(row[2], " │ "))
+      print_to_panel(r, hl_locations)
+      -- register the issue in the line_map
+      register({
+        kind = "row",
+        obj = {
+          ranges = location_hls,
+          columns = issues[i].paths[1]
+        }
+      })
+
+      if i < #rows then
+        r = string.format("├─%s─┤", table.concat(bars, "─┼─"))
+        print_to_panel(r, {CodeqlPanelSeparator = {{0,-1}}})
+      end
+    end
+    local footer = string.format("└─%s─┘", table.concat(bars, "─┴─"))
+    print_to_panel(footer, {CodeqlPanelSeparator = {{0,-1}}})
   end
 end
 
@@ -243,7 +391,191 @@ local function render_content()
   util.message(' ')
 end
 
-local function open_codeql_panel()
+local function render_keep_view(line)
+  if line == nil then line = vim.fn.line('.') end
+
+  -- called from toggle_fold commands, so within panel buffer
+  local curcol = vim.fn.col('.')
+  local topline = vim.fn.line('w0')
+
+  render_content()
+
+  local scrolloff_save = api.nvim_get_option('scrolloff')
+  vim.cmd('set scrolloff=0')
+
+  vim.fn.cursor(topline, 1)
+  vim.cmd('normal! zt')
+  vim.fn.cursor(line, curcol)
+
+  vim.cmd('let &scrolloff = '..scrolloff_save)
+  vim.cmd('redraw') -- consumes FDs
+end
+
+-- exported functions
+
+local M = {}
+
+function M.apply_mappings()
+  local bufnr = api.nvim_get_current_buf()
+  api.nvim_buf_set_keymap(bufnr, 'n', 'o', [[<cmd>lua require'codeql.panel'.toggle_fold()<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', 'm', [[<cmd>lua require'codeql.panel'.toggle_mode()<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', '<CR>', [[<cmd>lua require'codeql.panel'.jump_to_code(false)<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', 'p', [[<cmd>lua require'codeql.panel'.jump_to_code(true)<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', '<S-h>', [[<cmd>lua require'codeql.panel'.toggle_help()<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', 'q', [[<cmd>lua require'codeql.panel'.close_panel()<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', '<S-o>', [[<cmd>lua require'codeql.panel'.set_fold_level(false)<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', '<S-c>', [[<cmd>lua require'codeql.panel'.set_fold_level(true)<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', '<S-p>', [[<cmd>lua require'codeql.panel'.change_path(-1)<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', 'N', [[<cmd>lua require'codeql.panel'.change_path(1)<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', 'f', [[<cmd>lua require'codeql.panel'.label_filter()<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', '<S-f>', [[<cmd>lua require'codeql.panel'.generic_filter()<CR>]], { script = true,  silent = true})
+  api.nvim_buf_set_keymap(bufnr, 'n', '<S-x`>', [[<cmd>lua require'codeql.panel'.clear_filter()<CR>]], { script = true,  silent = true})
+end
+
+function M.clear_filter()
+  unhide_issues()
+  render_content()
+end
+
+function M.label_filter()
+  local pattern = vim.fn.input("Pattern: ")
+  unhide_issues()
+  filter_issues("string.match(string.lower(issue.label), string.lower('"..pattern.."')) ~= nil")
+  render_content()
+end
+
+function M.generic_filter()
+  local pattern = vim.fn.input("Pattern: ")
+  unhide_issues()
+  filter_issues(pattern)
+  render_content()
+end
+
+function M.toggle_mode()
+  if kind ~= "raw" then return end
+  if mode == "tree" then
+    mode = "table"
+  elseif mode == "table" then
+    mode = "tree"
+  end
+  M.render()
+end
+
+function M.toggle_fold()
+  -- prevent highlighting from being off after adding/removing the help text
+  vim.cmd('match none')
+
+  local c = vim.fn.line('.')
+  local entry
+  while c >= 7 do
+    entry = line_map[c]
+    if entry and (entry.kind == "node" or entry.kind == "issue") and vim.tbl_contains(vim.tbl_keys(entry.obj), "is_folded") then
+      entry.obj.is_folded = not entry.obj.is_folded
+      render_keep_view(c)
+      return
+    end
+    c = c - 1
+  end
+end
+
+function M.toggle_help()
+  panel_short_help = not panel_short_help
+  -- prevent highlighting from being off after adding/removing the help text
+  render_keep_view()
+end
+
+function M.set_fold_level(level)
+  for k, _ in pairs(line_map) do
+    line_map[k].obj.is_folded = level
+  end
+  render_keep_view()
+end
+
+function M.change_path(offset)
+  local line = vim.fn.line('.') - 1
+  if not line_map[line] or line_map[line].kind ~= "issue" then return end
+
+  local issue = line_map[line].obj
+
+  if issue.active_path then
+    if issue.active_path == 1 and offset == -1 then
+      line_map[line].obj.active_path = #(issue.paths)
+    elseif issue.active_path == (#issue.paths) and offset == 1 then
+      line_map[line].obj.active_path = 1
+    else
+      line_map[line].obj.active_path = issue.active_path + offset
+    end
+    render_keep_view(line+1)
+  end
+end
+
+local function get_column_at_cursor(row)
+  local ranges = row.ranges
+  local cur = vim.api.nvim_win_get_cursor(0)
+  for i, range in ipairs(ranges) do
+    if tonumber(range[1]) <= tonumber(cur[2]) and tonumber(cur[2]) <= tonumber(range[2]) then
+      return row.columns[i]
+    end
+  end
+end
+
+function M.jump_to_code(stay_in_pane)
+  --print('FDs before jumping '..vim.fn.system('lsof -p '..vim.loop.getpid()..' | wc -l'))
+  if not line_map[vim.fn.line('.')] then return end
+
+  local node
+  local entry = line_map[vim.fn.line('.')]
+  if entry.kind == "issue" then
+    node = entry.obj.node
+  elseif entry.kind == "node" then
+    node = entry.obj
+  elseif entry.kind == "row" then
+    node = get_column_at_cursor(entry.obj)
+  end
+
+  if not node then return end
+
+  if not node.visitable then
+    if not not node.filename then util.message(node.filename) end
+    return
+  end
+
+  -- open from src.zip
+  if vim.g.codeql_database and util.is_file(vim.g.codeql_database.sourceArchiveZip) then
+    if string.sub(node.filename, 1, 1) == '/' then
+      node.filename = string.sub(node.filename, 2)
+    end
+
+    -- save audit pane window
+    local panel_window = vim.fn.win_getid()
+
+    -- go to main window
+    go_to_main_window()
+
+    util.open_from_archive(vim.g.codeql_database.sourceArchiveZip, node.filename)
+    vim.fn.execute(node.line)
+    -- vim.cmd('normal! z.')
+    -- vim.cmd('normal! zv')
+    -- vim.cmd('redraw') -- consumes FDs
+
+    -- highlight node
+    api.nvim_buf_clear_namespace(0, range_ns, 0, -1)
+    local startLine = node.url.startLine
+    local startColumn = node.url.startColumn
+    local endColumn = node.url.endColumn
+
+     api.nvim_buf_add_highlight(0, range_ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn)
+
+    -- jump to main window if requested
+    if stay_in_pane then vim.fn.win_gotoid(panel_window) end
+  elseif not vim.g.codeql_database then
+    api.nvim_err_writeln("Please use SetDatabase to point to the analysis database")
+  end
+
+  --print('FDs afget jumping '..vim.fn.system('lsof -p '..vim.loop.getpid()..' | wc -l'))
+end
+
+function M.open_panel()
 
   -- check if audit pane is already opened
   if vim.fn.bufwinnr(panel_buffer_name) ~= -1 then
@@ -282,19 +614,6 @@ local function open_codeql_panel()
   api.nvim_buf_set_option(bufnr, 'swapfile', false)
   api.nvim_buf_set_option(bufnr, 'buflisted', false)
 
-  api.nvim_buf_set_keymap(bufnr, 'n', 'o', [[<cmd>lua require'codeql.panel'.toggle_fold()<CR>]], { script = true,  silent = true})
-  api.nvim_buf_set_keymap(bufnr, 'n', '<CR>', [[<cmd>lua require'codeql.panel'.jump_to_code(false)<CR>]], { script = true,  silent = true})
-  api.nvim_buf_set_keymap(bufnr, 'n', 'p', [[<cmd>lua require'codeql.panel'.jump_to_code(true)<CR>]], { script = true,  silent = true})
-  api.nvim_buf_set_keymap(bufnr, 'n', '<S-h>', [[<cmd>lua require'codeql.panel'.toggle_help()<CR>]], { script = true,  silent = true})
-  api.nvim_buf_set_keymap(bufnr, 'n', 'q', [[<cmd>lua require'codeql.panel'.close_codeql_panel()<CR>]], { script = true,  silent = true})
-  api.nvim_buf_set_keymap(bufnr, 'n', 't', [[<cmd>lua require'codeql.panel'.set_fold_level(false)<CR>]], { script = true,  silent = true})
-  api.nvim_buf_set_keymap(bufnr, 'n', '<S-T>', [[<cmd>lua require'codeql.panel'.set_fold_level(true)<CR>]], { script = true,  silent = true})
-  api.nvim_buf_set_keymap(bufnr, 'n', '<S-p>', [[<cmd>lua require'codeql.panel'.change_path(-1)<CR>]], { script = true,  silent = true})
-  api.nvim_buf_set_keymap(bufnr, 'n', 'n', [[<cmd>lua require'codeql.panel'.change_path(1)<CR>]], { script = true,  silent = true})
-  api.nvim_buf_set_keymap(bufnr, 'n', 'f', [[<cmd>lua require'codeql.panel'.label_filter()<CR>]], { script = true,  silent = true})
-  api.nvim_buf_set_keymap(bufnr, 'n', '<S-f>', [[<cmd>lua require'codeql.panel'.generic_filter()<CR>]], { script = true,  silent = true})
-  api.nvim_buf_set_keymap(bufnr, 'n', '<S-c>', [[<cmd>lua require'codeql.panel'.clear_filter()<CR>]], { script = true,  silent = true})
-
   -- window options
   local win = get_panel_window(panel_buffer_name)
   api.nvim_win_set_option(win, 'wrap', false)
@@ -307,159 +626,21 @@ local function open_codeql_panel()
   api.nvim_win_set_option(win, 'signcolumn', 'yes')
 end
 
-local function render_keep_view(line)
-  if line == nil then line = vim.fn.line('.') end
-
-  -- called from toggle_fold commands, so within panel buffer
-  local curcol = vim.fn.col('.')
-  local topline = vim.fn.line('w0')
-
-  render_content()
-
-  local scrolloff_save = api.nvim_get_option('scrolloff')
-  vim.cmd('set scrolloff=0')
-
-  vim.fn.cursor(topline, 1)
-  vim.cmd('normal! zt')
-  vim.fn.cursor(line, curcol)
-
-  vim.cmd('let &scrolloff = '..scrolloff_save)
-  vim.cmd('redraw') -- consumes FDs
-end
-
--- exported functions
-
-local M = {}
-
-function M.clear_filter()
-  unhide_issues()
-  render_content()
-end
-
-function M.label_filter()
-  local pattern = vim.fn.input("Pattern: ")
-  unhide_issues()
-  filter_issues("string.match(string.lower(issue.label), string.lower('"..pattern.."')) ~= nil")
-  render_content()
-end
-
-function M.generic_filter()
-  local pattern = vim.fn.input("Pattern: ")
-  unhide_issues()
-  filter_issues(pattern)
-  render_content()
-end
-
-function M.toggle_fold()
-  -- prevent highlighting from being off after adding/removing the help text
-  vim.cmd('match none')
-
-  local c = vim.fn.line('.')
-  while c >= 7 do
-    if nil ~= scaninfo.line_map[c] then
-      local node = scaninfo.line_map[c]
-      if nil ~= node['is_folded'] then
-        node['is_folded'] = not node['is_folded']
-        render_keep_view(c)
-        return
-      end
-    end
-    c = c - 1
-  end
-end
-
-function M.toggle_help()
-  panel_short_help = not panel_short_help
-  -- prevent highlighting from being off after adding/removing the help text
-  render_keep_view()
-end
-
-function M.set_fold_level(level)
-  for k, _ in pairs(scaninfo.line_map) do
-    scaninfo.line_map[k]['is_folded'] = level
-  end
-  render_keep_view()
-end
-
-function M.change_path(offset)
-  local line = vim.fn.line('.') - 1
-  if nil == scaninfo.line_map[line] then
-    return
-  end
-
-  local issue = scaninfo.line_map[line]
-
-  if nil ~= issue['active_path'] then
-    if issue['active_path'] == 1 and offset == -1 then
-      scaninfo['line_map'][line]['active_path'] = #(issue.paths)
-    elseif issue['active_path'] == (#issue.paths) and offset == 1 then
-      scaninfo['line_map'][line]['active_path'] = 1
-    else
-      scaninfo['line_map'][line]['active_path'] = issue['active_path'] + offset
-    end
-    render_keep_view(line+1)
-  end
-end
-
-function M.jump_to_code(stay_in_pane)
-  --print('FDs before jumping '..vim.fn.system('lsof -p '..vim.loop.getpid()..' | wc -l'))
-  if not scaninfo.line_map[vim.fn.line('.')] then return end
-
-  local node = scaninfo.line_map[vim.fn.line('.')]
-  if vim.tbl_contains(vim.tbl_keys(node), 'active_path') then
-    -- scaninfo contains an issue rather than a node
-    node = node.node
-  end
-
-  if not node.visitable then
-    if not not node.filename then util.message(node.filename) end
-    return
-  end
-
-  -- open from src.zip
-  if vim.g.codeql_database and util.is_file(vim.g.codeql_database.sourceArchiveZip) then
-    if string.sub(node.filename, 1, 1) == '/' then
-      node.filename = string.sub(node.filename, 2)
-    end
-
-    -- save audit pane window
-    local panel_window = vim.fn.win_getid()
-
-    -- go to main window
-    go_to_main_window()
-
-    util.open_from_archive(vim.g.codeql_database.sourceArchiveZip, node.filename)
-    vim.fn.execute(node.line)
-    vim.cmd('normal! z.')
-    vim.cmd('normal! zv')
-    --vim.cmd('redraw') -- consumes FDs
-
-    -- highlight node
-    api.nvim_buf_clear_namespace(0, range_ns, 0, -1)
-    local startLine = node.url.startLine
-    local startColumn = node.url.startColumn
-    local endColumn = node.url.endColumn
-
-     api.nvim_buf_add_highlight(0, range_ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn)
-
-    -- jump to main window if requested
-    if stay_in_pane then vim.fn.win_gotoid(panel_window) end
-  end
-
-  --print('FDs afget jumping '..vim.fn.system('lsof -p '..vim.loop.getpid()..' | wc -l'))
-end
-
-function M.close_codeql_panel()
+function M.close_panel()
   local win = get_panel_window(panel_buffer_name)
   vim.fn.nvim_win_close(win, true)
 end
 
-function M.render(_issues)
-  open_codeql_panel()
+function M.render(_issues, _kind, _columns)
+  M.open_panel()
 
-  scaninfo = { line_map =  {} }
+  line_map = {}
+  kind = _kind or kind
+  issues = _issues or issues or {}
+  columns = _columns or columns or {}
 
-  issues = _issues
+  if not mode and _kind == "sarif" then mode = "tree" end
+  if not mode and _kind == "raw" then mode = "table" end
 
   -- sort
   table.sort(issues, function(a,b)
