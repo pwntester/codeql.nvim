@@ -91,7 +91,7 @@ function M.process_results(opts)
         require'codeql.defs'.process_defs(resultsPath, bufnr)
       else
         util.err_message('ERROR: Cant find results at '..resultsPath)
-        panel.render({})
+        panel.render()
       end
     end))
 
@@ -112,7 +112,7 @@ function M.process_results(opts)
         require'codeql.defs'.process_refs(resultsPath, bufnr)
       else
         util.err_message('ERROR: Cant find results at '..resultsPath)
-        panel.render({})
+        panel.render()
       end
     end))
 
@@ -133,7 +133,7 @@ function M.process_results(opts)
         require'codeql.ast'.build_ast(resultsPath, bufnr)
       else
         util.err_message('ERROR: Cant find results at '..resultsPath)
-        panel.render({})
+        panel.render()
       end
     end))
 
@@ -158,7 +158,7 @@ function M.process_results(opts)
         M.load_sarif_results(resultsPath)
       else
         util.err_message('ERROR: Cant find results at '..resultsPath)
-        panel.render({})
+        panel.render()
       end
     end))
     if save_bqrs then
@@ -188,7 +188,7 @@ function M.process_results(opts)
         M.load_raw_results(resultsPath)
       else
         util.err_message('ERROR: Cant find results at '..resultsPath)
-        panel.render({})
+        panel.render()
       end
     end))
     if save_bqrs then
@@ -217,11 +217,11 @@ function M.load_raw_results(path)
   local issues = {}
   local tuples, columns
   if results['#select'] then
-    tuples = results['#select']['tuples']
-    columns = results['#select']['columns']
+    tuples = results['#select'].tuples
+    columns = results['#select'].columns
   else
     for k, _ in pairs(results) do
-      tuples = results[k]['tuples']
+      tuples = results[k].tuples
     end
   end
 
@@ -232,9 +232,9 @@ function M.load_raw_results(path)
     for _, element in ipairs(tuple) do
       local node = {}
       -- objects with url info
-      if type(element) == "table" and nil ~= element['url'] then
-        local filename = M.uri_to_fname(element['url']['uri'])
-        local line = element['url']['startLine']
+      if type(element) == "table" and nil ~= element.url then
+        local filename = M.uri_to_fname(element.url.uri)
+        local line = element.url.startLine
         node = {
           label = element['label'];
           mark = '→',
@@ -245,9 +245,9 @@ function M.load_raw_results(path)
         }
 
         -- objects with no url info
-      elseif type(element) == "table" and nil == element['url'] then
+      elseif type(element) == "table" and nil == element.url then
         node = {
-          label = element['label'];
+          label = element.label;
           mark = '≔';
           filename = nil;
           line = nil;
@@ -291,15 +291,26 @@ function M.load_raw_results(path)
   end
 
   local col_names = {}
-  for _, col in ipairs(columns) do
-    if col.name then
-      table.insert(col_names, col.name)
-    else
+  if columns then
+    for _, col in ipairs(columns) do
+      if col.name then
+        table.insert(col_names, col.name)
+      else
+        table.insert(col_names, "---")
+      end
+    end
+  else
+    for _=1, #tuples[1] do
       table.insert(col_names, "---")
     end
   end
 
-  panel.render(issues, "raw", col_names)
+  panel.render({
+    issues = issues,
+    kind = "raw",
+    columns = col_names,
+    mode = "table"
+  })
   api.nvim_command('redraw')
 end
 
@@ -473,7 +484,11 @@ function M.load_sarif_results(path)
     end
   end
 
-  panel.render(issues, "sarif")
+  panel.render({
+    issues = issues,
+    kind = "sarif",
+    mode = "tree"
+  })
   api.nvim_command('redraw')
 end
 

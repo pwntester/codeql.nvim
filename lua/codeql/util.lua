@@ -7,12 +7,14 @@ local format = string.format
 local M = {}
 
 function M.open_from_archive(zipfile, path)
+  --print('FDs before jumping '..vim.fn.system('lsof -p '..vim.loop.getpid()..' | wc -l'))
   local name = format('codeql:/%s', path)
   local bufnr = vim.fn.bufnr(name)
-  if bufnr == -1 then
+  if bufnr < 0 then
     local zip_bufnr = api.nvim_create_buf(true, false)
     api.nvim_set_current_buf(zip_bufnr)
-    vim.cmd(format('keepalt silent! read! unzip -p -- %s %s', zipfile, path))
+    local cmd = format('keepalt silent! read! unzip -p -- %s %s', zipfile, path)
+    vim.cmd(cmd)
     vim.cmd('normal! ggdd')
     api.nvim_buf_set_name(zip_bufnr, name)
     pcall(vim.cmd, 'filetype detect') -- consumes FDs
@@ -22,6 +24,7 @@ function M.open_from_archive(zipfile, path)
   else
     api.nvim_set_current_buf(bufnr)
   end
+  --print('FDs after jumping '..vim.fn.system('lsof -p '..vim.loop.getpid()..' | wc -l'))
 end
 
 function M.run_cmd(cmd, raw)

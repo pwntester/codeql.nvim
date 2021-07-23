@@ -281,6 +281,10 @@ local function print_issues()
 
   elseif mode == "table" then
 
+    -- TODO: node.label may need to be tweaked (eg: replace new lines with "")
+    -- and this is the place to do it
+
+    -- calculate max length for each cell
     local max_lengths = {}
     for _, issue in ipairs(issues) do
       local path = issue.paths[1]
@@ -289,6 +293,13 @@ local function print_issues()
         max_lengths[i] = math.max(vim.fn.strdisplaywidth(get_node_location(node)), max_lengths[i] or -1)
       end
     end
+    if columns then
+      for i, column in ipairs(columns) do
+        max_lengths[i] = math.max(vim.fn.strdisplaywidth(column), max_lengths[i] or -1)
+      end
+    end
+
+
     local total_length = 4
     for _, len in ipairs(max_lengths) do
       total_length = total_length + len + 3
@@ -453,12 +464,15 @@ end
 
 function M.toggle_mode()
   if kind ~= "raw" then return end
-  if mode == "tree" then
-    mode = "table"
-  elseif mode == "table" then
-    mode = "tree"
-  end
-  M.render()
+  local new_mode
+  if mode == "tree" then new_mode = "table"
+  elseif mode == "table" then new_mode = "tree" end
+  M.render({
+    issues = issues,
+    kind = kind,
+    columns = columns,
+    mode = new_mode
+  })
 end
 
 function M.toggle_fold()
@@ -631,16 +645,15 @@ function M.close_panel()
   vim.fn.nvim_win_close(win, true)
 end
 
-function M.render(_issues, _kind, _columns)
+function M.render(opts)
+  --  _issues, _kind, _columns)
   M.open_panel()
 
   line_map = {}
-  kind = _kind or kind
-  issues = _issues or issues or {}
-  columns = _columns or columns or {}
-
-  if not mode and _kind == "sarif" then mode = "tree" end
-  if not mode and _kind == "raw" then mode = "table" end
+  kind = opts.kind or "raw"
+  issues = opts.issues or {}
+  columns = opts.columns or {}
+  mode = opts.mode
 
   -- sort
   table.sort(issues, function(a,b)

@@ -82,7 +82,7 @@ function M.runAsync(cmd, callback)
 end
 
 function M.runSync(cmd)
-  local timeout = 5000
+  local timeout = 15000
   local done = false
   local result
   M.runAsync(cmd, function (res)
@@ -94,7 +94,7 @@ function M.runSync(cmd)
     return done
   end, 200)
   if not wait_result then
-    error(format("'%s' was unable to complete in %s ms",
+    print(format("'%s' was unable to complete in %s ms",
       table.concat(cmd, ' '),
       timeout
     ))
