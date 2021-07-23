@@ -146,21 +146,20 @@ It is possible to add codeql language server to `coc.nvim` using `coc-settings.j
 
 ``` json
 {
-	"languageserver": {
-		"codeql" : {
-			"command": "<path to codeql binary>",
-			"args": [
-				"execute",
-				"language-server",
-				"--check-errors=ON_CHANGE",
-				"--search-path=./:<path to semmle/ql repo maybe>:<any more paths>",
-				"-q"
-			],
-			"filetypes": ["ql"],
-			"rootPatterns": ["qlpack.yml"],
-			"requireRootPattern": true
-		}
-	}
+  "languageserver": {
+    "codeql" : {
+      "command": "<path to codeql binary>",
+      "args": [
+        "execute",
+        "language-server",
+        "--check-errors=ON_CHANGE",
+        "--search-path=./:<path to semmle/ql repo maybe>:<any more paths>",
+        "-q"
+      ],
+      "filetypes": ["ql"],
+      "rootPatterns": ["qlpack.yml"],
+      "requireRootPattern": true
+    }
+  }
 }
 ```
-
