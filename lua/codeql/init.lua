@@ -107,6 +107,7 @@ local templated_queries = {
   go         = 'ql/src/%s.ql';
   javascript = 'javascript/ql/src/%s.ql';
   python     = 'python/ql/src/%s.ql';
+  ruby       = 'ql/src/ide-contextual-queries/%s.ql';
 }
 
 function M.run_print_ast()
@@ -132,13 +133,14 @@ function M.run_templated_query(query_name, param)
   local queryPath
   for _, path in ipairs(vim.g.codeql_search_path) do
     local candidate = format('%s/%s', path, query)
+    print(1, candidate)
     if util.is_file(candidate) then
       queryPath = candidate
       break
     end
   end
   if not queryPath then
-    util.err_message(format('Cannot find a valid %s query', query_name))
+    vim.notify(format('Cannot find a valid %s query', query_name), 2)
     return
   end
 

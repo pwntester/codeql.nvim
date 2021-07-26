@@ -75,6 +75,11 @@ function M.process_results(opts)
   util.message(format("Processing %s results", queryPath))
   util.message(format("%d rows found", count))
 
+  if count == 0 then
+    vim.notify("No results", 1)
+    return
+  end
+
   -- process definitions
   if vim.endswith(queryPath, '/localDefinitions.ql') then
     local cmd = {
@@ -223,6 +228,11 @@ function M.load_raw_results(path)
     for k, _ in pairs(results) do
       tuples = results[k].tuples
     end
+  end
+
+  if not tuples or vim.tbl_isempty(tuples) then
+    vim.notify("No results", 2)
+    return
   end
 
   print("Json: "..path)

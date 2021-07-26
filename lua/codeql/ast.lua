@@ -361,10 +361,11 @@ function M.build_ast(jsonPath, bufnr)
   local childToParent = {}
   local astOrder = {}
   local roots = {}
+  local edgeLabels = {}
 
   -- Build up the parent-child relationships
   for _, tuple in ipairs(edgeTuples.tuples) do
-    local source, target, tupleType, orderValue = unpack(tuple)
+    local source, target, tupleType, value = unpack(tuple)
     -- local target = tuple[2]
     -- local tupleType = tuple[3]
     -- local orderValue = tuple[4]
@@ -372,12 +373,17 @@ function M.build_ast(jsonPath, bufnr)
     local targetId = target.id
 
     if tupleType == 'semmle.order' then
-      astOrder[targetId] = tonumber(orderValue)
+      astOrder[targetId] = tonumber(value)
     elseif tupleType == 'semmle.label' then
       childToParent[targetId] = sourceId
       local children = parentToChildren[sourceId] or {}
       table.insert(children, targetId)
       parentToChildren[sourceId] = children
+
+      -- ignore values that indicate a numeric order.
+      if not tonumber(value) then
+        edgeLabels[targetId] = value
+      end
     else
       -- ignore other tupleTypes since they are not needed by the ast viewer
     end
@@ -393,9 +399,20 @@ function M.build_ast(jsonPath, bufnr)
     if tupleType == 'semmle.order' then
       astOrder[id] = tonumber(value)
     elseif tupleType == 'semmle.label' then
+
+      -- If an edge label exists, include it and separate from the node label using ':'
+      local nodeLabel = value and value or entity.label
+      local edgeLabel = edgeLabels[id]
+      local label
+      if edgeLabel then
+        label = string.format("%s: %s", edgeLabel, nodeLabel)
+      else
+        label = nodeLabel
+      end
+
       local item = {
         id = id;
-        label = value and value or entity.label;
+        label = label;
         location = entity.url;
         children = {};
         order = math.huge;
