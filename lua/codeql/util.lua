@@ -1,4 +1,4 @@
-local cli = require'codeql.cliserver'
+local cli = require "codeql.cliserver"
 local vim = vim
 local api = vim.api
 local uv = vim.loop
@@ -8,19 +8,19 @@ local M = {}
 
 function M.open_from_archive(zipfile, path)
   --print('FDs before jumping '..vim.fn.system('lsof -p '..vim.loop.getpid()..' | wc -l'))
-  local name = format('codeql:/%s', path)
+  local name = format("codeql:/%s", path)
   local bufnr = vim.fn.bufnr(name)
   if bufnr < 0 then
     local zip_bufnr = api.nvim_create_buf(true, false)
     api.nvim_set_current_buf(zip_bufnr)
-    local cmd = format('keepalt silent! read! unzip -p -- %s %s', zipfile, path)
+    local cmd = format("keepalt silent! read! unzip -p -- %s %s", zipfile, path)
     vim.cmd(cmd)
-    vim.cmd('normal! ggdd')
+    vim.cmd "normal! ggdd"
     api.nvim_buf_set_name(zip_bufnr, name)
-    pcall(vim.cmd, 'filetype detect') -- consumes FDs
+    pcall(vim.cmd, "filetype detect") -- consumes FDs
     api.nvim_buf_set_option(zip_bufnr, "modified", false)
     api.nvim_buf_set_option(zip_bufnr, "modifiable", false)
-    vim.cmd('doau BufEnter')
+    vim.cmd "doau BufEnter"
   else
     api.nvim_set_current_buf(bufnr)
   end
@@ -28,13 +28,15 @@ function M.open_from_archive(zipfile, path)
 end
 
 function M.run_cmd(cmd, raw)
-  local f = assert(io.popen(cmd, 'r'))
-  local s = assert(f:read('*a'))
+  local f = assert(io.popen(cmd, "r"))
+  local s = assert(f:read "*a")
   f:close()
-  if raw then return s end
-  s = string.gsub(s, '^%s+', '')
-  s = string.gsub(s, '%s+$', '')
-  s = string.gsub(s, '[\n\r]+', ' ')
+  if raw then
+    return s
+  end
+  s = string.gsub(s, "^%s+", "")
+  s = string.gsub(s, "%s+$", "")
+  s = string.gsub(s, "[\n\r]+", " ")
   return s
 end
 
@@ -45,32 +47,38 @@ function M.cmd_parts(input)
     cmd_args = {}
     -- Don't mutate our input.
     for i, v in ipairs(input) do
-      assert(type(v) == 'string', "input arguments must be strings")
+      assert(type(v) == "string", "input arguments must be strings")
       if i > 1 then
         table.insert(cmd_args, v)
       end
     end
   else
-    error("cmd type must be list.")
+    error "cmd type must be list."
   end
   return cmd, cmd_args
 end
 
 function M.debounce(fn, debounce_time)
   local timer = vim.loop.new_timer()
-  local is_debounce_fn = type(debounce_time) == 'function'
+  local is_debounce_fn = type(debounce_time) == "function"
 
   return function(...)
     timer:stop()
 
     local time = debounce_time
-    local args = {...}
+    local args = { ... }
 
     if is_debounce_fn then
       time = debounce_time()
     end
 
-    timer:start(time, 0, vim.schedule_wrap(function() fn(unpack(args)) end))
+    timer:start(
+      time,
+      0,
+      vim.schedule_wrap(function()
+        fn(unpack(args))
+      end)
+    )
   end
 end
 
@@ -81,52 +89,55 @@ function M.for_each_buf_window(bufnr, fn)
 end
 
 function M.err_message(...)
-  api.nvim_err_writeln(table.concat(vim.tbl_flatten{...}))
-  api.nvim_command("redraw")
+  api.nvim_err_writeln(table.concat(vim.tbl_flatten { ... }))
+  api.nvim_command "redraw"
 end
 
 function M.message(...)
-  api.nvim_out_write(table.concat(vim.tbl_flatten{...}).."\n")
-  api.nvim_command("redraw")
+  api.nvim_out_write(table.concat(vim.tbl_flatten { ... }) .. "\n")
+  api.nvim_command "redraw"
 end
 
 function M.database_upgrades(dbscheme)
-  local status, json = pcall(cli.runSync, {'resolve', 'upgrades', '-v', '--log-to-stderr', '--format=json', '--dbscheme', dbscheme})
+  local status, json = pcall(
+    cli.runSync,
+    { "resolve", "upgrades", "-v", "--log-to-stderr", "--format=json", "--dbscheme", dbscheme }
+  )
   if status then
     local metadata, err = M.json_decode(json)
     if not metadata then
-      print("Error resolving database upgrades: "..err)
+      print("Error resolving database upgrades: " .. err)
       return nil
     else
       return metadata
     end
   else
-    print("Error resolving database upgrades")
+    print "Error resolving database upgrades"
     return nil
   end
 end
 
 function M.query_info(query)
-  local status, json = pcall(cli.runSync, {'resolve', 'metadata', '-v', '--log-to-stderr', '--format=json', query})
+  local status, json = pcall(cli.runSync, { "resolve", "metadata", "-v", "--log-to-stderr", "--format=json", query })
   if status then
     local metadata, err = M.json_decode(json)
     if not metadata then
-      print("Error resolving query metadata: "..err)
+      print("Error resolving query metadata: " .. err)
       return {}
     else
       return metadata
     end
   else
-    print("Error resolving query metadata")
+    print "Error resolving query metadata"
     return {}
   end
 end
 
 function M.database_info(database)
-  local json = cli.runSync({'resolve', 'database', '-v', '--log-to-stderr', '--format=json', database})
+  local json = cli.runSync { "resolve", "database", "-v", "--log-to-stderr", "--format=json", database }
   local metadata, err = M.json_decode(json)
   if not metadata then
-    print("Error resolving database metadata: "..err)
+    print("Error resolving database metadata: " .. err)
     return nil
   else
     return metadata
@@ -134,48 +145,48 @@ function M.database_info(database)
 end
 
 function M.bqrs_info(bqrsPath)
-  local json = cli.runSync({'bqrs', 'info', '-v', '--log-to-stderr', '--format=json', bqrsPath})
+  local json = cli.runSync { "bqrs", "info", "-v", "--log-to-stderr", "--format=json", bqrsPath }
   local decoded, err = M.json_decode(json)
   if not decoded then
-    print("ERROR: Could not get BQRS info: "..err)
+    print("ERROR: Could not get BQRS info: " .. err)
     return {}
   end
   return decoded
 end
 
 function M.resolve_library_path(queryPath)
-  local cmd = {'resolve', 'library-path', '-v', '--log-to-stderr', '--format=json', '--query='..queryPath}
+  local cmd = { "resolve", "library-path", "-v", "--log-to-stderr", "--format=json", "--query=" .. queryPath }
   if vim.g.codeql_search_path and #vim.g.codeql_search_path > 0 then
     for _, searchPath in ipairs(vim.g.codeql_search_path) do
-      if searchPath ~= '' then
-        table.insert(cmd, string.format('--search-path=%s', searchPath))
+      if searchPath ~= "" then
+        table.insert(cmd, string.format("--search-path=%s", searchPath))
       end
     end
   end
   local json = cli.runSync(cmd)
   local decoded, err = M.json_decode(json)
   if not decoded then
-    print("ERROR: Could not resolve library path: "..err)
+    print("ERROR: Could not resolve library path: " .. err)
     return {}
   end
   return decoded
 end
 
 function M.resolve_ram(jvm)
-  local cmd = 'codeql resolve ram --format=json'
+  local cmd = "codeql resolve ram --format=json"
   if vim.g.codeql_max_ram and vim.g.codeql_max_ram > -1 then
-    cmd = cmd..' -M '..vim.g.codeql_max_ram
+    cmd = cmd .. " -M " .. vim.g.codeql_max_ram
   end
   local json = M.run_cmd(cmd, true)
   local ram_opts, err = M.json_decode(json)
   if not ram_opts then
-    print("ERROR: Could not resolve RAM options: "..err)
+    print("ERROR: Could not resolve RAM options: " .. err)
     return {}
   else
     if jvm then
       -- --off-heap-ram is not supported by some commands
       ram_opts = vim.tbl_filter(function(i)
-        return vim.startswith(i, '-J')
+        return vim.startswith(i, "-J")
       end, ram_opts)
     end
     return ram_opts
@@ -202,21 +213,21 @@ end
 
 function M.is_file(filename)
   local stat = uv.fs_stat(filename)
-  return stat and stat.type == 'file' or false
+  return stat and stat.type == "file" or false
 end
 
 function M.is_dir(filename)
   local stat = uv.fs_stat(filename)
-  return stat and stat.type == 'directory' or false
+  return stat and stat.type == "directory" or false
 end
 
 function M.read_json_file(path)
   local f = io.open(path, "r")
-  local body = f:read("*all")
+  local body = f:read "*all"
   f:close()
   local decoded, err = M.json_decode(body)
   if not decoded then
-    print("ERROR: Could not process JSON. "..err)
+    print("ERROR: Could not process JSON. " .. err)
     return nil
   end
   return decoded
@@ -260,7 +271,7 @@ local special_buffers = {
     "TelescopeResults",
     "NeogitStatus",
     "notify",
-  }
+  },
 }
 
 ---Get user to pick a window. Selectable windows are all windows in the current
@@ -274,7 +285,7 @@ function M.pick_window(panel_winid)
   local win_ids = api.nvim_tabpage_list_wins(tabpage)
   local exclude = special_buffers
 
-  local selectable = vim.tbl_filter(function (id)
+  local selectable = vim.tbl_filter(function(id)
     local bufid = api.nvim_win_get_buf(id)
     for option, v in pairs(exclude) do
       local ok, option_value = pcall(api.nvim_buf_get_option, bufid, option)
@@ -284,14 +295,16 @@ function M.pick_window(panel_winid)
     end
 
     local win_config = api.nvim_win_get_config(id)
-    return id ~= panel_winid
-      and win_config.focusable
-      and not win_config.external
+    return id ~= panel_winid and win_config.focusable and not win_config.external
   end, win_ids)
 
   -- If there are no selectable windows: return. If there's only 1, return it without picking.
-  if #selectable == 0 then return -1 end
-  if #selectable == 1 then return selectable[1] end
+  if #selectable == 0 then
+    return -1
+  end
+  if #selectable == 1 then
+    return selectable[1]
+  end
 
   local chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
 
@@ -309,25 +322,25 @@ function M.pick_window(panel_winid)
 
     win_opts[id] = {
       statusline = ok_status and statusline or "",
-      winhl = ok_hl and winhl or ""
+      winhl = ok_hl and winhl or "",
     }
     win_map[char] = id
 
     api.nvim_win_set_option(id, "statusline", "%=" .. char .. "%=")
-    api.nvim_win_set_option(
-      id, "winhl", "StatusLine:CodeQLWindowPicker,StatusLineNC:CodeQLWindowPicker"
-    )
+    api.nvim_win_set_option(id, "winhl", "StatusLine:CodeQLWindowPicker,StatusLineNC:CodeQLWindowPicker")
 
     i = i + 1
-    if i > #chars then break end
+    if i > #chars then
+      break
+    end
   end
 
-  vim.cmd("redraw")
-  print("Pick window: ")
+  vim.cmd "redraw"
+  print "Pick window: "
   local _, resp = pcall(M.get_user_input_char)
   resp = (resp or ""):upper()
   -- clears prompt
-  vim.api.nvim_command('normal! :')
+  vim.api.nvim_command "normal! :"
 
   -- Restore window options
   for _, id in ipairs(selectable) do
