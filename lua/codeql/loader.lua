@@ -62,7 +62,7 @@ function M.process_results(opts)
   local resultsPath = vim.fn.tempname()
 
   local info = util.bqrs_info(bqrsPath)
-  if not info or not info['result-sets'] then return end
+  if not info or info == vim.NIL or not info['result-sets'] then return end
 
   local query_kinds = info['compatible-query-kinds']
 
