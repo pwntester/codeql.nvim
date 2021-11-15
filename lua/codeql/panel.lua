@@ -765,26 +765,18 @@ function M.render(results)
   end
 
   local rules = {}
+  local folded = #vim.tbl_keys(rule_groups) > 1 and true or false
   for group, rule_issues in pairs(rule_groups) do
     local rule = {
       mode = M.scan_results.mode,
       columns = M.scan_results.columns,
       issues = rule_issues,
-      is_folded = false,
+      is_folded = folded,
       label = group,
     }
     table.insert(rules, rule)
   end
   M.scan_results.rules = rules
-
-  -- sort
-  -- table.sort(M.scan_results.issues, function(a, b)
-  --   if a.rule_id ~= b.rule_id then
-  --     return a.rule_id < b.rule_id
-  --   else
-  --     return a.label < b.label
-  --   end
-  -- end)
 
   render_content(M.scan_results)
 end

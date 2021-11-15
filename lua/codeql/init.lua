@@ -3,6 +3,7 @@ local queryserver = require "codeql.queryserver"
 local vim = vim
 local api = vim.api
 local format = string.format
+local ts_utils = require "nvim-treesitter.ts_utils"
 
 local M = {}
 
@@ -53,7 +54,69 @@ function M.set_database(dbpath)
   vim.g.codeql_ram_opts = util.resolve_ram(true)
 end
 
-function M.run_query(quick_eval)
+function M.is_predicate_node(node)
+  return node:type() == "charpred" or node:type() == "classlessPredicate"
+end
+
+function M.get_enclosing_predicate_position()
+  local node = ts_utils.get_node_at_cursor()
+  if not node then
+    vim.notify("No treesitter CodeQL parser installed", 2)
+  end
+  local parent = node:parent()
+  local root = ts_utils.get_root_for_node(node)
+  while parent ~= root and not M.is_predicate_node(node) do
+    node = parent
+    parent = node:parent()
+  end
+  if M.is_predicate_node(node) then
+    for child in node:iter_children() do
+      if child:type() == "predicateName" then
+        local srow, scol, erow, ecol = child:range()
+        local midname = math.floor((scol + ecol) / 2)
+        return { srow + 1, midname, erow + 1, midname }
+      end
+    end
+    return
+  end
+end
+
+function M.get_current_position()
+  local srow, scol, erow, ecol
+
+  if vim.fn.getpos("'<")[2] == vim.fn.getcurpos()[2] and vim.fn.getpos("'<")[3] == vim.fn.getcurpos()[3] then
+    srow = vim.fn.getpos("'<")[2]
+    scol = vim.fn.getpos("'<")[3]
+    erow = vim.fn.getpos("'>")[2]
+    ecol = vim.fn.getpos("'>")[3]
+
+    ecol = ecol == 2147483647 and 1 + vim.fn.len(vim.fn.getline(erow)) or 1 + ecol
+  else
+    srow = vim.fn.getcurpos()[2]
+    scol = vim.fn.getcurpos()[3]
+    erow = vim.fn.getcurpos()[2]
+    ecol = vim.fn.getcurpos()[3]
+  end
+
+  return { srow, scol, erow, ecol }
+end
+
+function M.quick_evaluate_enclosing_predicate()
+  local position = M.get_enclosing_predicate_position()
+  if position then
+    M.query(true, position)
+  end
+end
+
+function M.quick_evaluate()
+  M.query(true, M.get_current_position())
+end
+
+function M.run_query()
+  M.query(false, M.get_current_position())
+end
+
+function M.query(quick_eval, position)
   local db = vim.g.codeql_database
   if not db then
     util.err_message "Missing database. Use :SetDatabase command"
@@ -63,23 +126,6 @@ function M.run_query(quick_eval)
   local dbPath = vim.g.codeql_database.path
   local queryPath = vim.fn.expand "%:p"
 
-  -- [bufnum, lnum, col, off, curswant]
-  local line_start, column_start, line_end, column_end
-
-  if vim.fn.getpos("'<")[2] == vim.fn.getcurpos()[2] and vim.fn.getpos("'<")[3] == vim.fn.getcurpos()[3] then
-    line_start = vim.fn.getpos("'<")[2]
-    column_start = vim.fn.getpos("'<")[3]
-    line_end = vim.fn.getpos("'>")[2]
-    column_end = vim.fn.getpos("'>")[3]
-
-    column_end = column_end == 2147483647 and 1 + vim.fn.len(vim.fn.getline(line_end)) or 1 + column_end
-  else
-    line_start = vim.fn.getcurpos()[2]
-    column_start = vim.fn.getcurpos()[3]
-    line_end = vim.fn.getcurpos()[2]
-    column_end = vim.fn.getcurpos()[3]
-  end
-
   local libPaths = util.resolve_library_path(queryPath)
 
   local opts = {
@@ -87,10 +133,10 @@ function M.run_query(quick_eval)
     bufnr = api.nvim_get_current_buf(),
     query = queryPath,
     dbPath = dbPath,
-    startLine = line_start,
-    startColumn = column_start,
-    endLine = line_end,
-    endColumn = column_end,
+    startLine = position[1],
+    startColumn = position[2],
+    endLine = position[3],
+    endColumn = position[4],
     metadata = util.query_info(queryPath),
     libraryPath = libPaths.libraryPath,
     dbschemePath = libPaths.dbscheme,
