@@ -54,30 +54,41 @@ function M.set_database(dbpath)
   vim.g.codeql_ram_opts = util.resolve_ram(true)
 end
 
-function M.is_predicate_node(node)
-  return node:type() == "charpred" or node:type() == "classlessPredicate"
+local function is_predicate_node(node)
+  return node:type() == "charpred" or node:type() == "memberPredicate" or node:type() == "classlessPredicate"
+end
+
+local function is_predicate_identifier_node(predicate_node, node)
+  return (predicate_node:type() == "charpred" and node:type() == "className")
+    or (predicate_node:type() == "classlessPredicate" and node:type() == "predicateName")
+    or (predicate_node:type() == "memberPredicate" and node:type() == "predicateName")
 end
 
 function M.get_enclosing_predicate_position()
   local node = ts_utils.get_node_at_cursor()
+  print(vim.inspect(node:type()))
   if not node then
     vim.notify("No treesitter CodeQL parser installed", 2)
   end
   local parent = node:parent()
   local root = ts_utils.get_root_for_node(node)
-  while parent ~= root and not M.is_predicate_node(node) do
+  while parent and parent ~= root and not is_predicate_node(node) do
     node = parent
     parent = node:parent()
   end
-  if M.is_predicate_node(node) then
+  if is_predicate_node(node) then
     for child in node:iter_children() do
-      if child:type() == "predicateName" then
+      if is_predicate_identifier_node(node, child) then
+        print(string.format("Evaluating '%s' predicate", child))
         local srow, scol, erow, ecol = child:range()
         local midname = math.floor((scol + ecol) / 2)
         return { srow + 1, midname, erow + 1, midname }
       end
     end
+    vim.notify("No predicate identifier node found", 2)
     return
+  else
+    vim.notify("No predicate node found", 2)
   end
 end
 
