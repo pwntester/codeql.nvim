@@ -55,6 +55,7 @@ if executable('codeql')
   " mappings
   nnoremap <Plug>(CodeQLGoToDefinition) <cmd>lua require'codeql.defs'.find_at_cursor('definitions')<CR>
   nnoremap <Plug>(CodeQLFindReferences) <cmd>lua require'codeql.defs'.find_at_cursor('references')<CR>
+  nnoremap <Plug>(CodeQLGrepSource) <cmd>lua require'codeql'.grep_source()<CR>
 
   augroup codeql_mappings
   au!

@@ -6,8 +6,7 @@ local format = string.format
 
 local M = {}
 
-function M.open_from_archive(zipfile, path)
-  --print('FDs before jumping '..vim.fn.system('lsof -p '..vim.loop.getpid()..' | wc -l'))
+function M.open_from_archive(zipfile, path, cursor)
   local name = format("codeql:/%s", path)
   local bufnr = vim.fn.bufnr(name)
   if bufnr < 0 then
@@ -21,10 +20,14 @@ function M.open_from_archive(zipfile, path)
     api.nvim_buf_set_option(zip_bufnr, "modified", false)
     api.nvim_buf_set_option(zip_bufnr, "modifiable", false)
     vim.cmd "doau BufEnter"
+    bufnr = zip_bufnr
   else
     api.nvim_set_current_buf(bufnr)
   end
-  --print('FDs after jumping '..vim.fn.system('lsof -p '..vim.loop.getpid()..' | wc -l'))
+  pcall(vim.api.nvim_win_set_cursor, 0, cursor)
+  vim.api.nvim_buf_call(bufnr, function()
+    vim.cmd "norm! zz"
+  end)
 end
 
 function M.run_cmd(cmd, raw)

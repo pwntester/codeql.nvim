@@ -123,8 +123,11 @@ function M.find_at_cursor(kind)
     local items = { { tagname = vim.fn.expand "<cword>", from = from } }
     vim.fn.settagstack(vim.fn.win_getid(), { items = items }, "t")
 
-    util.open_from_archive(vim.g.codeql_database.sourceArchiveZip, string.sub(location.fname, 2))
-    api.nvim_win_set_cursor(0, { location.lnum, location.range[1] })
+    util.open_from_archive(
+      vim.g.codeql_database.sourceArchiveZip,
+      string.sub(location.fname, 2),
+      { location.lnum, location.range[1] }
+    )
   elseif #matching_locs > 1 then
     local items = {}
     for _, location in ipairs(matching_locs) do

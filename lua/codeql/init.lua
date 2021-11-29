@@ -223,4 +223,19 @@ function M.run_templated_query(query_name, param)
   require("codeql.queryserver").run_query(opts)
 end
 
+function M.grep_source()
+  local ok = require("telescope").load_extension "zip_grep"
+  if ok then
+    local db = vim.g.codeql_database
+    if not db then
+      util.err_message "Missing database. Use :SetDatabase command"
+      return
+    else
+      require("telescope").extensions.zip_grep.zip_grep {
+        archive = vim.g.codeql_database.sourceArchiveZip,
+      }
+    end
+  end
+end
+
 return M

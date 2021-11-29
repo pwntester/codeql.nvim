@@ -662,14 +662,8 @@ function M.jump_to_code(stay_in_pane)
     end
 
     vim.fn.win_gotoid(target_id)
-    -- go to main window
-    --go_to_main_window()
 
-    util.open_from_archive(vim.g.codeql_database.sourceArchiveZip, node.filename)
-    vim.fn.execute(node.line)
-    -- vim.cmd('normal! z.')
-    -- vim.cmd('normal! zv')
-    -- vim.cmd('redraw') -- consumes FDs
+    util.open_from_archive(vim.g.codeql_database.sourceArchiveZip, node.filename, { node.line, 0 })
 
     -- highlight node
     api.nvim_buf_clear_namespace(0, range_ns, 0, -1)
