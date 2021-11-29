@@ -33,8 +33,9 @@ if executable('codeql')
   " commands
   command! -nargs=1 -complete=file SetDatabase lua require'codeql'.set_database(<f-args>)
   command! UnsetDatabase lua require'codeql.queryserver'.deregister_database(<f-args>)
-  command! RunQuery lua require'codeql'.run_query(false)
-  command! -range QuickEval lua require'codeql'.run_query(true)
+  command! RunQuery lua require'codeql'.run_query()
+  command! QuickEvalPredicate lua require'codeql'.quick_evaluate_enclosing_predicate()
+  command! -range QuickEval lua require'codeql'.quick_evaluate()
   command! StopServer lua require'codeql.queryserver'.stop_server()
   command! History lua require'codeql.history'.menu()
   command! PrintAST lua require'codeql'.run_print_ast()
@@ -54,10 +55,12 @@ if executable('codeql')
   " mappings
   nnoremap <Plug>(CodeQLGoToDefinition) <cmd>lua require'codeql.defs'.find_at_cursor('definitions')<CR>
   nnoremap <Plug>(CodeQLFindReferences) <cmd>lua require'codeql.defs'.find_at_cursor('references')<CR>
+  nnoremap <Plug>(CodeQLGrepSource) <cmd>lua require'codeql'.grep_source()<CR>
 
   augroup codeql_mappings
   au!
   au FileType ql nnoremap qr :RunQuery<CR>
+  au FileType ql nnoremap qp :QuickEvalPredicate<CR>
   au FileType ql nnoremap qe :QuickEval<CR>
   au FileType ql vnoremap qe :QuickEval<CR>
   au BufEnter codeql:/* nmap <buffer>gd <Plug>(CodeQLGoToDefinition)

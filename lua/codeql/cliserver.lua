@@ -8,11 +8,10 @@ local M = {}
 M.client = nil
 
 local function start()
-
-  print("Starting CodeQL CLI Server")
+  print "Starting CodeQL CLI Server"
 
   local cmd = "codeql"
-  local cmd_args = {"execute", "cli-server", "--logdir", "/tmp/codeql_queryserver"}
+  local cmd_args = { "execute", "cli-server", "--logdir", "/tmp/codeql_queryserver" }
 
   if not (vim.fn.executable(cmd) == 1) then
     api.nvim_err_writeln(format("The given command %q is not executable.", cmd))
@@ -31,8 +30,8 @@ local function start()
       handle:close()
     end
     local spawn_params = {
-      args = cmd_args;
-      stdio = {stdin, stdout, stderr};
+      args = cmd_args,
+      stdio = { stdin, stdout, stderr },
     }
     handle, pid = uv.spawn(cmd, spawn_params, onexit)
   end
@@ -42,7 +41,9 @@ local function start()
 
   local function request(cmd, cb)
     callback = cb
-    if handle:is_closing() then return false end
+    if handle:is_closing() then
+      return false
+    end
     schedule(function()
       local encoded = assert(vim.fn.json_encode(cmd))
       stdin:write(encoded)
@@ -53,13 +54,13 @@ local function start()
 
   stderr:read_start(function(err, data)
     assert(not err, err)
-    print("CLISERVER STDERR: "..data)
+    print("CLISERVER STDERR: " .. data)
   end)
 
   stdout:read_start(function(err, data)
     assert(not err, err)
-    if data and #data> 0 and string.byte(data, #data, #data) == 0 then
-      table.insert(stdoutBuffers, string.sub(data, 1, #data-1))
+    if data and #data > 0 and string.byte(data, #data, #data) == 0 then
+      table.insert(stdoutBuffers, string.sub(data, 1, #data - 1))
       callback(vim.trim(table.concat(stdoutBuffers)))
       stdoutBuffers = {}
     elseif data then
@@ -68,9 +69,9 @@ local function start()
   end)
 
   return {
-    handle = handle;
-    pid = pid;
-    request = request;
+    handle = handle,
+    pid = pid,
+    request = request,
   }
 end
 
@@ -82,10 +83,10 @@ function M.runAsync(cmd, callback)
 end
 
 function M.runSync(cmd)
-  local timeout = 5000
+  local timeout = 15000
   local done = false
   local result
-  M.runAsync(cmd, function (res)
+  M.runAsync(cmd, function(res)
     result = res
     done = true
   end)
@@ -94,10 +95,7 @@ function M.runSync(cmd)
     return done
   end, 200)
   if not wait_result then
-    error(format("'%s' was unable to complete in %s ms",
-      table.concat(cmd, ' '),
-      timeout
-    ))
+    print(format("'%s' was unable to complete in %s ms", table.concat(cmd, " "), timeout))
     return nil
   else
     return result
@@ -105,8 +103,8 @@ function M.runSync(cmd)
 end
 
 function M.shutdownServer()
-  M.runAsync({"shutdown"}, function(_)
-    print('Shutting down')
+  M.runAsync({ "shutdown" }, function(_)
+    print "Shutting down"
   end)
 end
 
