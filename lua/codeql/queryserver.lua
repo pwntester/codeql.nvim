@@ -112,6 +112,7 @@ function M.start_server()
       -- query completed
       ["evaluation/queryCompleted"] = function(_, result, _)
         util.message(format("Evaluation time: %s", result.evaluationTime))
+        print(vim.inspect(result))
         if result.resultType == 0 then
           return {}
         elseif result.resultType == 1 then
