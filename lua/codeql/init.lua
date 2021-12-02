@@ -138,6 +138,10 @@ function M.query(quick_eval, position)
   local queryPath = vim.fn.expand "%:p"
 
   local libPaths = util.resolve_library_path(queryPath)
+  if not libPaths then
+    util.err_message "Could not resolve library paths"
+    return
+  end
 
   local opts = {
     quick_eval = quick_eval,

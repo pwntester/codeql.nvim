@@ -230,8 +230,8 @@ local function print_issues(results)
     -- print group name
     local rule_foldmarker = not results.is_folded and icon_open or icon_closed
     local rule_label = format("%s %s", rule_foldmarker, results.label)
-    --print_to_panel ""
-    print_to_panel(rule_label, {
+
+    print_to_panel(string.format("%s (%d)", rule_label, #results.issues), {
       CodeqlPanelFoldIcon = { { 0, string.len(rule_foldmarker) } },
       CodeqlPanelRuleId = { { string.len(rule_foldmarker), string.len(rule_label) } },
     })

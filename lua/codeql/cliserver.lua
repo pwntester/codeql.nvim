@@ -54,7 +54,7 @@ local function start()
 
   stderr:read_start(function(err, data)
     assert(not err, err)
-    print("CLISERVER STDERR: " .. data)
+    require("codeql.util").err_message("cliserver error: " .. data)
   end)
 
   stdout:read_start(function(err, data)
