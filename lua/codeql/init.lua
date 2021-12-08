@@ -165,7 +165,7 @@ local templated_queries = {
   cpp = "cpp/ql/src/%s.ql",
   java = "java/ql/src/%s.ql",
   cs = "csharp/ql/src/%s.ql",
-  go = "ql/src/%s.ql",
+  go = "ql/lib/%s.ql",
   javascript = "javascript/ql/src/%s.ql",
   python = "python/ql/src/%s.ql",
   ruby = "ql/src/ide-contextual-queries/%s.ql",
@@ -202,7 +202,7 @@ function M.run_templated_query(query_name, param)
     end
   end
   if not queryPath then
-    --vim.notify(format('Cannot find a valid %s query', query_name), 2)
+    vim.notify(format("Cannot find a valid %s query", query_name), 2)
     return
   end
 
