@@ -18,6 +18,22 @@ Neovim plugin to help writing and testing CodeQL queries.
 
 - Neovim 0.5+
 
+## Install
+
+```lua
+use {
+  "pwntester/codeql.nvim",
+  requires = {
+    "MunifTanjim/nui.nvim",
+    "nvim-lua/telescope.nvim",
+    "kyazdani42/nvim-web-devicons",
+  },
+  config = function()
+    require("codeql").setup {}
+  end
+}
+```
+
 ## Usage
 
 ### Query pack 
@@ -82,6 +98,7 @@ eg:
 - `gr`: On a `codeql:/` file, show symbol references in the QuickFix window.
 - `qr`: Runs the current query.
 - `qe`: QuickEvals the selected predicate.
+- `<Plug>(CodeQLGrepSource)`: shows a telescope menu to grep the source archive
 
 ## Result Browser
 After running a query or quick evaluating a predicate, results will be rendered in a special panel.
