@@ -1,8 +1,3 @@
-local uv = vim.loop
-local api = vim.api
-local schedule = vim.schedule
-local format = string.format
-
 local M = {}
 
 M.client = nil
@@ -14,12 +9,12 @@ local function start()
   local cmd_args = { "execute", "cli-server", "--logdir", "/tmp/codeql_queryserver" }
 
   if not (vim.fn.executable(cmd) == 1) then
-    api.nvim_err_writeln(format("The given command %q is not executable.", cmd))
+    vim.api.nvim_err_writeln(string.format("The given command %q is not executable.", cmd))
   end
 
-  local stdin = uv.new_pipe(false)
-  local stdout = uv.new_pipe(false)
-  local stderr = uv.new_pipe(false)
+  local stdin = vim.loop.new_pipe(false)
+  local stdout = vim.loop.new_pipe(false)
+  local stderr = vim.loop.new_pipe(false)
 
   local handle, pid
   do
@@ -33,7 +28,7 @@ local function start()
       args = cmd_args,
       stdio = { stdin, stdout, stderr },
     }
-    handle, pid = uv.spawn(cmd, spawn_params, onexit)
+    handle, pid = vim.loop.spawn(cmd, spawn_params, onexit)
   end
 
   local callback
@@ -44,7 +39,7 @@ local function start()
     if handle:is_closing() then
       return false
     end
-    schedule(function()
+    vim.schedule(function()
       local encoded = assert(vim.fn.json_encode(cmd))
       stdin:write(encoded)
       stdin:write(string.char(0))
@@ -95,7 +90,7 @@ function M.runSync(cmd)
     return done
   end, 200)
   if not wait_result then
-    print(format("'%s' was unable to complete in %s ms", table.concat(cmd, " "), timeout))
+    print(string.format("'%s' was unable to complete in %s ms", table.concat(cmd, " "), timeout))
     return nil
   else
     return result

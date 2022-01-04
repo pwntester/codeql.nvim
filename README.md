@@ -35,7 +35,7 @@ Create `.ql` file with query
 ### Database
 
 Use `SetDatabase <path to db>` to let the plugin know what DB to work with.
-Use `UnsetDatabase` to deregister the current registered database.
+Use `UnsetDatabase` to unregister the current registered database.
 
 ### Run query or eval predicates
 

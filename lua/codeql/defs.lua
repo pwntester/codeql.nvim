@@ -1,7 +1,5 @@
 local util = require "codeql.util"
 local uri_to_fname = require("codeql.loader").uri_to_fname
-local format = string.format
-local api = vim.api
 
 local M = {}
 
@@ -12,7 +10,7 @@ M.cache = {
 M.processedFiles = {}
 
 local function add_to_cache(kind, fname, lnum, range, location)
-  local key = format("%s::%d", fname, lnum)
+  local key = string.format("%s::%d", fname, lnum)
   local entry = M.cache[kind][key]
   if not entry then
     entry = {}
@@ -35,7 +33,7 @@ function M.process(kind, results_path)
     return
   end
 
-  util.message(format("Processing %s from %s", kind, results_path))
+  util.message(string.format("Processing %s from %s", kind, results_path))
   util.message ""
   local results = util.read_json_file(results_path)
 
@@ -84,20 +82,20 @@ function M.find_at_cursor(kind)
   if not M.cache then
     return
   end
-  local bufnr = api.nvim_get_current_buf()
-  local bufname = vim.fn.bufname(bufnr)
+  local bufnr = vim.api.nvim_get_current_buf()
+  local bufname = vim.api.nvim_buf_get_name(bufnr)
   local _, row, col = unpack(vim.fn.getpos ".")
   if not vim.startswith(bufname, "codeql:/") then
     return
   end
-  local prefix = vim.split(bufname, ":")[1]
-  local fname = vim.split(bufname, ":")[2]
+  local prefix = vim.split(bufname, "://")[1]
+  local fname = vim.split(bufname, "://")[2]
   local word_at_cursor = ""
 
-  local key = format("%s::%d", fname, row)
+  local key = string.format("/%s::%d", fname, row)
   local entry = M.cache[kind][key]
   if not entry or vim.tbl_count(entry) == 0 then
-    util.message(format("Didnt found %s for %s", kind, fname))
+    util.message(string.format("Didnt found %s for %s", kind, key))
     return
   end
 
@@ -109,31 +107,34 @@ function M.find_at_cursor(kind)
   end
 
   if #matching_locs == 0 then
-    util.message(format("Didnt found matching %s for %s", kind, word_at_cursor))
+    util.message(string.format("Didnt found matching %s for %s", kind, word_at_cursor))
     return
   elseif #matching_locs == 1 then
     -- jump to location (def/ref)
     local location = matching_locs[1]
 
     -- mark current position so it can be jumped back to
-    api.nvim_command "mark '"
+    vim.api.nvim_command "mark '"
 
     -- push a new item into tagstack
     local from = { bufnr, vim.fn.line ".", vim.fn.col ".", 0 }
     local items = { { tagname = vim.fn.expand "<cword>", from = from } }
     vim.fn.settagstack(vim.fn.win_getid(), { items = items }, "t")
 
-    util.open_from_archive(
-      vim.g.codeql_database.sourceArchiveZip,
-      string.sub(location.fname, 2),
-      { location.lnum, location.range[1] }
-    )
+    local def_bufname = string.format("codeql://%s", string.sub(location.fname, 2))
+    if vim.fn.bufnr(def_bufname) == -1 then
+      vim.api.nvim_command(string.format("edit %s", def_bufname))
+    else
+      vim.api.nvim_command(string.format("buffer %s", def_bufname))
+    end
+    pcall(vim.api.nvim_win_set_cursor, 0, { location.lnum, location.range[1] - 1 })
+    vim.cmd "norm! zz"
   elseif #matching_locs > 1 then
     local items = {}
     for _, location in ipairs(matching_locs) do
       local rel_fname = string.sub(location.fname, 2)
       table.insert(items, {
-        filename = format("%s:%s", prefix, rel_fname),
+        filename = string.format("%s:%s", prefix, rel_fname),
         module = location.fname,
         lnum = location.lnum,
         col = location.range[1],
@@ -142,10 +143,10 @@ function M.find_at_cursor(kind)
     end
 
     vim.fn.setqflist({}, " ", {
-      title = format("CodeQL %s", kind),
+      title = string.format("CodeQL %s", kind),
       items = items,
     })
-    api.nvim_command "botright copen"
+    vim.api.nvim_command "botright copen"
   end
 end
 

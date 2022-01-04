@@ -1,15 +1,13 @@
 local util = require "codeql.util"
 local panel = require "codeql.panel"
 local cli = require "codeql.cliserver"
-local vim = vim
-local api = vim.api
-local format = string.format
+local config = require "codeql.config"
 
 local function generate_issue_label(node)
   local label = node.label
-
-  if vim.g.codeql_panel_filename and node["filename"] and node["filename"] ~= nil then
-    if vim.g.codeql_panel_longnames then
+  local conf = config.get_config()
+  if conf.panel_filename and node["filename"] and node["filename"] ~= nil then
+    if conf.panel_longnames then
       label = node.filename
     elseif #vim.fn.fnamemodify(node.filename, ":p:t") > 0 then
       label = vim.fn.fnamemodify(node.filename, ":p:t")
@@ -35,8 +33,8 @@ function M.uri_to_fname(uri)
   local path = string.sub(uri, colon + 1)
 
   if string.find(string.upper(path), "%%SRCROOT%%") then
-    if vim.g.codeql_database then
-      local sourceLocationPrefix = vim.g.codeql_database.sourceLocationPrefix
+    if config.database then
+      local sourceLocationPrefix = config.database.sourceLocationPrefix
       path = string.gsub(path, "%%SRCROOT%%", sourceLocationPrefix)
     else
       -- TODO: request path to user
@@ -53,6 +51,7 @@ function M.uri_to_fname(uri)
 end
 
 function M.process_results(opts)
+  local conf = config.get_config()
   local bqrsPath = opts.bqrs_path
   local dbPath = opts.db_path
   local queryPath = opts.query_path
@@ -60,7 +59,7 @@ function M.process_results(opts)
   local id = opts.query_id
   local save_bqrs = opts.save_bqrs
   local bufnr = opts.bufnr
-  local ram_opts = vim.g.codeql_ram_opts
+  local ram_opts = conf.ram_opts
   local resultsPath = vim.fn.tempname()
 
   local info = util.bqrs_info(bqrsPath)
@@ -76,8 +75,8 @@ function M.process_results(opts)
       count = resultset.rows
     end
   end
-  util.message(format("Processing %s results", queryPath))
-  util.message(format("%d rows found", count))
+  util.message(string.format("Processing %s results", queryPath))
+  util.message(string.format("%d rows found", count))
 
   if count == 0 then
     vim.notify("No results", 1)
@@ -224,7 +223,7 @@ function M.process_results(opts)
     end
   end
 
-  api.nvim_command "redraw"
+  vim.api.nvim_command "redraw"
 end
 
 --[[ DEBUG
@@ -347,11 +346,12 @@ function M.load_raw_results(path)
     columns = col_names,
     mode = "table",
   }
-  api.nvim_command "redraw"
+  vim.api.nvim_command "redraw"
 end
 
 function M.load_sarif_results(path)
-  local max_length = vim.g.codeql_path_max_length
+  local conf = config.get_config()
+  local max_length = conf.path_max_length
   if not util.is_file(path) then
     return
   end
@@ -394,7 +394,7 @@ function M.load_sarif_results(path)
         local uri = l.physicalLocation.artifactLocation.uri
         local uriBaseId = l.physicalLocation.artifactLocation.uriBaseId
         if uriBaseId then
-          uri = format("file:%s/%s", uriBaseId, uri)
+          uri = string.format("file:%s/%s", uriBaseId, uri)
         end
         local region = l.physicalLocation.region
 
@@ -449,7 +449,7 @@ function M.load_sarif_results(path)
             local uri = l.location.physicalLocation.artifactLocation.uri
             local uriBaseId = l.location.physicalLocation.artifactLocation.uriBaseId
             if uriBaseId then
-              uri = format("file:%s/%s", uriBaseId, uri)
+              uri = string.format("file:%s/%s", uriBaseId, uri)
             end
             local region = l.location.physicalLocation.region
 
@@ -514,7 +514,7 @@ function M.load_sarif_results(path)
       --- issue label
       for _, p in pairs(paths) do
         local primary_node = p[1][1]
-        if vim.g.codeql_group_by_sink then
+        if conf.group_by_sink then
           -- last node is the message node, so sink is #nodes - 1
           primary_node = p[1][#p[1] - 1]
         end
@@ -539,7 +539,7 @@ function M.load_sarif_results(path)
     kind = "sarif",
     mode = "tree",
   }
-  api.nvim_command "redraw"
+  vim.api.nvim_command "redraw"
 end
 
 return M
