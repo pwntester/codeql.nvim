@@ -11,6 +11,8 @@ Neovim plugin to help writing and testing CodeQL queries.
 - Quick query evaluation
 - Query history
 - Result browser
+- Source archive grepper
+- Source archive explorer
 
 ## Requirements
 
@@ -35,20 +37,34 @@ Create `.ql` file with query
 ### Database
 
 Use `SetDatabase <path to db>` to let the plugin know what DB to work with.
-Use `UnsetDatabase` to deregister the current registered database.
+Use `UnsetDatabase` to unregister the current registered database.
 
 ### Run query or eval predicates
 
 Use `RunQuery` or `QuickEval` commands or `qr`, `qe` shortcuts respectively to run the query or evaluate the predicate under the cursor.
 
 ## Configuration options
-g:codeql_search_path: List of codeql search paths
-g:codeql_max_ram: Max RAM memory to be used by CodeQL
+- search_path: List of codeql search paths
+- max_ram: Max RAM memory to be used by CodeQL
 
 eg:
-```
-let g:codeql_max_ram = 32000
-let g:codeql_search_path = ['/Users/pwntester/codeql-home/codeql-repo', '/Users/pwntester/codeql-home/codeql-go-repo']
+
+```lua
+    use {
+      "pwntester/codeql.nvim",
+      config = function()
+        require("codeql").setup {
+          group_by_sink = true,
+          max_ram = 32000,
+          search_path = {
+            "/Users/pwntester/codeql-home/codeql",
+            "/Users/pwntester/codeql-home/codeql-go",
+            "/Users/pwntester/codeql-home/codeql-ruby",
+            "./codeql",
+          },
+        }
+      end,
+    }
 ```
 
 ## Commands
@@ -59,6 +75,7 @@ let g:codeql_search_path = ['/Users/pwntester/codeql-home/codeql-repo', '/Users/
 - `StopServer`: Stops the query server associated with the query buffer. A new one will be started upon query evaluation.
 - `PrintAST`: On a `codeql:/` buffer, prints the AST of the current file.
 - `LoadSarif`: Loads the issues of a SARIF file. To browse the results, use `SetDatabase` before.
+- `ArchiveTree`: Shows source archive tree explorer
 
 ## Mappings
 - `gd`: On a `codeql:/` file, jumps to the symbol definition.
@@ -88,11 +105,10 @@ There are many LSP clients in the NeoVim ecosystem. The following clients have b
 
 ### Neovim Built-In LSP
 
-It is possible to configure the built-in LSP client without any additional plugins, but a default configuration for the CodeQL Language Server has been added to [Nvim-LSP](https://github.com/neovim/nvim-lsp). If you are using `vim-plug`, it is a matter
-of adding following line to you vim config:
+It is possible to configure the built-in LSP client without any additional plugins, but a default configuration for the CodeQL Language Server has been added to [Nvim-LSP](https://github.com/neovim/nvim-lsp). If you are using `packer`, it is a matter of adding following line to you vim config:
 
-```
-Plug 'neovim/nvim-lsp'
+```lua
+use 'neovim/nvim-lsp'
 ```
 
 Using this client, it is only required to configure the client with:
@@ -163,3 +179,4 @@ It is possible to add codeql language server to `coc.nvim` using `coc-settings.j
   }
 }
 ```
+
