@@ -1,6 +1,4 @@
 local util = require "codeql.util"
-local vim = vim
-local api = vim.api
 
 local history = {}
 
@@ -25,7 +23,7 @@ function M.save_bqrs(bqrs_path, query_path, db_path, kind, id, count, bufnr)
 end
 
 function M.menu()
-  api.nvim_command "redraw"
+  vim.api.nvim_command "redraw"
   local options = { "Select:" }
   for i, entry in ipairs(history) do
     if util.is_file(entry.bqrs) then
