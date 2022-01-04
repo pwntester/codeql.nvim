@@ -1,29 +1,34 @@
 local util = require "codeql.util"
 local queryserver = require "codeql.queryserver"
-local vim = vim
-local api = vim.api
-local format = string.format
+local config = require "codeql.config"
 local ts_utils = require "nvim-treesitter.ts_utils"
 
 local M = {}
 
-vim.g.codeql_database = {}
-vim.g.codeql_ram_opts = {}
-
-M.count = 0
-
-function M.load_definitions()
+function M.setup_codeql_buffer()
   local bufnr = vim.api.nvim_get_current_buf()
-  local bufname = vim.fn.bufname(bufnr)
 
-  -- not a codeql:// buffer
-  if not vim.startswith(bufname, "codeql:/") then
-    return
-  end
+  -- set codeql buffers as scratch buffers
+  vim.api.nvim_buf_set_option(bufnr, "buftype", "nofile")
+  vim.api.nvim_buf_set_option(bufnr, "bufhidden", "hide")
+  vim.api.nvim_buf_set_option(bufnr, "swapfile", false)
+
+  -- set mappings
+  vim.api.nvim_buf_call(bufnr, function()
+    vim.cmd [[nmap <buffer>gd <Plug>(CodeQLGoToDefinition)]]
+    vim.cmd [[nmap <buffer>gr <Plug>(CodeQLFindReferences)]]
+  end)
+
+  -- load definitions and references
+  M.load_definitions(bufnr)
+end
+
+function M.load_definitions(bufnr)
+  local bufname = vim.api.nvim_buf_get_name(bufnr)
 
   -- check if file has already been processed
   local defs = require "codeql.defs"
-  local fname = vim.split(bufname, ":")[2]
+  local fname = vim.split(bufname, "://")[2]
   if defs.processedFiles[fname] then
     return
   end
@@ -37,6 +42,8 @@ function M.load_definitions()
 end
 
 function M.set_database(dbpath)
+  local conf = config.get_config()
+  conf.ram_opts = util.resolve_ram(true)
   local database = vim.fn.fnamemodify(vim.trim(dbpath), ":p")
   if not vim.endswith(database, "/") then
     database = database .. "/"
@@ -46,12 +53,9 @@ function M.set_database(dbpath)
   else
     local metadata = util.database_info(database)
     metadata.path = database
-    api.nvim_set_var("codeql_database", metadata)
-    queryserver.register_database()
-    util.message("Database set to " .. database)
+    queryserver.register_database(metadata)
   end
-  --TODO: print(util.database_upgrades(vim.g.codeql_database.dbscheme))
-  vim.g.codeql_ram_opts = util.resolve_ram(true)
+  --TODO: print(util.database_upgrades(config.database.dbscheme))
 end
 
 local function is_predicate_node(node)
@@ -128,13 +132,13 @@ function M.run_query()
 end
 
 function M.query(quick_eval, position)
-  local db = vim.g.codeql_database
+  local db = config.database
   if not db then
     util.err_message "Missing database. Use :SetDatabase command"
     return
   end
 
-  local dbPath = vim.g.codeql_database.path
+  local dbPath = config.database.path
   local queryPath = vim.fn.expand "%:p"
 
   local libPaths = util.resolve_library_path(queryPath)
@@ -145,7 +149,7 @@ function M.query(quick_eval, position)
 
   local opts = {
     quick_eval = quick_eval,
-    bufnr = api.nvim_get_current_buf(),
+    bufnr = vim.api.nvim_get_current_buf(),
     query = queryPath,
     dbPath = dbPath,
     startLine = position[1],
@@ -175,7 +179,7 @@ function M.run_print_ast()
   local bufnr = vim.api.nvim_get_current_buf()
   local bufname = vim.fn.bufname(bufnr)
 
-  -- not a codeql:// buffer
+  -- not a codeql:/ buffer
   if not vim.startswith(bufname, "codeql:/") then
     return
   end
@@ -185,31 +189,32 @@ function M.run_print_ast()
 end
 
 function M.run_templated_query(query_name, param)
-  local bufnr = api.nvim_get_current_buf()
-  local dbPath = vim.g.codeql_database.path
+  local bufnr = vim.api.nvim_get_current_buf()
+  local dbPath = config.database.path
   local ft = vim.bo[bufnr]["ft"]
   if not templated_queries[ft] then
     --util.err_message(format('%s does not support %s file type', query_name, ft))
     return
   end
-  local query = format(templated_queries[ft], query_name)
+  local query = string.format(templated_queries[ft], query_name)
   local queryPath
-  for _, path in ipairs(vim.g.codeql_search_path) do
-    local candidate = format("%s/%s", path, query)
+  local conf = config.get_config()
+  for _, path in ipairs(conf.search_path) do
+    local candidate = string.format("%s/%s", path, query)
     if util.is_file(candidate) then
       queryPath = candidate
       break
     end
   end
   if not queryPath then
-    vim.notify(format("Cannot find a valid %s query", query_name), 2)
+    vim.notify(string.format("Cannot find a valid %s query", query_name), 2)
     return
   end
 
   local templateValues = {
     selectedSourceFile = {
       values = {
-        tuples = { { { stringValue = param } } },
+        tuples = { { { stringValue = "/" .. param } } },
       },
     },
   }
@@ -227,18 +232,62 @@ function M.run_templated_query(query_name, param)
   require("codeql.queryserver").run_query(opts)
 end
 
-function M.grep_source()
-  local ok = require("telescope").load_extension "zip_grep"
-  if ok then
-    local db = vim.g.codeql_database
-    if not db then
-      util.err_message "Missing database. Use :SetDatabase command"
-      return
-    else
-      require("telescope").extensions.zip_grep.zip_grep {
-        archive = vim.g.codeql_database.sourceArchiveZip,
-      }
-    end
+local function open_from_archive(bufnr, zipfile, path)
+  vim.api.nvim_set_current_buf(bufnr)
+  local cmd = string.format("keepalt silent! read! unzip -p -- %s %s", zipfile, path)
+  vim.cmd(cmd)
+  vim.cmd "normal! ggdd"
+  pcall(vim.cmd, "filetype detect")
+  vim.api.nvim_buf_set_option(bufnr, "modified", false)
+  vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
+  vim.cmd "doau BufEnter"
+end
+
+function M.load_buffer()
+  local db = config.database
+  if not db then
+    util.err_message "Missing database. Use :SetDatabase command"
+    return
+  else
+    local bufnr = vim.api.nvim_get_current_buf()
+    local bufname = vim.api.nvim_buf_get_name(bufnr)
+    local path = string.match(bufname, "codeql://(.*)")
+    open_from_archive(bufnr, db.sourceArchiveZip, path)
+  end
+end
+
+function M.setup(opts)
+  if vim.fn.executable "codeql" then
+    config.setup(opts or {})
+
+    -- highlight groups
+    vim.cmd [[highlight default link CodeqlAstFocus CursorLine]]
+    vim.cmd [[highlight default link CodeqlRange Error]]
+
+    -- commands
+    vim.cmd [[command! -nargs=1 -complete=file SetDatabase lua require'codeql'.set_database(<f-args>)]]
+    vim.cmd [[command! UnsetDatabase lua require'codeql.queryserver'.unregister_database(<f-args>)]]
+    vim.cmd [[command! RunQuery lua require'codeql'.run_query()]]
+    vim.cmd [[command! QuickEvalPredicate lua require'codeql'.quick_evaluate_enclosing_predicate()]]
+    vim.cmd [[command! -range QuickEval lua require'codeql'.quick_evaluate()]]
+    vim.cmd [[command! StopServer lua require'codeql.queryserver'.stop_server()]]
+    vim.cmd [[command! History lua require'codeql.history'.menu()]]
+    vim.cmd [[command! PrintAST lua require'codeql'.run_print_ast()]]
+    vim.cmd [[command! -nargs=1 -complete=file LoadSarif lua require'codeql.loader'.load_sarif_results(<f-args>)]]
+    vim.cmd [[command! ArchiveTree lua require'codeql.explorer'.draw()]]
+
+    -- autocommands
+    vim.cmd [[augroup codeql]]
+    vim.cmd [[au!]]
+    vim.cmd [[au BufEnter * if &ft ==# 'codeqlpanel' | execute("lua require'codeql.panel'.apply_mappings()") | endif]]
+    vim.cmd [[au BufEnter codeql://* lua require'codeql'.setup_codeql_buffer()]]
+    vim.cmd [[au BufReadCmd codeql://* lua require'codeql'.load_buffer()]]
+    vim.cmd [[augroup END]]
+
+    -- mappings
+    vim.cmd [[nnoremap <Plug>(CodeQLGoToDefinition) <cmd>lua require'codeql.defs'.find_at_cursor('definitions')<CR>]]
+    vim.cmd [[nnoremap <Plug>(CodeQLFindReferences) <cmd>lua require'codeql.defs'.find_at_cursor('references')<CR>]]
+    vim.cmd [[nnoremap <Plug>(CodeQLGrepSource) <cmd>lua require'codeql.grepper'.grep_source()<CR>]]
   end
 end
 

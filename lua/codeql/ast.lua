@@ -1,8 +1,5 @@
-local api = vim.api
-local format = string.format
 local util = require "codeql.util"
-
-local codeql_ast_ns = api.nvim_create_namespace "codeql_ast"
+local codeql_ast_ns = vim.api.nvim_create_namespace "codeql_ast"
 
 local M = {}
 
@@ -39,7 +36,7 @@ local function close_buf_windows(bufnr)
   end
 
   util.for_each_buf_window(bufnr, function(window)
-    api.nvim_win_close(window, true)
+    vim.api.nvim_win_close(window, true)
   end)
 end
 
@@ -50,8 +47,8 @@ local function close_buf(bufnr)
 
   close_buf_windows(bufnr)
 
-  if api.nvim_buf_is_loaded(bufnr) then
-    vim.cmd(format("bw! %d", bufnr))
+  if vim.api.nvim_buf_is_loaded(bufnr) then
+    vim.cmd(string.format("bw! %d", bufnr))
   end
 end
 
@@ -68,29 +65,35 @@ local function setup_buf(for_buf)
     return M._entries[for_buf].display_bufnr
   end
 
-  local buf = api.nvim_create_buf(false, false)
+  local buf = vim.api.nvim_create_buf(false, false)
 
-  api.nvim_buf_set_option(buf, "buftype", "nofile")
-  api.nvim_buf_set_option(buf, "swapfile", false)
-  api.nvim_buf_set_option(buf, "buflisted", false)
-  api.nvim_buf_set_option(buf, "filetype", "codeqlast")
+  vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
+  vim.api.nvim_buf_set_option(buf, "swapfile", false)
+  vim.api.nvim_buf_set_option(buf, "buflisted", false)
+  vim.api.nvim_buf_set_option(buf, "filetype", "codeqlast")
 
-  vim.cmd(format("augroup CodeQLAST_%d", buf))
+  vim.cmd(string.format("augroup CodeQLAST_%d", buf))
   vim.cmd "au!"
-  vim.cmd(format([[autocmd CursorMoved <buffer=%d> lua require'codeql.ast'.highlight_node(%d)]], buf, for_buf))
-  vim.cmd(format([[autocmd BufLeave <buffer=%d> lua require'codeql.ast'.clear_highlights(%d)]], buf, for_buf))
-  vim.cmd(format([[autocmd BufWinEnter <buffer=%d> lua require'codeql.ast'.update(%d)]], buf, for_buf))
+  vim.cmd(string.format([[autocmd CursorMoved <buffer=%d> lua require'codeql.ast'.highlight_node(%d)]], buf, for_buf))
+  vim.cmd(string.format([[autocmd BufLeave <buffer=%d> lua require'codeql.ast'.clear_highlights(%d)]], buf, for_buf))
+  vim.cmd(string.format([[autocmd BufWinEnter <buffer=%d> lua require'codeql.ast'.update(%d)]], buf, for_buf))
   vim.cmd "augroup END"
 
-  api.nvim_buf_set_keymap(buf, "n", "R", format(':lua require "codeql.ast".update(%d)<CR>', for_buf), { silent = true })
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
+    buf,
+    "n",
+    "R",
+    string.format(':lua require "codeql.ast".update(%d)<CR>', for_buf),
+    { silent = true }
+  )
+  vim.api.nvim_buf_set_keymap(
     buf,
     "n",
     "<CR>",
-    format(':lua require "codeql.ast".goto_node(%d)<CR>', for_buf),
+    string.format(':lua require "codeql.ast".goto_node(%d)<CR>', for_buf),
     { silent = true }
   )
-  api.nvim_buf_attach(buf, false, {
+  vim.api.nvim_buf_attach(buf, false, {
     on_detach = function()
       clear_entry(for_buf)
     end,
@@ -105,7 +108,7 @@ local function print_node(bufnr, node, lines, level)
   node.line = #lines
 
   -- print node
-  local line = format(
+  local line = string.format(
     "%s%s [%d, %d] - [%d, %d]",
     string.rep(" ", 2 * level),
     node.label ~= "" and node.label or "???",
@@ -201,7 +204,7 @@ function M.clear_highlights(bufnr, namespace)
     return
   end
   namespace = namespace or codeql_ast_ns
-  api.nvim_buf_clear_namespace(bufnr, namespace, 0, -1)
+  vim.api.nvim_buf_clear_namespace(bufnr, namespace, 0, -1)
 end
 
 function M.clear_ast_highlights(bufnr)
@@ -221,7 +224,7 @@ function M.highlight_ast_nodes(bufnr, nodes)
   for _, node in ipairs(nodes) do
     local lnum = node.line
     table.insert(lines, lnum)
-    local ast_lines = api.nvim_buf_get_lines(display_buf, lnum, lnum + 1, false)
+    local ast_lines = vim.api.nvim_buf_get_lines(display_buf, lnum, lnum + 1, false)
     if ast_lines[1] then
       local _, _, ws, _ = string.find(ast_lines[1], "(%s*)(.+)")
       vim.api.nvim_buf_add_highlight(display_buf, codeql_ast_ns, "CodeqlAstFocus", lnum, #ws, -1)
@@ -254,7 +257,7 @@ function M.highlight_node(bufnr)
   )
 
   util.for_each_buf_window(bufnr, function(window)
-    pcall(api.nvim_win_set_cursor, window, { start_row, start_col })
+    pcall(vim.api.nvim_win_set_cursor, window, { start_row, start_col })
   end)
 end
 
@@ -265,33 +268,33 @@ function M.goto_node(bufnr)
 
   local bufwin = vim.fn.win_findbuf(bufnr)[1]
   if bufwin then
-    api.nvim_set_current_win(bufwin)
+    vim.api.nvim_set_current_win(bufwin)
     M.clear_highlights(bufnr)
-    api.nvim_win_set_cursor(bufwin, { loc.startLine, loc.startColumn })
+    vim.api.nvim_win_set_cursor(bufwin, { loc.startLine, loc.startColumn })
   end
 end
 
 function M.open(bufnr)
-  bufnr = bufnr or api.nvim_get_current_buf()
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
   local display_buf = setup_buf(bufnr)
-  local current_window = api.nvim_get_current_win()
+  local current_window = vim.api.nvim_get_current_win()
 
   M._entries[bufnr].display_bufnr = display_buf
   vim.cmd "vsplit"
-  vim.cmd(format("buffer %d", display_buf))
+  vim.cmd(string.format("buffer %d", display_buf))
 
-  api.nvim_win_set_option(0, "spell", false)
-  api.nvim_win_set_option(0, "number", false)
-  api.nvim_win_set_option(0, "relativenumber", false)
-  api.nvim_win_set_option(0, "cursorline", false)
+  vim.api.nvim_win_set_option(0, "spell", false)
+  vim.api.nvim_win_set_option(0, "number", false)
+  vim.api.nvim_win_set_option(0, "relativenumber", false)
+  vim.api.nvim_win_set_option(0, "cursorline", false)
 
-  api.nvim_set_current_win(current_window)
+  vim.api.nvim_set_current_win(current_window)
 
   return display_buf
 end
 
 function M.update(bufnr)
-  bufnr = bufnr or api.nvim_get_current_buf()
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
   local display_buf = M._entries[bufnr].display_bufnr
 
   -- Don't bother updating if the playground isn't shown
@@ -301,14 +304,14 @@ function M.update(bufnr)
 
   local results = M._entries[bufnr].results
 
-  api.nvim_buf_set_lines(display_buf, 0, -1, false, results.lines)
+  vim.api.nvim_buf_set_lines(display_buf, 0, -1, false, results.lines)
   -- if print_virt_hl then
   --   printer.print_hl_groups(bufnr, display_buf)
   -- end
 end
 
 function M.toggle(bufnr)
-  bufnr = bufnr or api.nvim_get_current_buf()
+  bufnr = bufnr or vim.api.nvim_get_current_buf()
   local display_buf = M._entries[bufnr].display_bufnr
 
   if display_buf and is_buf_visible(display_buf) then
@@ -329,10 +332,10 @@ function M.highlight_ast_node_from_buffer(bufnr)
 
   local bufwin = vim.fn.win_findbuf(bufnr)[1]
   if not bufwin then
-    bufwin = api.nvim_get_current_win()
+    bufwin = vim.api.nvim_get_current_win()
   end
   if bufwin then
-    local cursor = api.nvim_win_get_cursor(bufwin)
+    local cursor = vim.api.nvim_win_get_cursor(bufwin)
     local roots = M._entries[bufnr].roots
 
     local nodes_at_cursor = {}
@@ -352,7 +355,7 @@ function M.highlight_ast_node_from_buffer(bufnr)
     local lnums = M.highlight_ast_nodes(bufnr, nodes_at_cursor)
     if lnums[#lnums] then
       util.for_each_buf_window(display_buf, function(window)
-        pcall(api.nvim_win_set_cursor, window, { lnums[#lnums], 0 })
+        pcall(vim.api.nvim_win_set_cursor, window, { lnums[#lnums], 0 })
       end)
     end
   end
@@ -363,19 +366,25 @@ M._highlight_ast_node_debounced = util.debounce(M.highlight_ast_node_from_buffer
 end)
 
 function M.attach(bufnr)
-  vim.cmd(format("augroup CodeQLAST %d", bufnr))
+  vim.cmd(string.format("augroup CodeQLAST %d", bufnr))
   vim.cmd "au!"
   vim.cmd(
-    format([[autocmd CursorMoved <buffer=%d> lua require'codeql.ast'._highlight_ast_node_debounced(%d)]], bufnr, bufnr)
+    string.format(
+      [[autocmd CursorMoved <buffer=%d> lua require'codeql.ast'._highlight_ast_node_debounced(%d)]],
+      bufnr,
+      bufnr
+    )
   )
-  vim.cmd(format([[autocmd BufLeave <buffer=%d> lua require'codeql.ast'.clear_ast_highlights(%d)]], bufnr, bufnr))
+  vim.cmd(
+    string.format([[autocmd BufLeave <buffer=%d> lua require'codeql.ast'.clear_ast_highlights(%d)]], bufnr, bufnr)
+  )
   vim.cmd "augroup END"
 end
 
 function M.detach(bufnr)
   clear_entry(bufnr)
-  vim.cmd(format("autocmd! CodeQLAST_%d CursorMoved", bufnr))
-  vim.cmd(format("autocmd! CodeQLAST_%d BufLeave", bufnr))
+  vim.cmd(string.format("autocmd! CodeQLAST_%d CursorMoved", bufnr))
+  vim.cmd(string.format("autocmd! CodeQLAST_%d BufLeave", bufnr))
 end
 
 function M.build_ast(jsonPath, bufnr)

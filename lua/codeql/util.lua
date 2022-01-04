@@ -1,33 +1,31 @@
 local cli = require "codeql.cliserver"
-local vim = vim
-local api = vim.api
-local uv = vim.loop
-local format = string.format
+local config = require "codeql.config"
+local _, Job = pcall(require, "plenary.job")
 
 local M = {}
 
-function M.open_from_archive(zipfile, path, cursor)
-  local name = format("codeql:/%s", path)
-  local bufnr = vim.fn.bufnr(name)
-  if bufnr < 0 then
-    local zip_bufnr = api.nvim_create_buf(true, false)
-    api.nvim_set_current_buf(zip_bufnr)
-    local cmd = format("keepalt silent! read! unzip -p -- %s %s", zipfile, path)
-    vim.cmd(cmd)
-    vim.cmd "normal! ggdd"
-    api.nvim_buf_set_name(zip_bufnr, name)
-    pcall(vim.cmd, "filetype detect") -- consumes FDs
-    api.nvim_buf_set_option(zip_bufnr, "modified", false)
-    api.nvim_buf_set_option(zip_bufnr, "modifiable", false)
-    vim.cmd "doau BufEnter"
-    bufnr = zip_bufnr
-  else
-    api.nvim_set_current_buf(bufnr)
+function M.list_from_archive(zipfile)
+  local job = Job:new {
+    enable_recording = true,
+    command = "zipinfo",
+    args = { "-1", zipfile },
+  }
+  job:sync()
+  local output = table.concat(job:result(), "\n")
+  local files = vim.split(output, "\n")
+  for i, file in ipairs(files) do
+    files[i] = M.replace("/" .. file, config.database.sourceLocationPrefix .. "/", "")
   end
-  pcall(vim.api.nvim_win_set_cursor, 0, cursor)
-  vim.api.nvim_buf_call(bufnr, function()
-    vim.cmd "norm! zz"
-  end)
+  return files
+end
+
+function M.regexEscape(str)
+  return str:gsub("[%(%)%.%%%+%-%*%?%[%^%$%]]", "%%%1")
+end
+function M.replace(str, this, that)
+  local escaped_this = M.regexEscape(this)
+  local escaped_that = that:gsub("%%", "%%%%") -- only % needs to be escaped for 'that'
+  return str:gsub(escaped_this, escaped_that)
 end
 
 function M.run_cmd(cmd, raw)
@@ -92,13 +90,13 @@ function M.for_each_buf_window(bufnr, fn)
 end
 
 function M.err_message(...)
-  api.nvim_err_writeln(table.concat(vim.tbl_flatten { ... }))
-  api.nvim_command "redraw"
+  vim.api.nvim_err_writeln(table.concat(vim.tbl_flatten { ... }))
+  vim.api.nvim_command "redraw"
 end
 
 function M.message(...)
-  api.nvim_out_write(table.concat(vim.tbl_flatten { ... }) .. "\n")
-  api.nvim_command "redraw"
+  vim.api.nvim_out_write(table.concat(vim.tbl_flatten { ... }) .. "\n")
+  vim.api.nvim_command "redraw"
 end
 
 function M.database_upgrades(dbscheme)
@@ -159,8 +157,9 @@ end
 
 function M.resolve_library_path(queryPath)
   local cmd = { "resolve", "library-path", "-v", "--log-to-stderr", "--format=json", "--query=" .. queryPath }
-  if vim.g.codeql_search_path and #vim.g.codeql_search_path > 0 then
-    for _, searchPath in ipairs(vim.g.codeql_search_path) do
+  local conf = config.get_config()
+  if conf.search_path and #conf.search_path > 0 then
+    for _, searchPath in ipairs(conf.search_path) do
       if searchPath ~= "" then
         table.insert(cmd, string.format("--search-path=%s", searchPath))
       end
@@ -177,8 +176,9 @@ end
 
 function M.resolve_ram(jvm)
   local cmd = "codeql resolve ram --format=json"
-  if vim.g.codeql_max_ram and vim.g.codeql_max_ram > -1 then
-    cmd = cmd .. " -M " .. vim.g.codeql_max_ram
+  local conf = config.get_config()
+  if conf.max_ram and conf.max_ram > -1 then
+    cmd = cmd .. " -M " .. conf.max_ram
   end
   local json = M.run_cmd(cmd, true)
   local ram_opts, err = M.json_decode(json)
@@ -215,12 +215,12 @@ function M.json_decode(data)
 end
 
 function M.is_file(filename)
-  local stat = uv.fs_stat(filename)
+  local stat = vim.loop.fs_stat(filename)
   return stat and stat.type == "file" or false
 end
 
 function M.is_dir(filename)
-  local stat = uv.fs_stat(filename)
+  local stat = vim.loop.fs_stat(filename)
   return stat and stat.type == "directory" or false
 end
 
@@ -284,20 +284,20 @@ local special_buffers = {
 ---       no selectable windows, return -1.
 --- from: https://github.com/kyazdani42/nvim-tree.lua/blob/master/lua/nvim-tree/lib.lua
 function M.pick_window(panel_winid)
-  local tabpage = api.nvim_get_current_tabpage()
-  local win_ids = api.nvim_tabpage_list_wins(tabpage)
+  local tabpage = vim.api.nvim_get_current_tabpage()
+  local win_ids = vim.api.nvim_tabpage_list_wins(tabpage)
   local exclude = special_buffers
 
   local selectable = vim.tbl_filter(function(id)
-    local bufid = api.nvim_win_get_buf(id)
+    local bufid = vim.api.nvim_win_get_buf(id)
     for option, v in pairs(exclude) do
-      local ok, option_value = pcall(api.nvim_buf_get_option, bufid, option)
+      local ok, option_value = pcall(vim.api.nvim_buf_get_option, bufid, option)
       if ok and vim.tbl_contains(v, option_value) then
         return false
       end
     end
 
-    local win_config = api.nvim_win_get_config(id)
+    local win_config = vim.api.nvim_win_get_config(id)
     return id ~= panel_winid and win_config.focusable and not win_config.external
   end, win_ids)
 
@@ -320,8 +320,8 @@ function M.pick_window(panel_winid)
   -- Setup UI
   for _, id in ipairs(selectable) do
     local char = chars:sub(i, i)
-    local ok_status, statusline = pcall(api.nvim_win_get_option, id, "statusline")
-    local ok_hl, winhl = pcall(api.nvim_win_get_option, id, "winhl")
+    local ok_status, statusline = pcall(vim.api.nvim_win_get_option, id, "statusline")
+    local ok_hl, winhl = pcall(vim.api.nvim_win_get_option, id, "winhl")
 
     win_opts[id] = {
       statusline = ok_status and statusline or "",
@@ -329,8 +329,8 @@ function M.pick_window(panel_winid)
     }
     win_map[char] = id
 
-    api.nvim_win_set_option(id, "statusline", "%=" .. char .. "%=")
-    api.nvim_win_set_option(id, "winhl", "StatusLine:CodeQLWindowPicker,StatusLineNC:CodeQLWindowPicker")
+    vim.api.nvim_win_set_option(id, "statusline", "%=" .. char .. "%=")
+    vim.api.nvim_win_set_option(id, "winhl", "StatusLine:CodeQLWindowPicker,StatusLineNC:CodeQLWindowPicker")
 
     i = i + 1
     if i > #chars then
@@ -348,7 +348,7 @@ function M.pick_window(panel_winid)
   -- Restore window options
   for _, id in ipairs(selectable) do
     for opt, value in pairs(win_opts[id]) do
-      api.nvim_win_set_option(id, opt, value)
+      vim.api.nvim_win_set_option(id, opt, value)
     end
   end
 

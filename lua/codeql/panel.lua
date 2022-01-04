@@ -1,9 +1,7 @@
 local util = require "codeql.util"
-local vim = vim
-local api = vim.api
-local format = string.format
+local config = require "codeql.config"
 
-local range_ns = api.nvim_create_namespace "codeql"
+local range_ns = vim.api.nvim_create_namespace "codeql"
 local panel_buffer_name = "__CodeQLPanel__"
 local panel_pos = "right"
 local panel_width = 50
@@ -21,18 +19,18 @@ M.line_map = {}
 
 local function register(obj)
   local bufnr = vim.fn.bufnr(panel_buffer_name)
-  local curline = api.nvim_buf_line_count(bufnr)
+  local curline = vim.api.nvim_buf_line_count(bufnr)
   M.line_map[curline] = obj
 end
 
 local function print_to_panel(text, matches)
   local bufnr = vim.fn.bufnr(panel_buffer_name)
-  api.nvim_buf_set_lines(bufnr, -1, -1, true, { text })
+  vim.api.nvim_buf_set_lines(bufnr, -1, -1, true, { text })
   if type(matches) == "table" then
     for hlgroup, groups in pairs(matches) do
       for _, group in ipairs(groups) do
-        local linenr = api.nvim_buf_line_count(bufnr) - 1
-        api.nvim_buf_add_highlight(bufnr, 0, hlgroup, linenr, group[1], group[2])
+        local linenr = vim.api.nvim_buf_line_count(bufnr) - 1
+        vim.api.nvim_buf_add_highlight(bufnr, 0, hlgroup, linenr, group[1], group[2])
       end
     end
   end
@@ -40,8 +38,8 @@ end
 
 local function get_panel_window(buffer_name)
   local bufnr = vim.fn.bufnr(buffer_name)
-  for _, w in ipairs(api.nvim_list_wins()) do
-    if api.nvim_win_get_buf(w) == bufnr then
+  for _, w in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_buf(w) == bufnr then
       return w
     end
   end
@@ -52,11 +50,11 @@ local function go_to_main_window()
   -- go to the wider window
   local widerwin = 0
   local widerwidth = 0
-  for _, w in ipairs(api.nvim_list_wins()) do
-    if api.nvim_win_get_width(w) > widerwidth then
+  for _, w in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_width(w) > widerwidth then
       if vim.api.nvim_win_get_buf(w) ~= vim.fn.bufnr(panel_buffer_name) then
         widerwin = w
-        widerwidth = api.nvim_win_get_width(w)
+        widerwidth = vim.api.nvim_win_get_width(w)
       end
     end
   end
@@ -107,11 +105,11 @@ local function get_node_location(node)
   if node.line and node.filename then
     local line = ""
     if node.line > -1 then
-      line = format(":%d", node.line)
+      line = string.format(":%d", node.line)
     end
-
     local filename
-    if vim.g.codeql_panel_longnames then
+    local conf = config.get_config()
+    if conf.panel_longnames then
       filename = node.filename
     else
       filename = vim.fn.fnamemodify(node.filename, ":p:t")
@@ -139,7 +137,7 @@ local function print_tree_node(node, indent_level)
   -- text
   if node.filename then
     local location = get_node_location(node)
-    text = format("%s%s - %s", mark, location, node.label)
+    text = string.format("%s%s - %s", mark, location, node.label)
 
     local sep_index = string.find(text, " - ", 1, true)
 
@@ -180,7 +178,7 @@ end
 
 local function print_tree_nodes(issue, indent_level)
   local bufnr = vim.fn.bufnr(panel_buffer_name)
-  local curline = api.nvim_buf_line_count(bufnr)
+  local curline = vim.api.nvim_buf_line_count(bufnr)
 
   local paths = issue.paths
 
@@ -210,7 +208,7 @@ end
 
 local function print_header(scan_results)
   local hl = { CodeqlPanelInfo = { { 0, string.len "Database:" } } }
-  local database = vim.g.codeql_database.path
+  local database = config.database.path
   print_to_panel("Database: " .. database, hl)
   hl = { CodeqlPanelInfo = { { 0, string.len "Issues:" } } }
   print_to_panel("Issues:   " .. table.getn(scan_results.issues), hl)
@@ -229,7 +227,7 @@ local function print_issues(results)
   if results.mode == "tree" then
     -- print group name
     local rule_foldmarker = not results.is_folded and icon_open or icon_closed
-    local rule_label = format("%s %s", rule_foldmarker, results.label)
+    local rule_label = string.format("%s %s", rule_foldmarker, results.label)
 
     print_to_panel(string.format("%s (%d)", rule_label, #results.issues), {
       CodeqlPanelFoldIcon = { { 0, string.len(rule_foldmarker) } },
@@ -247,7 +245,7 @@ local function print_issues(results)
         if not issue.hidden then
           local is_folded = issue.is_folded
           local foldmarker = not is_folded and icon_open or icon_closed
-          local label = format("  %s %s", foldmarker, issue.label)
+          local label = string.format("  %s %s", foldmarker, issue.label)
           print_to_panel(label, {
             CodeqlPanelFoldIcon = { { 0, 2 + string.len(foldmarker) } },
             --CodeqlPanelRuleId = { { 2 + string.len(foldmarker), string.len(label) } },
@@ -364,8 +362,8 @@ local function render_content(scan_results)
     return
   end
 
-  api.nvim_buf_set_option(bufnr, "modifiable", true)
-  api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
+  vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
 
   print_help()
 
@@ -377,12 +375,12 @@ local function render_content(scan_results)
     end
 
     local win = get_panel_window(panel_buffer_name)
-    local lcount = api.nvim_buf_line_count(bufnr)
-    api.nvim_win_set_cursor(win, { math.min(7, lcount), 0 })
+    local lcount = vim.api.nvim_buf_line_count(bufnr)
+    vim.api.nvim_win_set_cursor(win, { math.min(7, lcount), 0 })
   else
     print_to_panel "No results found."
   end
-  api.nvim_buf_set_option(bufnr, "modifiable", false)
+  vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
   util.message " "
 end
 
@@ -397,7 +395,7 @@ local function render_keep_view(line)
 
   render_content(M.scan_results)
 
-  local scrolloff_save = api.nvim_get_option "scrolloff"
+  local scrolloff_save = vim.api.nvim_get_option "scrolloff"
   vim.cmd "set scrolloff=0"
 
   vim.fn.cursor(topline, 1)
@@ -411,92 +409,92 @@ end
 -- exported functions
 
 function M.apply_mappings()
-  local bufnr = api.nvim_get_current_buf()
-  api.nvim_buf_set_keymap(
+  local bufnr = vim.api.nvim_get_current_buf()
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "o",
     [[<cmd>lua require'codeql.panel'.toggle_fold()<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "m",
     [[<cmd>lua require'codeql.panel'.toggle_mode()<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "<CR>",
     [[<cmd>lua require'codeql.panel'.jump_to_code(false)<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "p",
     [[<cmd>lua require'codeql.panel'.jump_to_code(true)<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "<S-h>",
     [[<cmd>lua require'codeql.panel'.toggle_help()<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "q",
     [[<cmd>lua require'codeql.panel'.close_panel()<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "<S-o>",
     [[<cmd>lua require'codeql.panel'.set_fold_level(false)<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "<S-c>",
     [[<cmd>lua require'codeql.panel'.set_fold_level(true)<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "<S-p>",
     [[<cmd>lua require'codeql.panel'.change_path(-1)<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "N",
     [[<cmd>lua require'codeql.panel'.change_path(1)<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "f",
     [[<cmd>lua require'codeql.panel'.label_filter()<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "<S-f>",
     [[<cmd>lua require'codeql.panel'.generic_filter()<CR>]],
     { script = true, silent = true }
   )
-  api.nvim_buf_set_keymap(
+  vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
     "<S-x`>",
@@ -644,7 +642,7 @@ function M.jump_to_code(stay_in_pane)
   end
 
   -- open from src.zip
-  if vim.g.codeql_database and util.is_file(vim.g.codeql_database.sourceArchiveZip) then
+  if config.database and util.is_file(config.database.sourceArchiveZip) then
     if string.sub(node.filename, 1, 1) == "/" then
       node.filename = string.sub(node.filename, 2)
     end
@@ -663,22 +661,29 @@ function M.jump_to_code(stay_in_pane)
 
     vim.fn.win_gotoid(target_id)
 
-    util.open_from_archive(vim.g.codeql_database.sourceArchiveZip, node.filename, { node.line, 0 })
+    local bufname = string.format("codeql://%s", node.filename)
+    if vim.fn.bufnr(bufname) == -1 then
+      vim.api.nvim_command(string.format("edit %s", bufname))
+    else
+      vim.api.nvim_command(string.format("buffer %s", bufname))
+    end
+    pcall(vim.api.nvim_win_set_cursor, 0, { node.line, 0 })
+    vim.cmd "norm! zz"
 
     -- highlight node
-    api.nvim_buf_clear_namespace(0, range_ns, 0, -1)
+    vim.api.nvim_buf_clear_namespace(0, range_ns, 0, -1)
     local startLine = node.url.startLine
     local startColumn = node.url.startColumn
     local endColumn = node.url.endColumn
 
-    pcall(api.nvim_buf_add_highlight, 0, range_ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn)
+    pcall(vim.api.nvim_buf_add_highlight, 0, range_ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn)
 
     -- jump to main window if requested
     if stay_in_pane then
       vim.fn.win_gotoid(panel_winid)
     end
-  elseif not vim.g.codeql_database then
-    api.nvim_err_writeln "Please use SetDatabase to point to the analysis database"
+  elseif not config.database then
+    vim.api.nvim_err_writeln "Please use SetDatabase to point to the analysis database"
   end
 end
 
@@ -714,22 +719,22 @@ function M.open_panel()
   -- buffer options
   local bufnr = vim.fn.bufnr(panel_buffer_name)
 
-  api.nvim_buf_set_option(bufnr, "filetype", "codeqlpanel")
-  api.nvim_buf_set_option(bufnr, "buftype", "nofile")
-  api.nvim_buf_set_option(bufnr, "bufhidden", "hide")
-  api.nvim_buf_set_option(bufnr, "swapfile", false)
-  api.nvim_buf_set_option(bufnr, "buflisted", false)
+  vim.api.nvim_buf_set_option(bufnr, "filetype", "codeqlpanel")
+  vim.api.nvim_buf_set_option(bufnr, "buftype", "nofile")
+  vim.api.nvim_buf_set_option(bufnr, "bufhidden", "hide")
+  vim.api.nvim_buf_set_option(bufnr, "swapfile", false)
+  vim.api.nvim_buf_set_option(bufnr, "buflisted", false)
 
   -- window options
   local win = get_panel_window(panel_buffer_name)
-  api.nvim_win_set_option(win, "wrap", false)
-  api.nvim_win_set_option(win, "number", false)
-  api.nvim_win_set_option(win, "relativenumber", false)
-  api.nvim_win_set_option(win, "foldenable", false)
-  api.nvim_win_set_option(win, "winfixwidth", true)
-  api.nvim_win_set_option(win, "concealcursor", "nvi")
-  api.nvim_win_set_option(win, "conceallevel", 3)
-  api.nvim_win_set_option(win, "signcolumn", "yes")
+  vim.api.nvim_win_set_option(win, "wrap", false)
+  vim.api.nvim_win_set_option(win, "number", false)
+  vim.api.nvim_win_set_option(win, "relativenumber", false)
+  vim.api.nvim_win_set_option(win, "foldenable", false)
+  vim.api.nvim_win_set_option(win, "winfixwidth", true)
+  vim.api.nvim_win_set_option(win, "concealcursor", "nvi")
+  vim.api.nvim_win_set_option(win, "conceallevel", 3)
+  vim.api.nvim_win_set_option(win, "signcolumn", "yes")
 end
 
 function M.close_panel()

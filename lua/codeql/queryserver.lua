@@ -1,9 +1,8 @@
 local util = require "codeql.util"
 local loader = require "codeql.loader"
+local config = require "codeql.config"
 local rpc = require "vim.lsp.rpc"
 local protocol = require "vim.lsp.protocol"
-local vim = vim
-local format = string.format
 
 local client_index = 0
 local evaluate_id = 0
@@ -91,11 +90,12 @@ function M.start_server()
   util.message "Starting CodeQL Query Server"
   -- TODO: make sure we are on 2.4.1 or greater
   local cmd = { "codeql", "execute", "query-server", "--require-db-registration", "-v", "--log-to-stderr" }
-  vim.list_extend(cmd, vim.g.codeql_ram_opts)
+  local conf = config.get_config()
+  vim.list_extend(cmd, conf.ram_opts)
 
   local last_message = ""
 
-  local config = {
+  local client_config = {
     cmd = cmd,
     offset_encoding = { "utf-8", "utf-16" },
     callbacks = {
@@ -111,7 +111,7 @@ function M.start_server()
 
       -- query completed
       ["evaluation/queryCompleted"] = function(_, result, _)
-        util.message(format("Evaluation time: %s", result.evaluationTime))
+        util.message(string.format("Evaluation time: %s", result.evaluationTime))
         print(vim.inspect(result))
         if result.resultType == 0 then
           return {}
@@ -131,11 +131,11 @@ function M.start_server()
       end,
     },
   }
-  return M.start_client(config)
+  return M.start_client(client_config)
 end
 
 function M.run_query(opts)
-  local dbDir = vim.g.codeql_database.datasetFolder
+  local dbDir = config.database.datasetFolder
   if not dbDir then
     util.err_message "Cannot find dataset folder. Did you :SetDatabase?"
     return
@@ -147,13 +147,13 @@ function M.run_query(opts)
 
   local bufnr = opts.bufnr
   local queryPath = opts.query
-  local qloPath = format(vim.fn.tempname(), ".qlo")
-  local bqrsPath = format(vim.fn.tempname(), ".bqrs")
+  local qloPath = string.format(vim.fn.tempname(), ".qlo")
+  local bqrsPath = string.format(vim.fn.tempname(), ".bqrs")
   local libraryPath = opts.libraryPath
   local dbschemePath = opts.dbschemePath
   local dbPath = opts.dbPath
   if not vim.endswith(dbPath, "/") then
-    dbPath = format("%s/", dbPath)
+    dbPath = string.format("%s/", dbPath)
   end
 
   -- https://github.com/github/vscode-codeql/blob/master/extensions/ql-vscode/src/messages.ts
@@ -238,7 +238,7 @@ function M.run_query(opts)
           queries = {
             {
               resultsPath = bqrsPath,
-              qlo = format("file://%s", qloPath),
+              qlo = string.format("file://%s", qloPath),
               allowUnknownTemplates = true,
               templateValues = opts.templateValues or nil,
               id = 0,
@@ -258,25 +258,22 @@ function M.run_query(opts)
   end
 
   -- compile query
-  util.message(format("Compiling query %s", queryPath))
+  util.message(string.format("Compiling query %s", queryPath))
 
   M.client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
 end
 
-function M.register_database()
-  if not vim.g.codeql_database then
-    util.err_message "No database specified"
-    return
-  end
+function M.register_database(database)
+  config.database = database
   if not M.client then
     M.client = M.start_server()
   end
-  util.message(format("Registering database %s", vim.g.codeql_database.datasetFolder))
+  util.message(string.format("Registering database %s", config.database.datasetFolder))
   local params = {
     body = {
       databases = {
         {
-          dbDir = vim.g.codeql_database.datasetFolder,
+          dbDir = config.database.datasetFolder,
           workingSet = "default",
         },
       },
@@ -285,27 +282,27 @@ function M.register_database()
   }
   M.client.request("evaluation/registerDatabases", params, function(err, result)
     if err then
-      util.err_message(format("Error registering database %s", vim.inspect(err)))
+      util.err_message(string.format("Error registering database %s", vim.inspect(err)))
     else
-      util.message(format("Successfully registered %s", result.registeredDatabases[1].dbDir))
+      util.message(string.format("Successfully registered %s", result.registeredDatabases[1].dbDir))
     end
   end)
 end
 
-function M.deregister_database()
-  if not vim.g.codeql_database then
+function M.unregister_database()
+  if not config.database then
     util.err_message "No database registered"
     return
   end
   if not M.client then
     M.client = M.start_server()
   end
-  util.message(format("Deregistering database %s", vim.g.codeql_database.datasetFolder))
+  util.message(string.format("Unregistering database %s", config.database.datasetFolder))
   local params = {
     body = {
       databases = {
         {
-          dbDir = vim.g.codeql_database.datasetFolder,
+          dbDir = config.database.datasetFolder,
           workingSet = "default",
         },
       },
@@ -314,10 +311,10 @@ function M.deregister_database()
   }
   M.client.request("evaluation/deregisterDatabases", params, function(err, result)
     if err then
-      util.err_message(format("Error registering database %s", vim.inspect(err)))
+      util.err_message(string.format("Error registering database %s", vim.inspect(err)))
     elseif #result.registeredDatabases == 0 then
-      util.message(format("Successfully deregistered %s", vim.g.codeql_database.datasetFolder))
-      vim.g.codeql_database = nil
+      util.message(string.format("Successfully deregistered %s", config.database.datasetFolder))
+      config.database = nil
     end
   end)
 end
