@@ -11,4 +11,4 @@ hi def link CodeqlNodeType Identifier
 hi def link CodeqlNodeNumber Number
 hi def link CodeqlNodeOp Operator
 
-let b:current_syntax = 'codeqlast'
+let b:current_syntax = 'codeql_ast'

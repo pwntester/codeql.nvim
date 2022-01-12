@@ -70,7 +70,7 @@ local function setup_buf(for_buf)
   vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
   vim.api.nvim_buf_set_option(buf, "swapfile", false)
   vim.api.nvim_buf_set_option(buf, "buflisted", false)
-  vim.api.nvim_buf_set_option(buf, "filetype", "codeqlast")
+  vim.api.nvim_buf_set_option(buf, "filetype", "codeql_ast")
 
   vim.cmd(string.format("augroup CodeQLAST_%d", buf))
   vim.cmd "au!"

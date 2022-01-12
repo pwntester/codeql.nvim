@@ -279,7 +279,7 @@ function M.setup(opts)
     -- autocommands
     vim.cmd [[augroup codeql]]
     vim.cmd [[au!]]
-    vim.cmd [[au BufEnter * if &ft ==# 'codeqlpanel' | execute("lua require'codeql.panel'.apply_mappings()") | endif]]
+    vim.cmd [[au BufEnter * if &ft ==# 'codeql_panel' | execute("lua require'codeql.panel'.apply_mappings()") | endif]]
     vim.cmd [[au BufEnter codeql://* lua require'codeql'.setup_codeql_buffer()]]
     vim.cmd [[au BufReadCmd codeql://* lua require'codeql'.load_buffer()]]
     vim.cmd [[augroup END]]

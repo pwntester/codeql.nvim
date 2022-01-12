@@ -719,7 +719,7 @@ function M.open_panel()
   -- buffer options
   local bufnr = vim.fn.bufnr(panel_buffer_name)
 
-  vim.api.nvim_buf_set_option(bufnr, "filetype", "codeqlpanel")
+  vim.api.nvim_buf_set_option(bufnr, "filetype", "codeql_panel")
   vim.api.nvim_buf_set_option(bufnr, "buftype", "nofile")
   vim.api.nvim_buf_set_option(bufnr, "bufhidden", "hide")
   vim.api.nvim_buf_set_option(bufnr, "swapfile", false)

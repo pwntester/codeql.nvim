@@ -23,4 +23,4 @@ highlight default link CodeqlPanelBracket              String
 highlight default link CodeqlPanelFile                 NonText
 highlight default link CodeqlPanelSeparator            Function
 
-let b:current_syntax = "codeqlpanel"
+let b:current_syntax = "codeql_panel"

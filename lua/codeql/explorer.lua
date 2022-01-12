@@ -12,13 +12,16 @@ M.tree = nil
 M.split = nil
 
 M.prepare_node = function(node)
+  if node.type == "raw" then
+    return node.line
+  end
   local line = NuiLine()
   line:append(string.rep("  ", node:get_depth() - 1))
   if node:has_children() then
     line:append(node:is_expanded() and " " or " ", "SpecialKey")
   end
   if node.type == "dir" then
-    line:append(node.id .. "/", "SpecialKey")
+    line:append(node.name .. "/", "SpecialKey")
   else
     local name = vim.fn.split(node.name, "\\.")[1]
     local ext = vim.fn.split(node.name, "\\.")[2]
@@ -89,7 +92,7 @@ M.create_split = function()
       buftype = "nowrite",
       modifiable = false,
       swapfile = false,
-      filetype = "codeql-explorer",
+      filetype = "codeql_explorer",
     },
   }
   split:mount()
@@ -151,7 +154,25 @@ M.draw = function()
     end
 
     local flatten_root = root:flatten_directories()
+
+    local header = {
+      NuiTree.Node {
+        id = "raw1",
+        name = "raw",
+        type = "raw",
+        line = NuiLine("CodeQL Explorer", "SpecialKey"),
+        indent = "",
+      },
+      NuiTree.Node {
+        id = "raw2",
+        name = "raw",
+        type = "raw",
+        line = NuiLine "",
+        indent = "",
+      },
+    }
     local nui_nodes = M.create_nodes(flatten_root.children)
+    --vim.list_extend(nui_nodes, header)
     M.create_split()
     M.create_tree()
     M.tree:set_nodes(nui_nodes)

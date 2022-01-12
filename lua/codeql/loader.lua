@@ -79,7 +79,13 @@ function M.process_results(opts)
   util.message(string.format("%d rows found", count))
 
   if count == 0 then
-    vim.notify("No results", 1)
+    util.err_message "No results"
+    panel.render {
+      kind = "raw",
+      issues = {},
+      columns = {},
+      mode = "table",
+    }
     return
   end
 
@@ -172,6 +178,7 @@ function M.process_results(opts)
       "-t=kind=" .. kind,
       "-o=" .. resultsPath,
       "--format=sarif-latest",
+      "--max-paths=" .. conf.max_paths,
       bqrsPath,
     }
     vim.list_extend(cmd, ram_opts)
@@ -256,7 +263,13 @@ function M.load_raw_results(path)
   end
 
   if not tuples or vim.tbl_isempty(tuples) then
-    vim.notify("No results", 2)
+    util.err_message "No results"
+    panel.render {
+      kind = "raw",
+      issues = {},
+      columns = {},
+      mode = "table",
+    }
     return
   end
 

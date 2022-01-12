@@ -9,6 +9,7 @@ M.defaults = {
   path_max_length = -1,
   search_path = {},
   fmt_onsave = false,
+  max_paths = 4,
 }
 
 M._config = M.defaults
