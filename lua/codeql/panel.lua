@@ -109,7 +109,7 @@ local function get_node_location(node)
     end
     local filename
     local conf = config.get_config()
-    if conf.panel_longnames then
+    if conf.panel.long_filename then
       filename = node.filename
     else
       filename = vim.fn.fnamemodify(node.filename, ":p:t")
@@ -275,7 +275,7 @@ local function print_issues(results)
         max_lengths[i] = math.max(vim.fn.strdisplaywidth(get_node_location(node)), max_lengths[i] or -1)
       end
     end
-    if results.columns then
+    if results.columns and #results.columns > 0 then
       for i, column in ipairs(results.columns) do
         max_lengths[i] = math.max(vim.fn.strdisplaywidth(column), max_lengths[i] or -1)
       end
@@ -301,10 +301,12 @@ local function print_issues(results)
 
     local header1 = string.format("┌─%s─┐", table.concat(bars, "─┬─"))
     print_to_panel(header1, { CodeqlPanelSeparator = { { 0, -1 } } })
-    local header2 = string.format("│ %s │", table.concat(column_names, " │ "))
-    print_to_panel(header2, { CodeqlPanelSeparator = { { 0, -1 } } })
-    local header3 = string.format("├─%s─┤", table.concat(bars, "─┼─"))
-    print_to_panel(header3, { CodeqlPanelSeparator = { { 0, -1 } } })
+    if results.columns and #results.columns > 0 then
+      local header2 = string.format("│ %s │", table.concat(column_names, " │ "))
+      print_to_panel(header2, { CodeqlPanelSeparator = { { 0, -1 } } })
+      local header3 = string.format("├─%s─┤", table.concat(bars, "─┼─"))
+      print_to_panel(header3, { CodeqlPanelSeparator = { { 0, -1 } } })
+    end
 
     local separator_hls = { { 0, vim.fn.len "│ " } }
     local acc = vim.fn.len "│ "
@@ -356,6 +358,7 @@ local function print_issues(results)
 end
 
 local function render_content(scan_results)
+  print("Render content", scan_results.kind, scan_results.mode)
   local bufnr = vim.fn.bufnr(panel_buffer_name)
   if bufnr == -1 then
     util.err_message "Error opening CodeQL panel"
@@ -540,15 +543,16 @@ function M.generic_filter()
 end
 
 function M.toggle_mode()
-  if M.scan_results.kind ~= "raw" then
-    return
-  end
   if M.scan_results.mode == "tree" then
-    M.scan_results.new_mode = "table"
+    M.scan_results.mode = "table"
   elseif M.scan_results.mode == "table" then
-    M.scan_results.new_mode = "tree"
+    M.scan_results.mode = "tree"
   end
-  M.render(M.scan_results)
+  M.render(M.scan_results.issues, {
+    kind = M.scan_results.kind,
+    mode = M.scan_results.mode,
+    columns = M.scan_results.columns,
+  })
 end
 
 function M.toggle_fold()
@@ -739,23 +743,22 @@ end
 
 function M.close_panel()
   local win = get_panel_window(panel_buffer_name)
-  vim.fn.nvim_win_close(win, true)
+  vim.api.nvim_win_close(win, true)
 end
 
-function M.render(results)
+function M.render(issues, opts)
   M.open_panel()
 
   M.line_map = {}
   M.scan_results = {
-    kind = results.kind or "raw",
-    issues = results.issues or {},
-    columns = results.columns or {},
-    mode = results.mode,
-    rules = {},
+    issues = issues or {},
+    kind = opts.kind or "raw",
+    columns = opts.columns or {},
+    mode = opts.mode or "table",
   }
 
   local rule_groups = {}
-  for _, issue in ipairs(M.scan_results.issues) do
+  for _, issue in ipairs(issues) do
     if rule_groups[issue.rule_id] then
       table.insert(rule_groups[issue.rule_id], issue)
     else

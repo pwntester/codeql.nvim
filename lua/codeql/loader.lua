@@ -6,8 +6,8 @@ local config = require "codeql.config"
 local function generate_issue_label(node)
   local label = node.label
   local conf = config.get_config()
-  if conf.panel_filename and node["filename"] and node["filename"] ~= nil then
-    if conf.panel_longnames then
+  if conf.panel.show_filename and node["filename"] and node["filename"] ~= nil then
+    if conf.panel.long_filename then
       label = node.filename
     elseif #vim.fn.fnamemodify(node.filename, ":p:t") > 0 then
       label = vim.fn.fnamemodify(node.filename, ":p:t")
@@ -59,7 +59,7 @@ function M.process_results(opts)
   local id = opts.query_id
   local save_bqrs = opts.save_bqrs
   local bufnr = opts.bufnr
-  local ram_opts = conf.ram_opts
+  local ram_opts = config.ram_opts
   local resultsPath = vim.fn.tempname()
 
   local info = util.bqrs_info(bqrsPath)
@@ -80,12 +80,7 @@ function M.process_results(opts)
 
   if count == 0 then
     util.err_message "No results"
-    panel.render {
-      kind = "raw",
-      issues = {},
-      columns = {},
-      mode = "table",
-    }
+    panel.render()
     return
   end
 
@@ -178,7 +173,7 @@ function M.process_results(opts)
       "-t=kind=" .. kind,
       "-o=" .. resultsPath,
       "--format=sarif-latest",
-      "--max-paths=" .. conf.max_paths,
+      "--max-paths=" .. conf.results.max_paths,
       bqrsPath,
     }
     vim.list_extend(cmd, ram_opts)
@@ -264,12 +259,7 @@ function M.load_raw_results(path)
 
   if not tuples or vim.tbl_isempty(tuples) then
     util.err_message "No results"
-    panel.render {
-      kind = "raw",
-      issues = {},
-      columns = {},
-      mode = "table",
-    }
+    panel.render()
     return
   end
 
@@ -353,18 +343,17 @@ function M.load_raw_results(path)
     end
   end
 
-  panel.render {
-    issues = issues,
+  panel.render(issues, {
     kind = "raw",
     columns = col_names,
     mode = "table",
-  }
+  })
   vim.api.nvim_command "redraw"
 end
 
 function M.load_sarif_results(path)
   local conf = config.get_config()
-  local max_length = conf.path_max_length
+  local max_length = conf.results.max_path_depth
   if not util.is_file(path) then
     return
   end
@@ -526,10 +515,16 @@ function M.load_sarif_results(path)
       -- create issue
       --- issue label
       for _, p in pairs(paths) do
-        local primary_node = p[1][1]
-        if conf.group_by_sink then
+        local primary_node
+        if conf.panel.group_by == "sink" then
           -- last node is the message node, so sink is #nodes - 1
           primary_node = p[1][#p[1] - 1]
+        elseif conf.panel.group_by == "source" then
+          -- first node is the message node, so source is 1
+          primary_node = p[1][1]
+        else
+          -- default to source
+          primary_node = p[1][1]
         end
         local label = generate_issue_label(primary_node)
 
@@ -547,11 +542,10 @@ function M.load_sarif_results(path)
     end
   end
 
-  panel.render {
-    issues = issues,
+  panel.render(issues, {
     kind = "sarif",
     mode = "tree",
-  }
+  })
   vim.api.nvim_command "redraw"
 end
 

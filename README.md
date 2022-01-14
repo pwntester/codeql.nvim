@@ -66,21 +66,25 @@ Use `RunQuery` or `QuickEval` commands or `qr`, `qe` shortcuts respectively to r
 eg:
 
 ```lua
-    use {
-      "pwntester/codeql.nvim",
-      config = function()
-        require("codeql").setup {
-          group_by_sink = true,
-          max_ram = 32000,
-          search_path = {
-            "/Users/pwntester/codeql-home/codeql",
-            "/Users/pwntester/codeql-home/codeql-go",
-            "/Users/pwntester/codeql-home/codeql-ruby",
-            "./codeql",
-          },
-        }
-      end,
-    }
+require("codeql").setup {
+  results = {
+    max_paths = 10,
+    max_path_depth = nil,
+  },
+  panel = {
+    group_by = "sink", -- "source"
+    show_filename = true,
+    long_filename = false,
+  },
+  max_ram = 32000,
+  format_on_save = true,
+  search_path = {
+    "/Users/pwntester/codeql-home/codeql",
+    "/Users/pwntester/codeql-home/codeql-go",
+    "/Users/pwntester/codeql-home/codeql-ruby",
+    "./codeql",
+  },
+}
 ```
 
 ## Commands

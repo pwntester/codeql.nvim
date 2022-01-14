@@ -5,7 +5,7 @@ local ts_utils = require "nvim-treesitter.ts_utils"
 
 local M = {}
 
-function M.setup_codeql_buffer()
+function M.setup_archive_buffer()
   local bufnr = vim.api.nvim_get_current_buf()
 
   -- set codeql buffers as scratch buffers
@@ -280,8 +280,11 @@ function M.setup(opts)
     vim.cmd [[augroup codeql]]
     vim.cmd [[au!]]
     vim.cmd [[au BufEnter * if &ft ==# 'codeql_panel' | execute("lua require'codeql.panel'.apply_mappings()") | endif]]
-    vim.cmd [[au BufEnter codeql://* lua require'codeql'.setup_codeql_buffer()]]
+    vim.cmd [[au BufEnter codeql://* lua require'codeql'.setup_archive_buffer()]]
     vim.cmd [[au BufReadCmd codeql://* lua require'codeql'.load_buffer()]]
+    if require("codeql.config").get_config().format_on_save then
+      vim.cmd [[autocmd FileType ql autocmd BufWrite <buffer> lua vim.lsp.buf.formatting()]]
+    end
     vim.cmd [[augroup END]]
 
     -- mappings

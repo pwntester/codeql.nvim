@@ -2,14 +2,18 @@ local M = {}
 
 -- user configurable options
 M.defaults = {
-  max_ram = -1,
-  panel_longnames = false,
-  panel_filename = true,
-  group_by_sink = false,
-  path_max_length = -1,
   search_path = {},
-  fmt_onsave = false,
-  max_paths = 4,
+  max_ram = nil,
+  format_on_save = false,
+  results = {
+    max_paths = 4,
+    max_path_depth = nil,
+  },
+  panel = {
+    show_filename = true,
+    long_filename = false,
+    group_by = "sink",
+  },
 }
 
 M._config = M.defaults
