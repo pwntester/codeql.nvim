@@ -159,11 +159,8 @@ function M.resolve_library_path(queryPath)
   local cmd = { "resolve", "library-path", "-v", "--log-to-stderr", "--format=json", "--query=" .. queryPath }
   local conf = config.get_config()
   if conf.search_path and #conf.search_path > 0 then
-    for _, searchPath in ipairs(conf.search_path) do
-      if searchPath ~= "" then
-        table.insert(cmd, string.format("--search-path=%s", searchPath))
-      end
-    end
+    local additionalPacks = table.concat(conf.search_path, ":")
+    table.insert(cmd, string.format("--additional-packs=%s", additionalPacks))
   end
   local json = cli.runSync(cmd)
   local decoded, err = M.json_decode(json)

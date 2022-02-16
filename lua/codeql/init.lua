@@ -143,7 +143,7 @@ function M.query(quick_eval, position)
 
   local libPaths = util.resolve_library_path(queryPath)
   if not libPaths then
-    util.err_message "Could not resolve library paths"
+    vim.notify(string.format("Cannot resolve QL library paths for %s", queryPath), 2)
     return
   end
 
