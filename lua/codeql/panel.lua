@@ -358,7 +358,6 @@ local function print_issues(results)
 end
 
 local function render_content(scan_results)
-  print("Render content", scan_results.kind, scan_results.mode)
   local bufnr = vim.fn.bufnr(panel_buffer_name)
   if bufnr == -1 then
     util.err_message "Error opening CodeQL panel"
@@ -747,6 +746,8 @@ function M.close_panel()
 end
 
 function M.render(issues, opts)
+  opts = opts or {}
+  issues = issues or {}
   M.open_panel()
 
   M.line_map = {}

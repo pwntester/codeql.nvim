@@ -12,8 +12,12 @@ M.tree = nil
 M.split = nil
 
 M.prepare_node = function(node)
-  if node.type == "raw" then
-    return node.line
+  if node.type == "label" then
+    local line = NuiLine()
+    for _, p in ipairs(node.name) do
+      line:append(p[1], p[2])
+    end
+    return line
   end
   local line = NuiLine()
   line:append(string.rep("  ", node:get_depth() - 1))
@@ -80,7 +84,7 @@ M.create_split = function()
   local split = Split {
     relative = "win",
     position = "left",
-    size = 30,
+    size = 50,
     win_options = {
       number = false,
       relativenumber = false,
@@ -105,6 +109,9 @@ M.create_split = function()
 
   split:map("n", "<CR>", function()
     local node = M.tree:get_node()
+    if node.type == "label" then
+      return
+    end
     local winid = vim.fn.win_getid()
     local target_id = util.pick_window(winid)
     vim.api.nvim_set_current_win(target_id)
@@ -140,7 +147,11 @@ M.draw = function()
     return
   else
     local files = util.list_from_archive(db.sourceArchiveZip)
-    local root = Tree:new("root", "root", "dir", {})
+    local db_name = vim.split(db.path, "/")[#vim.split(db.path, "/") - 1]
+    local root = Tree:new("root", "root", "dir", {
+      Tree:new("::header1::", { { "🛢 ", "SpecialKey" }, { db_name } }, "label"),
+      Tree:new("::header2::", { { "" } }, "label"),
+    })
     for _, file in ipairs(files) do
       local segments = vim.fn.split(file, "/")
       local current = root
@@ -155,22 +166,6 @@ M.draw = function()
 
     local flatten_root = root:flatten_directories()
 
-    local header = {
-      NuiTree.Node {
-        id = "raw1",
-        name = "raw",
-        type = "raw",
-        line = NuiLine("CodeQL Explorer", "SpecialKey"),
-        indent = "",
-      },
-      NuiTree.Node {
-        id = "raw2",
-        name = "raw",
-        type = "raw",
-        line = NuiLine "",
-        indent = "",
-      },
-    }
     local nui_nodes = M.create_nodes(flatten_root.children)
     --vim.list_extend(nui_nodes, header)
     M.create_split()

@@ -56,6 +56,7 @@ function M.set_database(dbpath)
     queryserver.register_database(metadata)
   end
   --TODO: print(util.database_upgrades(config.database.dbscheme))
+  vim.cmd [[ArchiveTree]]
 end
 
 local function is_predicate_node(node)
@@ -70,7 +71,6 @@ end
 
 function M.get_enclosing_predicate_position()
   local node = ts_utils.get_node_at_cursor()
-  print(vim.inspect(node:type()))
   if not node then
     vim.notify("No treesitter CodeQL parser installed", 2)
   end
@@ -184,7 +184,7 @@ function M.run_print_ast()
     return
   end
 
-  local fname = vim.split(bufname, ":")[2]
+  local fname = vim.split(bufname, "://")[2]
   M.run_templated_query("printAst", fname)
 end
 
@@ -219,6 +219,10 @@ function M.run_templated_query(query_name, param)
     },
   }
   local libPaths = util.resolve_library_path(queryPath)
+  if not libPaths then
+    vim.notify(string.format("Cannot resolve QL library paths for %s", query_name), 2)
+    return
+  end
   local opts = {
     quick_eval = false,
     bufnr = bufnr,

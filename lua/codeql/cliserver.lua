@@ -34,13 +34,13 @@ local function start()
   local callback
   local stdoutBuffers = {}
 
-  local function request(cmd, cb)
+  local function request(c, cb)
     callback = cb
     if handle:is_closing() then
       return false
     end
     vim.schedule(function()
-      local encoded = assert(vim.fn.json_encode(cmd))
+      local encoded = assert(vim.fn.json_encode(c))
       stdin:write(encoded)
       stdin:write(string.char(0))
     end)
@@ -49,7 +49,11 @@ local function start()
 
   stderr:read_start(function(err, data)
     assert(not err, err)
-    require("codeql.util").err_message("cliserver error: " .. data)
+    vim.schedule(function()
+      if data then
+        require("codeql.util").err_message("cliserver error: " .. data)
+      end
+    end)
   end)
 
   stdout:read_start(function(err, data)
