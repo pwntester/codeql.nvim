@@ -2,6 +2,7 @@ local util = require "codeql.util"
 local queryserver = require "codeql.queryserver"
 local config = require "codeql.config"
 local ts_utils = require "nvim-treesitter.ts_utils"
+local scan = require "plenary.scandir"
 
 local M = {}
 
@@ -45,17 +46,25 @@ function M.set_database(dbpath)
   local conf = config.get_config()
   conf.ram_opts = util.resolve_ram(true)
   local database = vim.fn.fnamemodify(vim.trim(dbpath), ":p")
+  if not util.is_dir(database) and vim.endswith(database, ".zip") then
+    -- extract the zip file
+    local data_dir = vim.fn.stdpath "data"
+    local db_dir = data_dir .. "/codeql_dbs"
+    vim.fn.mkdir(vim.fn.fnamemodify(db_dir, ":h"), "p", 0777)
+    vim.fn.system(string.format("unzip -q %s -d %s", database, db_dir))
+    local dirs = scan.scan_dir(db_dir, { only_dirs = true })
+    database = dirs[1]
+  elseif not util.is_dir(database) then
+    util.err_message("Incorrect database: " .. database)
+  end
   if not vim.endswith(database, "/") then
     database = database .. "/"
   end
-  if not util.is_dir(database) then
-    util.err_message("Incorrect database: " .. database)
-  else
-    local metadata = util.database_info(database)
-    metadata.path = database
-    queryserver.register_database(metadata)
-  end
-  --TODO: print(util.database_upgrades(config.database.dbscheme))
+  -- register database
+  local metadata = util.database_info(database)
+  metadata.path = database
+  queryserver.register_database(metadata)
+  -- show the side tree
   vim.cmd [[ArchiveTree]]
 end
 
