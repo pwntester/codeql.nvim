@@ -19,6 +19,32 @@ function M.list_from_archive(zipfile)
   return files
 end
 
+function M.uri_to_fname(uri)
+  local colon = string.find(uri, ":")
+  if not colon then
+    return uri
+  end
+  local scheme = string.sub(uri, 1, colon)
+  local path = string.sub(uri, colon + 1)
+
+  if string.find(string.upper(path), "%%SRCROOT%%") then
+    if config.database then
+      local sourceLocationPrefix = config.database.sourceLocationPrefix
+      path = string.gsub(path, "%%SRCROOT%%", sourceLocationPrefix)
+    else
+      -- TODO: request path to user
+    end
+  end
+
+  local orig_fname
+  if string.sub(uri, colon + 1, colon + 2) ~= "//" then
+    orig_fname = vim.uri_to_fname(scheme .. "//" .. path)
+  else
+    orig_fname = vim.uri_to_fname(uri)
+  end
+  return orig_fname
+end
+
 function M.regexEscape(str)
   return str:gsub("[%(%)%.%%%+%-%*%?%[%^%$%]]", "%%%1")
 end
@@ -227,7 +253,7 @@ function M.read_json_file(path)
   f:close()
   local decoded, err = M.json_decode(body)
   if not decoded then
-    print("ERROR: Could not process JSON. " .. err)
+    vim.api.nvim_err_writeln("Could not process JSON. " .. err)
     return nil
   end
   return decoded

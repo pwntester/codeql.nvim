@@ -17,6 +17,25 @@ M.line_map = {}
 
 -- local functions
 
+local function generate_issue_label(node)
+  local label = node.label
+  local conf = config.get_config()
+  if conf.panel.show_filename and node["filename"] and node["filename"] ~= nil then
+    if conf.panel.long_filename then
+      label = node.filename
+    elseif #vim.fn.fnamemodify(node.filename, ":p:t") > 0 then
+      label = vim.fn.fnamemodify(node.filename, ":p:t")
+    else
+      label = node.label
+    end
+    if node.line and node.line > 0 then
+      label = label .. ":" .. node.line
+    end
+  end
+
+  return label
+end
+
 local function register(obj)
   local bufnr = vim.fn.bufnr(panel_buffer_name)
   local curline = vim.api.nvim_buf_line_count(bufnr)
@@ -245,7 +264,7 @@ local function print_issues(results)
         if not issue.hidden then
           local is_folded = issue.is_folded
           local foldmarker = not is_folded and icon_open or icon_closed
-          local label = string.format("  %s %s", foldmarker, issue.label)
+          local label = string.format("  %s %s", foldmarker, generate_issue_label(issue.node))
           print_to_panel(label, {
             CodeqlPanelFoldIcon = { { 0, 2 + string.len(foldmarker) } },
             --CodeqlPanelRuleId = { { 2 + string.len(foldmarker), string.len(label) } },
@@ -529,7 +548,7 @@ function M.label_filter()
   unhide_issues(M.scan_results.issues)
   filter_issues(
     M.scan_results.issues,
-    "string.match(string.lower(issue.label), string.lower('" .. pattern .. "')) ~= nil"
+    string.format("string.match(string.lower(generate_issue_label(issue.node)), string.lower('%s')) ~= nil", pattern)
   )
   render_content(M.scan_results)
 end

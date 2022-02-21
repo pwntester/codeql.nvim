@@ -1,5 +1,4 @@
 local util = require "codeql.util"
-local uri_to_fname = require("codeql.loader").uri_to_fname
 
 local M = {}
 
@@ -50,12 +49,12 @@ function M.process(kind, results_path)
     local src = tuple[1]
     local dst = tuple[2]
 
-    local src_fname = uri_to_fname(src["url"]["uri"])
+    local src_fname = util.uri_to_fname(src["url"]["uri"])
     local src_lnum = src["url"]["startLine"]
     local src_range = { src["url"]["startColumn"], src["url"]["endColumn"] }
     local src_label = src["label"]
 
-    local dst_fname = uri_to_fname(dst["url"]["uri"])
+    local dst_fname = util.uri_to_fname(dst["url"]["uri"])
     local dst_lnum = dst["url"]["startLine"]
     local dst_range = { dst["url"]["startColumn"], dst["url"]["endColumn"] }
     local dst_label = dst["label"]
