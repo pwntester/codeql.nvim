@@ -79,9 +79,11 @@ local function is_predicate_identifier_node(predicate_node, node)
 end
 
 function M.get_enclosing_predicate_position()
-  local node = ts_utils.get_node_at_cursor()
-  if not node then
-    vim.notify("No treesitter CodeQL parser installed", 2)
+  local winnr = vim.api.nvim_get_current_win()
+  local ok, node = pcall(ts_utils.get_node_at_cursor, winnr)
+  if not ok or not node then
+    vim.api.nvim_err_writeln "Error getting node at cursor. Make sure treesitter CodeQL parser is installed"
+    return
   end
   local parent = node:parent()
   local root = ts_utils.get_root_for_node(node)
