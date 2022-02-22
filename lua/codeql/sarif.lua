@@ -57,20 +57,20 @@ function M.process_sarif(opts)
     if r.codeFlows == nil then
       -- results with NO codeFlows
       local nodes = {}
-      local locs = {}
+      local locations = {}
       --- location relevant to understanding the result.
       if r.relatedLocations then
         for _, v in ipairs(r.relatedLocations) do
-          table.insert(locs, v)
+          table.insert(locations, v)
         end
       end
       --- location where the result occurred
       if r.locations then
         for _, v in ipairs(r.locations) do
-          table.insert(locs, v)
+          table.insert(locations, v)
         end
       end
-      for j, l in ipairs(locs) do
+      for j, l in ipairs(locations) do
         local label, mark
         if l.message then
           label = l.message.text or message
@@ -89,11 +89,6 @@ function M.process_sarif(opts)
         end
         local region = l.physicalLocation.region
 
-        -- check if the SARIF file contains source code snippets
-        if l.physicalLocation.contextRegion and l.physicalLocation.contextRegion.snippet then
-          config.sarif.hasSnippets = true
-        end
-
         local node = {
           label = label,
           mark = mark,
@@ -107,6 +102,13 @@ function M.process_sarif(opts)
             endColumn = region and region.endColumn or -1,
           },
         }
+
+        -- check if the SARIF file contains source code snippets
+        if l.physicalLocation.contextRegion and l.physicalLocation.contextRegion.snippet then
+          config.sarif.hasSnippets = true
+          node.contextRegion = l.physicalLocation.contextRegion
+        end
+
         table.insert(nodes, node)
       end
 
