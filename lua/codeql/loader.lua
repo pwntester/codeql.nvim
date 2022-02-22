@@ -60,7 +60,7 @@ function M.process_results(opts)
         if util.is_file(resultsPath) then
           require("codeql.defs").process_defs(resultsPath, bufnr)
         else
-          util.err_message("ERROR: Cant find results at " .. resultsPath)
+          util.err_message("Cant find results at " .. resultsPath)
           panel.render()
         end
       end)
@@ -86,7 +86,7 @@ function M.process_results(opts)
         if util.is_file(resultsPath) then
           require("codeql.defs").process_refs(resultsPath, bufnr)
         else
-          util.err_message("ERROR: Cant find results at " .. resultsPath)
+          util.err_message("Cant find results at " .. resultsPath)
           panel.render()
         end
       end)
@@ -112,7 +112,7 @@ function M.process_results(opts)
         if util.is_file(resultsPath) then
           require("codeql.ast").build_ast(resultsPath, bufnr)
         else
-          util.err_message("ERROR: Cant find results at " .. resultsPath)
+          util.err_message("Cant find results at " .. resultsPath)
           panel.render()
         end
       end)
@@ -140,7 +140,7 @@ function M.process_results(opts)
         if util.is_file(resultsPath) then
           M.load_sarif_results(resultsPath)
         else
-          util.err_message("ERROR: Cant find results at " .. resultsPath)
+          util.err_message("Cant find results at " .. resultsPath)
           panel.render()
         end
       end)
@@ -149,7 +149,7 @@ function M.process_results(opts)
       require("codeql.history").save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count, bufnr)
     end
   elseif vim.tbl_contains(query_kinds, "PathProblem") and kind == "path-problem" and id == nil then
-    util.err_message "ERROR: Insuficient Metadata for a Path Problem. Need at least @kind and @id elements"
+    util.err_message "Insuficient Metadata for a Path Problem. Need at least @kind and @id elements"
 
     -- process RAW results
   else
@@ -171,7 +171,7 @@ function M.process_results(opts)
         if util.is_file(resultsPath) then
           M.load_raw_results(resultsPath)
         else
-          util.err_message("ERROR: Cant find results at " .. resultsPath)
+          util.err_message("Cant find results at " .. resultsPath)
           panel.render()
         end
       end)
@@ -262,7 +262,7 @@ function M.load_raw_results(path)
 
         -- ???
       else
-        util.err_message "ERROR: Error processing node"
+        util.err_message "Error processing node"
       end
       table.insert(path, node)
     end

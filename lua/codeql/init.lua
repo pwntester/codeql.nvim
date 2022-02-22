@@ -90,7 +90,7 @@ function M.get_enclosing_predicate_position()
   local winnr = vim.api.nvim_get_current_win()
   local ok, node = pcall(ts_utils.get_node_at_cursor, winnr)
   if not ok or not node then
-    vim.api.nvim_err_writeln "Error getting node at cursor. Make sure treesitter CodeQL parser is installed"
+    util.err_message "Error getting node at cursor. Make sure treesitter CodeQL parser is installed"
     return
   end
   local parent = node:parent()
@@ -255,10 +255,7 @@ function M.run_templated_query(query_name, param)
   require("codeql.queryserver").run_query(opts)
 end
 
-local function open_from_archive(bufnr, zipfile, path)
-  vim.api.nvim_set_current_buf(bufnr)
-  local cmd = string.format("keepalt silent! read! unzip -p -- %s %s", zipfile, path)
-  vim.cmd(cmd)
+local function set_source_buffer_options(bufnr)
   vim.cmd "normal! ggdd"
   pcall(vim.cmd, "filetype detect")
   vim.api.nvim_buf_set_option(bufnr, "modified", false)
@@ -266,16 +263,37 @@ local function open_from_archive(bufnr, zipfile, path)
   vim.cmd "doau BufEnter"
 end
 
-function M.load_buffer()
-  local db = config.database
-  if not db then
-    util.err_message "Missing database. Use :SetDatabase command"
-    return
+local function open_from_archive(bufnr, path)
+  local zipfile = config.database.sourceArchiveZip
+  vim.api.nvim_set_current_buf(bufnr)
+  vim.cmd(string.format("keepalt silent! read! unzip -p -- %s %s", zipfile, path))
+  set_source_buffer_options(bufnr)
+end
+
+local function open_from_sarif(bufnr, path)
+  local sarif_path = config.sarif_path
+  local sarif = util.read_json_file(sarif_path)
+  local artifacts = sarif.runs[1].artifacts
+  for _, artifact in ipairs(artifacts) do
+    local uri = artifact.location.uri
+    if uri == path then
+      local content = vim.split(artifact.contents.text, "\n")
+      vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, content)
+      set_source_buffer_options(bufnr)
+    end
+  end
+end
+
+function M.load_source_buffer()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local bufname = vim.api.nvim_buf_get_name(bufnr)
+  local path = string.match(bufname, "codeql://(.*)")
+  if config.sarif_path then
+    open_from_sarif(bufnr, path)
+  elseif config.database then
+    open_from_archive(bufnr, path)
   else
-    local bufnr = vim.api.nvim_get_current_buf()
-    local bufname = vim.api.nvim_buf_get_name(bufnr)
-    local path = string.match(bufname, "codeql://(.*)")
-    open_from_archive(bufnr, db.sourceArchiveZip, path)
+    vim.notify "Cannot find source file"
   end
 end
 
@@ -304,7 +322,7 @@ function M.setup(opts)
     vim.cmd [[au!]]
     vim.cmd [[au BufEnter * if &ft ==# 'codeql_panel' | execute("lua require'codeql.panel'.apply_mappings()") | endif]]
     vim.cmd [[au BufEnter codeql://* lua require'codeql'.setup_archive_buffer()]]
-    vim.cmd [[au BufReadCmd codeql://* lua require'codeql'.load_buffer()]]
+    vim.cmd [[au BufReadCmd codeql://* lua require'codeql'.load_source_buffer()]]
     if require("codeql.config").get_config().format_on_save then
       vim.cmd [[autocmd FileType ql autocmd BufWrite <buffer> lua vim.lsp.buf.formatting()]]
     end

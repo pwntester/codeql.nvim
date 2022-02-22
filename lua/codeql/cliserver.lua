@@ -9,7 +9,7 @@ local function start()
   local cmd_args = { "execute", "cli-server", "--logdir", "/tmp/codeql_queryserver" }
 
   if not (vim.fn.executable(cmd) == 1) then
-    vim.api.nvim_err_writeln(string.format("The given command %q is not executable.", cmd))
+    require("codeql.util").err_message(string.format("The given command %q is not executable.", cmd))
   end
 
   local stdin = vim.loop.new_pipe(false)

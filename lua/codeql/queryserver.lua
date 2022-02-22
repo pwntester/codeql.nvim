@@ -137,7 +137,7 @@ end
 function M.run_query(opts)
   local dbDir = config.database.datasetFolder
   if not dbDir then
-    util.err_message "Cannot find dataset folder. Did you :SetDatabase?"
+    --util.err_message "Cannot find dataset folder. Did you :SetDatabase?"
     return
   end
 

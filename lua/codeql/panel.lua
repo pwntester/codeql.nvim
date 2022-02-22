@@ -15,8 +15,6 @@ local M = {}
 M.scan_results = {}
 M.line_map = {}
 
--- local functions
-
 local function generate_issue_label(node)
   local label = node.label
   local conf = config.get_config()
@@ -32,7 +30,6 @@ local function generate_issue_label(node)
       label = label .. ":" .. node.line
     end
   end
-
   return label
 end
 
@@ -226,12 +223,15 @@ local function print_tree_nodes(issue, indent_level)
 end
 
 local function print_header(scan_results)
-  local hl = { CodeqlPanelInfo = { { 0, string.len "Database:" } } }
-  local database = config.database.path
-  print_to_panel("Database: " .. database, hl)
-  hl = { CodeqlPanelInfo = { { 0, string.len "Issues:" } } }
+  if config.database.path then
+    local hl = { CodeqlPanelInfo = { { 0, string.len "Database:" } } }
+    print_to_panel("Database: " .. config.database.path, hl)
+  elseif config.sarif_path then
+    local hl = { CodeqlPanelInfo = { { 0, string.len "SARIF:" } } }
+    print_to_panel("SARIF: " .. config.sarif_path, hl)
+  end
+  local hl = { CodeqlPanelInfo = { { 0, string.len "Issues:" } } }
   print_to_panel("Issues:   " .. table.getn(scan_results.issues), hl)
-  --print_to_panel('')
 end
 
 local function get_column_names(columns, max_lengths)
@@ -663,8 +663,11 @@ function M.jump_to_code(stay_in_pane)
     return
   end
 
-  -- open from src.zip
-  if config.database and util.is_file(config.database.sourceArchiveZip) then
+  -- open from ZIP archive or SARIF file
+  if
+    (config.database.sourceArchiveZip and util.is_file(config.database.sourceArchiveZip))
+    or config.sarif_path and util.is_file(config.sarif_path)
+  then
     if string.sub(node.filename, 1, 1) == "/" then
       node.filename = string.sub(node.filename, 2)
     end
@@ -684,6 +687,7 @@ function M.jump_to_code(stay_in_pane)
     vim.fn.win_gotoid(target_id)
 
     local bufname = string.format("codeql://%s", node.filename)
+    print("Opening " .. bufname)
     if vim.fn.bufnr(bufname) == -1 then
       vim.api.nvim_command(string.format("edit %s", bufname))
     else
@@ -704,8 +708,8 @@ function M.jump_to_code(stay_in_pane)
     if stay_in_pane then
       vim.fn.win_gotoid(panel_winid)
     end
-  elseif not config.database then
-    vim.api.nvim_err_writeln "Please use SetDatabase to point to the analysis database"
+  else
+    util.err_message("Cannot find source code for " .. node.filename)
   end
 end
 

@@ -1,4 +1,5 @@
 local util = require "codeql.util"
+local config = require "codeql.config"
 
 local M = {}
 
@@ -31,6 +32,18 @@ function M.process_sarif(opts)
 
   -- TODO: handle multiple runs
   local results = decoded.runs[1].results
+
+  -- check if the SARIF file contains source code content
+  local artifacts = decoded.runs[1].artifacts
+  if artifacts then
+    print(1)
+    for _, artifact in ipairs(artifacts) do
+      if artifact.contents then
+        config.sarif_path = opts.path
+        break
+      end
+    end
+  end
 
   print("Sarif: " .. opts.path)
   print("Results: " .. #results)

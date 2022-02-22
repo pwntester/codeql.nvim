@@ -28,11 +28,10 @@ function M.uri_to_fname(uri)
   local path = string.sub(uri, colon + 1)
 
   if string.find(string.upper(path), "%%SRCROOT%%") then
-    if config.database then
-      local sourceLocationPrefix = config.database.sourceLocationPrefix
-      path = string.gsub(path, "%%SRCROOT%%", sourceLocationPrefix)
+    if config.database.sourceLocationPrefix then
+      path = string.gsub(path, "%%SRCROOT%%", config.database.sourceLocationPrefix)
     else
-      -- TODO: request path to user
+      path = string.gsub(path, "%%SRCROOT%%", "")
     end
   end
 
@@ -48,6 +47,7 @@ end
 function M.regexEscape(str)
   return str:gsub("[%(%)%.%%%+%-%*%?%[%^%$%]]", "%%%1")
 end
+
 function M.replace(str, this, that)
   local escaped_this = M.regexEscape(this)
   local escaped_that = that:gsub("%%", "%%%%") -- only % needs to be escaped for 'that'
@@ -253,7 +253,7 @@ function M.read_json_file(path)
   f:close()
   local decoded, err = M.json_decode(body)
   if not decoded then
-    vim.api.nvim_err_writeln("Could not process JSON. " .. err)
+    M.err_message("Could not process JSON. " .. err)
     return nil
   end
   return decoded
