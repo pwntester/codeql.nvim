@@ -271,16 +271,38 @@ local function open_from_archive(bufnr, path)
 end
 
 local function open_from_sarif(bufnr, path)
-  local sarif_path = config.sarif_path
-  local sarif = util.read_json_file(sarif_path)
-  local artifacts = sarif.runs[1].artifacts
-  for _, artifact in ipairs(artifacts) do
-    local uri = artifact.location.uri
-    if uri == path then
-      local content = vim.split(artifact.contents.text, "\n")
-      vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, content)
-      set_source_buffer_options(bufnr)
+  local sarif = util.read_json_file(config.sarif.path)
+  if config.sarif.hasArtifacts then
+    local artifacts = sarif.runs[1].artifacts
+    for _, artifact in ipairs(artifacts) do
+      local uri = artifact.location.uri
+      if uri == path then
+        local content = vim.split(artifact.contents.text, "\n")
+        vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, content)
+        set_source_buffer_options(bufnr)
+      end
     end
+  elseif config.sarif.hasSnippets then
+    -- TODO: implement
+    -- "physicalLocation" : {
+    --   "artifactLocation" : {
+    --     "uri" : "log4j-core/src/main/java/org/apache/logging/log4j/core/util/NetUtils.java",
+    --     "uriBaseId" : "%SRCROOT%",
+    --     "index" : 1
+    --   },
+    --   "region" : {
+    --     "startLine" : 66,
+    --     "startColumn" : 57,
+    --     "endColumn" : 78
+    --   },
+    --   "contextRegion" : {
+    --     "startLine" : 64,
+    --     "endLine" : 68,
+    --     "snippet" : {
+    --       "text" : "                            final InetAddress address = addresses.nextElement();\n                            if (!address.isLoopbackAddress()) {\n                                final String hostname = address.getHostName();\n                                if (hostname != null) {\n                                    return hostname;\n"
+    --     }
+    --   }
+    -- },
   end
 end
 
@@ -288,9 +310,9 @@ function M.load_source_buffer()
   local bufnr = vim.api.nvim_get_current_buf()
   local bufname = vim.api.nvim_buf_get_name(bufnr)
   local path = string.match(bufname, "codeql://(.*)")
-  if config.sarif_path then
+  if config.sarif.path and (config.sarif.hasArtifacts or config.sarif.hasSnippets) then
     open_from_sarif(bufnr, path)
-  elseif config.database then
+  elseif config.database.sourceArchiveZip then
     open_from_archive(bufnr, path)
   else
     vim.notify "Cannot find source file"

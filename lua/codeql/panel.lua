@@ -226,9 +226,9 @@ local function print_header(scan_results)
   if config.database.path then
     local hl = { CodeqlPanelInfo = { { 0, string.len "Database:" } } }
     print_to_panel("Database: " .. config.database.path, hl)
-  elseif config.sarif_path then
+  elseif config.sarif.path then
     local hl = { CodeqlPanelInfo = { { 0, string.len "SARIF:" } } }
-    print_to_panel("SARIF: " .. config.sarif_path, hl)
+    print_to_panel("SARIF: " .. config.sarif.path, hl)
   end
   local hl = { CodeqlPanelInfo = { { 0, string.len "Issues:" } } }
   print_to_panel("Issues:   " .. table.getn(scan_results.issues), hl)
@@ -666,7 +666,11 @@ function M.jump_to_code(stay_in_pane)
   -- open from ZIP archive or SARIF file
   if
     (config.database.sourceArchiveZip and util.is_file(config.database.sourceArchiveZip))
-    or config.sarif_path and util.is_file(config.sarif_path)
+    or (
+      config.sarif.path
+      and util.is_file(config.sarif.path)
+      and (config.sarif.hasArtifacts or config.sarif.hasSnippets)
+    )
   then
     if string.sub(node.filename, 1, 1) == "/" then
       node.filename = string.sub(node.filename, 2)
@@ -687,12 +691,13 @@ function M.jump_to_code(stay_in_pane)
     vim.fn.win_gotoid(target_id)
 
     local bufname = string.format("codeql://%s", node.filename)
-    print("Opening " .. bufname)
     if vim.fn.bufnr(bufname) == -1 then
       vim.api.nvim_command(string.format("edit %s", bufname))
     else
       vim.api.nvim_command(string.format("buffer %s", bufname))
     end
+
+    -- TODO: for snippets, we will need to adjust the line
     pcall(vim.api.nvim_win_set_cursor, 0, { node.line, 0 })
     vim.cmd "norm! zz"
 

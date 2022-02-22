@@ -28,18 +28,18 @@ function M.process_sarif(opts)
   if not util.is_file(opts.path) then
     return
   end
+  config.sarif.path = opts.path
   local decoded = util.read_json_file(opts.path)
 
   -- TODO: handle multiple runs
   local results = decoded.runs[1].results
 
-  -- check if the SARIF file contains source code content
+  -- check if the SARIF file contains source code artifacts
   local artifacts = decoded.runs[1].artifacts
   if artifacts then
-    print(1)
     for _, artifact in ipairs(artifacts) do
       if artifact.contents then
-        config.sarif_path = opts.path
+        config.sarif.hasArtifacts = true
         break
       end
     end
@@ -88,6 +88,11 @@ function M.process_sarif(opts)
           uri = string.format("file:%s/%s", uriBaseId, uri)
         end
         local region = l.physicalLocation.region
+
+        -- check if the SARIF file contains source code snippets
+        if l.physicalLocation.contextRegion and l.physicalLocation.contextRegion.snippet then
+          config.sarif.hasSnippets = true
+        end
 
         local node = {
           label = label,

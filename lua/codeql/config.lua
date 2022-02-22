@@ -21,7 +21,7 @@ M._config = M.defaults
 -- internal options
 M.database = {}
 M.ram_opts = {}
-M.sarif_path = nil -- only set when SARIF file contains source code
+M.sarif = {}
 
 function M.get_config()
   return M._config
