@@ -13,6 +13,7 @@ M.defaults = {
     show_filename = true,
     long_filename = false,
     group_by = "sink",
+    context_lines = 3,
   },
 }
 

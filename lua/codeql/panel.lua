@@ -1,5 +1,8 @@
 local util = require "codeql.util"
 local config = require "codeql.config"
+local Popup = require "nui.popup"
+local autocmd = require "nui.utils.autocmd"
+local event = autocmd.event
 
 local range_ns = vim.api.nvim_create_namespace "codeql"
 local panel_buffer_name = "__CodeQLPanel__"
@@ -462,6 +465,13 @@ function M.apply_mappings()
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
+    "s",
+    [[<cmd>lua require'codeql.panel'.preview_snippet(true)<CR>]],
+    { script = true, silent = true }
+  )
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "n",
     "<S-h>",
     [[<cmd>lua require'codeql.panel'.toggle_help()<CR>]],
     { script = true, silent = true }
@@ -637,7 +647,7 @@ local function get_column_at_cursor(row)
   end
 end
 
-function M.jump_to_code(stay_in_pane)
+local function get_current_node()
   if not M.line_map[vim.fn.line "."] then
     return
   end
@@ -651,15 +661,12 @@ function M.jump_to_code(stay_in_pane)
   elseif entry.kind == "row" then
     node = get_column_at_cursor(entry.obj)
   end
+  return node
+end
 
-  if not node then
-    return
-  end
-
-  if not node.visitable then
-    if not not node.filename then
-      util.message(node.filename)
-    end
+function M.jump_to_code(stay_in_panel)
+  local node = get_current_node()
+  if not node or not node.visitable then
     return
   end
 
@@ -712,62 +719,110 @@ function M.jump_to_code(stay_in_pane)
     pcall(vim.api.nvim_buf_add_highlight, 0, range_ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn)
 
     -- jump to main window if requested
-    if stay_in_pane then
+    if stay_in_panel then
       vim.fn.win_gotoid(panel_winid)
     end
-  elseif config.sarif.path and node.contextRegion and node.contextRegion.snippet then
-    local Popup = require "nui.popup"
-    local autocmd = require "nui.utils.autocmd"
-    local event = autocmd.event
-
-    local popup = Popup {
-      enter = false,
-      focusable = false,
-      relative = "editor",
-      border = {
-        style = "rounded",
-      },
-      position = "50%",
-      size = {
-        width = "70%",
-        height = "20%",
-      },
-      buf_options = {
-        modifiable = true,
-        readonly = false,
-        filetype = "markdown",
-      },
-      win_options = {
-        winblend = 10,
-        winhighlight = "Normal:NormalAlt,FloatBorder:FloatBorder",
-      },
-    }
-
-    -- when cursor is moved, close the popup
-    local current_bufnr = vim.api.nvim_get_current_buf()
-    autocmd.buf.define(current_bufnr, event.CursorMoved, function()
-      popup:unmount()
-    end, { once = true })
-
-    -- mount/open the component
-    popup:mount()
-
-    -- set content
-    local _, _, ext = string.find(node.filename, "%.(%w+)$")
-    local content = { "```" .. ext }
-    vim.list_extend(content, vim.split(node.contextRegion.snippet.text, "\n"))
-    vim.list_extend(content, { "```" })
-    vim.api.nvim_buf_set_lines(popup.bufnr, 0, 1, false, content)
-
-    -- highlight node
-    vim.api.nvim_buf_clear_namespace(popup.bufnr, range_ns, 0, -1)
-    local startLine = node.url.startLine - node.contextRegion.startLine
-    local startColumn = node.url.startColumn
-    local endColumn = node.url.endColumn
-    vim.api.nvim_buf_add_highlight(popup.bufnr, range_ns, "CodeqlRange", startLine + 1, startColumn - 1, endColumn - 1)
   else
     util.err_message("Cannot find source code for " .. node.filename)
   end
+end
+
+function M.preview_snippet()
+  local node = get_current_node()
+  if not node or not node.visitable then
+    return
+  end
+  local conf = config.get_config()
+  local context_lines = conf.panel.context_lines
+  local snippet = {}
+  local max_len = 0
+  local context_start_line
+  if config.sarif.path and node.contextRegion and node.contextRegion.snippet then
+    snippet = vim.split(node.contextRegion.snippet.text, "\n")
+    context_start_line = node.contextRegion.startLine
+    for _, line in ipairs(snippet) do
+      if #line > max_len then
+        max_len = #line
+      end
+    end
+  elseif config.sarif.path and config.sarif.hasArtifacts then
+    local sarif = util.read_json_file(config.sarif.path)
+    local artifacts = sarif.runs[1].artifacts
+    for _, artifact in ipairs(artifacts) do
+      local uri = "/" .. util.uri_to_fname(artifact.location.uri)
+      if uri == node.filename then
+        local content = vim.split(artifact.contents.text, "\n")
+        context_start_line = math.max(node.url.startLine - context_lines, 0)
+        local context_end_line = math.min(node.url.startLine + context_lines, #content)
+        for i = context_start_line, context_end_line do
+          table.insert(snippet, content[i])
+          if #content[i] > max_len then
+            max_len = #content[i]
+          end
+        end
+        break
+      end
+    end
+  elseif config.database.sourceArchiveZip then
+    local zipfile = config.database.sourceArchiveZip
+    local path = string.gsub(node.filename, "^/", "")
+    local content = vim.fn.systemlist(string.format("unzip -p -- %s %s", zipfile, path))
+    context_start_line = math.max(node.url.startLine - context_lines, 0)
+    local context_end_line = math.min(node.url.startLine + context_lines, #content)
+    for i = context_start_line, context_end_line do
+      table.insert(snippet, content[i])
+      if #content[i] > max_len then
+        max_len = #content[i]
+      end
+    end
+  end
+
+  -- create popup window
+  local popup = Popup {
+    enter = false,
+    focusable = false,
+    relative = "editor",
+    border = {
+      style = "rounded",
+    },
+    position = "50%",
+    size = {
+      width = max_len + 10,
+      height = #snippet + 2,
+    },
+    buf_options = {
+      modifiable = true,
+      readonly = false,
+      filetype = "markdown",
+    },
+    win_options = {
+      winblend = 10,
+      winhighlight = "Normal:NormalAlt,FloatBorder:FloatBorder",
+    },
+  }
+
+  -- when cursor is moved, close the popup
+  local current_bufnr = vim.api.nvim_get_current_buf()
+  autocmd.buf.define(current_bufnr, event.CursorMoved, function()
+    popup:unmount()
+  end, { once = true })
+
+  -- mount/open the component
+  popup:mount()
+
+  -- set content
+  local _, _, ext = string.find(node.filename, "%.(%w+)$")
+  local content = { "```" .. ext }
+  vim.list_extend(content, snippet)
+  vim.list_extend(content, { "```" })
+  vim.api.nvim_buf_set_lines(popup.bufnr, 0, 1, false, content)
+
+  -- highlight node
+  vim.api.nvim_buf_clear_namespace(popup.bufnr, range_ns, 0, -1)
+  local startLine = node.url.startLine - context_start_line
+  local startColumn = node.url.startColumn
+  local endColumn = node.url.endColumn
+  vim.api.nvim_buf_add_highlight(popup.bufnr, range_ns, "CodeqlRange", startLine + 1, startColumn - 1, endColumn - 1)
 end
 
 function M.open_panel()

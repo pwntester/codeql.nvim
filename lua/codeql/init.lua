@@ -256,17 +256,19 @@ function M.run_templated_query(query_name, param)
 end
 
 local function set_source_buffer_options(bufnr)
-  vim.cmd "normal! ggdd"
-  pcall(vim.cmd, "filetype detect")
-  vim.api.nvim_buf_set_option(bufnr, "modified", false)
-  vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
-  vim.cmd "doau BufEnter"
+  vim.api.nvim_buf_call(bufnr, function()
+    vim.cmd "normal! ggdd"
+    pcall(vim.cmd, "filetype detect")
+    vim.api.nvim_buf_set_option(bufnr, "modified", false)
+    vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
+    vim.cmd "doau BufEnter"
+  end)
 end
 
 local function open_from_archive(bufnr, path)
   local zipfile = config.database.sourceArchiveZip
-  vim.api.nvim_set_current_buf(bufnr)
-  vim.cmd(string.format("keepalt silent! read! unzip -p -- %s %s", zipfile, path))
+  local content = vim.fn.systemlist(string.format("unzip -p -- %s %s", zipfile, path))
+  vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, content)
 end
 
 local function open_from_sarif(bufnr, path)
@@ -278,6 +280,7 @@ local function open_from_sarif(bufnr, path)
       if uri == path then
         local content = vim.split(artifact.contents.text, "\n")
         vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, content)
+        break
       end
     end
   end

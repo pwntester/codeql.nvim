@@ -157,6 +157,7 @@ function M.run_query(opts)
   end
 
   -- https://github.com/github/vscode-codeql/blob/master/extensions/ql-vscode/src/messages.ts
+  -- https://github.com/github/vscode-codeql/blob/eec72e0cbd65fd0d5fea19c7f63104df2ebc8b07/extensions/ql-vscode/src/run-queries.ts#L171-L180
   local compileQuery_params = {
     body = {
       compilationOptions = {
@@ -167,6 +168,7 @@ function M.run_query(opts)
         localChecking = false,
         noComputeGetUrl = false,
         noComputeToString = false,
+        computeDefaultStrings = true,
       },
       extraOptions = {
         timeoutSecs = 0,
@@ -228,6 +230,8 @@ function M.run_query(opts)
       return
     else
       -- prepare `runQueries` params
+      -- https://github.com/github/vscode-codeql/blob/81e60286f299660e0326d6036e0e0a0969ebbf51/extensions/ql-vscode/src/pure/messages.ts#L722
+      -- https://github.com/github/vscode-codeql/blob/eec72e0cbd65fd0d5fea19c7f63104df2ebc8b07/extensions/ql-vscode/src/run-queries.ts#L123
       local runQueries_params = {
         body = {
           db = {

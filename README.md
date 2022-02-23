@@ -75,6 +75,7 @@ require("codeql").setup {
     group_by = "sink", -- "source"
     show_filename = true,
     long_filename = false,
+    context_lines = 3,
   },
   max_ram = 32000,
   format_on_save = true,
@@ -118,6 +119,7 @@ After running a query or quick evaluating a predicate, results will be rendered 
 - `t`: open all folds
 - `T`: closes all folds
 - `q`: closes result panel
+- `s`: show context snippet
  
 ## Language Server Protocol
 This plugin does not provide any support for the Language Server Protocol (LSP). But in order to have the best CodeQL writing experience it is recommended to configure a LSP client to connect to the CodeQL Language Server.
