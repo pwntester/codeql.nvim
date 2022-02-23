@@ -40,8 +40,12 @@ function M.process_results(opts)
     return
   end
 
-  -- process definitions
-  if vim.endswith(queryPath, "/localDefinitions.ql") then
+  -- process ASTs, definitions and references
+  if
+    vim.endswith(queryPath, "/localDefinitions.ql")
+    or vim.endswith(queryPath, "/localReferences.ql")
+    or vim.endswith(queryPath, "/printAst.ql")
+  then
     local cmd = {
       "bqrs",
       "decode",
@@ -53,73 +57,28 @@ function M.process_results(opts)
       bqrsPath,
     }
     vim.list_extend(cmd, ram_opts)
-    util.message("Decoding BQRS " .. bqrsPath)
     cli.runAsync(
       cmd,
       vim.schedule_wrap(function(_)
         if util.is_file(resultsPath) then
-          require("codeql.defs").process_defs(resultsPath, bufnr)
+          if vim.endswith(queryPath, "/localDefinitions.ql") then
+            require("codeql.defs").process_defs(resultsPath)
+          elseif vim.endswith(queryPath, "/localReferences.ql") then
+            require("codeql.defs").process_refs(resultsPath)
+          elseif vim.endswith(queryPath, "/printAST.ql") then
+            require("codeql.ast").build_ast(resultsPath, bufnr)
+          end
         else
           util.err_message("Cant find results at " .. resultsPath)
           panel.render()
         end
       end)
     )
+    return
+  end
 
-    -- process references
-  elseif vim.endswith(queryPath, "/localReferences.ql") then
-    local cmd = {
-      "bqrs",
-      "decode",
-      "-v",
-      "--log-to-stderr",
-      "--format=json",
-      "-o=" .. resultsPath,
-      "--entities=id,url,string",
-      bqrsPath,
-    }
-    vim.list_extend(cmd, ram_opts)
-    util.message("Decoding BQRS " .. bqrsPath)
-    cli.runAsync(
-      cmd,
-      vim.schedule_wrap(function(_)
-        if util.is_file(resultsPath) then
-          require("codeql.defs").process_refs(resultsPath, bufnr)
-        else
-          util.err_message("Cant find results at " .. resultsPath)
-          panel.render()
-        end
-      end)
-    )
-
-    -- process printAST results
-  elseif vim.endswith(queryPath, "/printAst.ql") then
-    local cmd = {
-      "bqrs",
-      "decode",
-      "-v",
-      "--log-to-stderr",
-      "--format=json",
-      "-o=" .. resultsPath,
-      "--entities=id,url,string",
-      bqrsPath,
-    }
-    vim.list_extend(cmd, ram_opts)
-    util.message("Decoding BQRS " .. bqrsPath)
-    cli.runAsync(
-      cmd,
-      vim.schedule_wrap(function(_)
-        if util.is_file(resultsPath) then
-          require("codeql.ast").build_ast(resultsPath, bufnr)
-        else
-          util.err_message("Cant find results at " .. resultsPath)
-          panel.render()
-        end
-      end)
-    )
-
-    -- process SARIF results
-  elseif vim.tbl_contains(query_kinds, "PathProblem") and kind == "path-problem" and id ~= nil then
+  -- process SARIF results
+  if vim.tbl_contains(query_kinds, "PathProblem") and kind == "path-problem" and id ~= nil then
     local cmd = {
       "bqrs",
       "interpret",
@@ -133,7 +92,6 @@ function M.process_results(opts)
       bqrsPath,
     }
     vim.list_extend(cmd, ram_opts)
-    util.message("Decoding BQRS " .. bqrsPath)
     cli.runAsync(
       cmd,
       vim.schedule_wrap(function(_)
@@ -148,55 +106,42 @@ function M.process_results(opts)
     if save_bqrs then
       require("codeql.history").save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count, bufnr)
     end
+    vim.api.nvim_command "redraw"
+    return
   elseif vim.tbl_contains(query_kinds, "PathProblem") and kind == "path-problem" and id == nil then
     util.err_message "Insuficient Metadata for a Path Problem. Need at least @kind and @id elements"
-
-    -- process RAW results
-  else
-    local cmd = {
-      "bqrs",
-      "decode",
-      "-v",
-      "--log-to-stderr",
-      "-o=" .. resultsPath,
-      "--format=json",
-      "--entities=string,url",
-      bqrsPath,
-    }
-    vim.list_extend(cmd, ram_opts)
-    util.message("Decoding BQRS " .. bqrsPath)
-    cli.runAsync(
-      cmd,
-      vim.schedule_wrap(function(_)
-        if util.is_file(resultsPath) then
-          M.load_raw_results(resultsPath)
-        else
-          util.err_message("Cant find results at " .. resultsPath)
-          panel.render()
-        end
-      end)
-    )
-    if save_bqrs then
-      require("codeql.history").save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count, bufnr)
-    end
+    return
   end
 
+  -- process RAW results
+  local cmd = {
+    "bqrs",
+    "decode",
+    "-v",
+    "--log-to-stderr",
+    "-o=" .. resultsPath,
+    "--format=json",
+    "--entities=string,url",
+    bqrsPath,
+  }
+  vim.list_extend(cmd, ram_opts)
+  cli.runAsync(
+    cmd,
+    vim.schedule_wrap(function(_)
+      if util.is_file(resultsPath) then
+        M.load_raw_results(resultsPath)
+      else
+        util.err_message("Cant find results at " .. resultsPath)
+        panel.render()
+      end
+    end)
+  )
+  if save_bqrs then
+    require("codeql.history").save_bqrs(bqrsPath, queryPath, dbPath, kind, id, count, bufnr)
+  end
   vim.api.nvim_command "redraw"
 end
 
---[[ DEBUG
-  ["#select"] = {
-    columns = { {
-        kind = "Entity"
-      }, {
-        kind = "Entity",
-        name = "t"
-      }, {
-        kind = "Entity",
-        name = "s"
-      } },
-  ]]
---
 function M.load_raw_results(path)
   if not util.is_file(path) then
     return
@@ -218,8 +163,6 @@ function M.load_raw_results(path)
     panel.render()
     return
   end
-
-  print("Json: " .. path)
 
   for _, tuple in ipairs(tuples) do
     path = {}
