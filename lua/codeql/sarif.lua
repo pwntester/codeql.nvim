@@ -163,6 +163,12 @@ function M.process_sarif(opts)
               },
             }
 
+            -- check if the SARIF file contains source code snippets
+            if l.location.physicalLocation.contextRegion and l.location.physicalLocation.contextRegion.snippet then
+              config.sarif.hasSnippets = true
+              node.contextRegion = l.location.physicalLocation.contextRegion
+            end
+
             table.insert(nodes, node)
           end
 
