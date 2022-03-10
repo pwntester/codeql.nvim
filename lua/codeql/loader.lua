@@ -61,11 +61,11 @@ function M.process_results(opts)
       cmd,
       vim.schedule_wrap(function(_)
         if util.is_file(resultsPath) then
-          if vim.endswith(queryPath, "/localDefinitions.ql") then
+          if vim.endswith(string.lower(queryPath), "/localdefinitions.ql") then
             require("codeql.defs").process_defs(resultsPath)
-          elseif vim.endswith(queryPath, "/localReferences.ql") then
+          elseif vim.endswith(string.lower(queryPath), "/localreferences.ql") then
             require("codeql.defs").process_refs(resultsPath)
-          elseif vim.endswith(queryPath, "/printAST.ql") then
+          elseif vim.endswith(string.lower(queryPath), "/printast.ql") then
             require("codeql.ast").build_ast(resultsPath, bufnr)
           end
         else

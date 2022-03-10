@@ -44,6 +44,10 @@ end
 
 local function print_to_panel(text, matches)
   local bufnr = vim.fn.bufnr(panel_buffer_name)
+
+  local lines = vim.split(text, "\n")
+  text = table.concat(lines, " <CR> ")
+
   vim.api.nvim_buf_set_lines(bufnr, -1, -1, true, { text })
   if type(matches) == "table" then
     for hlgroup, groups in pairs(matches) do

@@ -1,7 +1,6 @@
 local util = require "codeql.util"
 local queryserver = require "codeql.queryserver"
 local config = require "codeql.config"
-local ts_utils = require "nvim-treesitter.ts_utils"
 local Path = require "plenary.path"
 
 local M = {}
@@ -87,6 +86,10 @@ local function is_predicate_identifier_node(predicate_node, node)
 end
 
 function M.get_enclosing_predicate_position()
+  local ok, ts_utils = pcall(require, "nvim-treesitter.ts_utils")
+  if not ok then
+    return nil
+  end
   local winnr = vim.api.nvim_get_current_win()
   local ok, node = pcall(ts_utils.get_node_at_cursor, winnr)
   if not ok or not node then
