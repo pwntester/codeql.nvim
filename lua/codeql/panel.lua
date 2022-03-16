@@ -587,24 +587,30 @@ function M.toggle_mode()
   })
 end
 
-function M.toggle_fold()
-  -- prevent highlighting from being off after adding/removing the help text
-  vim.cmd "match none"
-
-  local c = vim.fn.line "."
+local function get_enclosing_issue(line)
   local entry
-  while c >= 7 do
-    entry = M.line_map[c]
+  while line >= 7 do
+    entry = M.line_map[line]
     if
       entry
       and (entry.kind == "node" or entry.kind == "issue" or entry.kind == "rule")
       and vim.tbl_contains(vim.tbl_keys(entry.obj), "is_folded")
     then
-      entry.obj.is_folded = not entry.obj.is_folded
-      render_keep_view(c)
-      return
+      return entry.obj
     end
-    c = c - 1
+    line = line - 1
+  end
+end
+
+function M.toggle_fold()
+  -- prevent highlighting from being off after adding/removing the help text
+  vim.cmd "match none"
+
+  local line = vim.fn.line "."
+  local issue = get_enclosing_issue(line)
+  if vim.tbl_contains(vim.tbl_keys(issue), "is_folded") then
+    issue.is_folded = not issue.is_folded
+    render_keep_view(line)
   end
 end
 
@@ -622,20 +628,16 @@ function M.set_fold_level(level)
 end
 
 function M.change_path(offset)
-  local line = vim.fn.line "." - 1
-  if not M.line_map[line] or M.line_map[line].kind ~= "issue" then
-    return
-  end
-
-  local issue = M.line_map[line].obj
+  local line = vim.fn.line "."
+  local issue = get_enclosing_issue(line)
 
   if issue.active_path then
     if issue.active_path == 1 and offset == -1 then
-      M.line_map[line].obj.active_path = #issue.paths
+      issue.active_path = #issue.paths
     elseif issue.active_path == #issue.paths and offset == 1 then
-      M.line_map[line].obj.active_path = 1
+      issue.active_path = 1
     else
-      M.line_map[line].obj.active_path = issue.active_path + offset
+      issue.active_path = issue.active_path + offset
     end
     render_keep_view(line + 1)
   end

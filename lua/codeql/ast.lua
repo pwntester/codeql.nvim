@@ -70,7 +70,7 @@ local function setup_buf(for_buf)
   vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
   vim.api.nvim_buf_set_option(buf, "swapfile", false)
   vim.api.nvim_buf_set_option(buf, "buflisted", false)
-  vim.api.nvim_buf_set_option(buf, "filetype", "codeql_ast")
+  vim.api.nvim_buf_set_option(buf, "filetype", "codeqlast")
 
   vim.cmd(string.format("augroup CodeQLAST_%d", buf))
   vim.cmd "au!"
@@ -388,6 +388,7 @@ function M.detach(bufnr)
 end
 
 function M.build_ast(jsonPath, bufnr)
+  print(1)
   if not util.is_file(jsonPath) then
     return
   end
