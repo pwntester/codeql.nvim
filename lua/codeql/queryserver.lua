@@ -215,9 +215,19 @@ function M.run_query(opts)
     end
   end
 
-  local compileQuery_callback = function(_, result)
+  local compileQuery_callback = function(err, result)
     local failed = false
     if not result then
+      -- we may have got an RPC error, so print it
+      -- this is possible if the language server crashed, etc
+      if err then
+        if err["message"] == "Internal error." and err["code"] == -32603 then
+          util.err_message("ERROR: Compilation failed. Encountered NullPointerException. Missing qlpack.yml?")
+        else
+          util.err_message("ERROR: Compilation failed. Encountered unknown RPC error")
+          util.err_message(err)
+        end
+      end
       return
     end
     for _, msg in ipairs(result.messages) do
@@ -265,6 +275,7 @@ function M.run_query(opts)
   util.message(string.format("Compiling query %s", queryPath))
 
   M.client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
+
 end
 
 function M.register_database(database)
