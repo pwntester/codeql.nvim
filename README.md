@@ -38,7 +38,7 @@ use {
 
 ### Query pack 
 
-Create `qlpack.yaml` (see [QL packs](https://help.semmle.com/codeql/codeql-cli/reference/qlpack-overview.html)). E.g:
+Create `qlpack.yaml` (see [QL packs](https://codeql.github.com/docs/codeql-cli/about-ql-packs/)). E.g:
 
 ```
 name: test 
