@@ -688,19 +688,8 @@ function M.jump_to_code(stay_in_panel)
     -- save audit pane window
     local panel_winid = vim.fn.win_getid()
 
-    -- hide windline if installed
-    local ok, fl = pcall(require, "wlfloatline")
-    if ok then
-      fl.floatline_hide()
-    end
-
     -- choose the target window to open the file in
     local target_id = util.pick_window(panel_winid)
-
-    -- restore windline if needed
-    if ok then
-      fl.floatline_on_resize()
-    end
 
     -- go to the target window
     vim.fn.win_gotoid(target_id)
