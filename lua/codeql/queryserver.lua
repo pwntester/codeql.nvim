@@ -7,6 +7,8 @@ local protocol = require "vim.lsp.protocol"
 local client_index = 0
 local evaluate_id = 0
 local progress_id = 0
+local last_rpc_result = false
+local last_rpc_msg_id = -1
 
 local function next_client_id()
   client_index = client_index + 1
@@ -88,7 +90,6 @@ function M.start_server()
   end
 
   util.message "Starting CodeQL Query Server"
-  -- TODO: make sure we are on 2.4.1 or greater
   local cmd = { "codeql", "execute", "query-server", "--require-db-registration", "-v", "--log-to-stderr" }
   local conf = config.get_config()
   vim.list_extend(cmd, conf.ram_opts)
@@ -112,21 +113,20 @@ function M.start_server()
       -- query completed
       ["evaluation/queryCompleted"] = function(_, result, _)
         util.message(string.format("Evaluation time: %s", result.evaluationTime))
-        print(vim.inspect(result))
         if result.resultType == 0 then
           return {}
         elseif result.resultType == 1 then
           util.err_message(result.message or "ERROR: Other")
-          return nil
+          return {}
         elseif result.resultType == 2 then
           util.err_message(result.message or "ERROR: OOM")
-          return nil
+          return {}
         elseif result.resultType == 3 then
           util.err_message(result.message or "ERROR: Timeout")
-          return nil
+          return {}
         elseif result.resultType == 4 then
           util.err_message(result.message or "ERROR: Query was cancelled")
-          return nil
+          return {}
         end
       end,
     },
@@ -267,14 +267,15 @@ function M.run_query(opts)
 
       -- run query
       util.message(string.format("Running query [%s]", M.client.pid))
-      M.client.request("evaluation/runQueries", runQueries_params, runQueries_callback)
+      last_rpc_result, last_rpc_msg_id = M.client.request("evaluation/runQueries", runQueries_params, runQueries_callback)
+      print("RunQuery", last_rpc_result, last_rpc_msg_id)
     end
   end
 
   -- compile query
   util.message(string.format("Compiling query %s", queryPath))
-
-  M.client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
+  last_rpc_result, last_rpc_msg_id = M.client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
+  print("CompileQuery", last_rpc_result, last_rpc_msg_id)
 
 end
 
@@ -332,6 +333,18 @@ function M.unregister_database()
       config.database = nil
     end
   end)
+end
+
+function M.cancel_query()
+  if last_rpc_msg_id < 0 then
+    return
+  end
+  if not M.client then
+    M.client = M.start_server()
+  end
+  print(M.client.notify("$/cancelRequest", {
+    id = last_rpc_msg_id,
+  }))
 end
 
 function M.stop_server()
