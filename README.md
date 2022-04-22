@@ -16,7 +16,9 @@ Neovim plugin to help writing and testing CodeQL queries.
 
 ## Requirements
 
-- Neovim 0.5+
+- [neovim](https://github.com/neovim/neovim)
+- [ugrep](https://github.com/Genivia/ugrep)
+- [zipinfo](http://infozip.sourceforge.net/mans/zipinfo.html)
 
 ## Install
 
