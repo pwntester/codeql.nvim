@@ -55,7 +55,7 @@ function M.set_database(dbpath)
     vim.fn.mkdir(vim.fn.fnamemodify(db_dir, ":h"), "p", 0777)
     -- extract the zip file
     vim.fn.system(string.format("unzip -q %s -d %s", dbpath, db_dir))
-    local db_name = vim.trim(vim.fn.system(string.format('zipinfo -1 %s | head -n 1 | cut -d "/" -f 1', dbpath)))
+    local db_name = vim.trim(vim.fn.system(string.format('unzip -Z1 %s | head -n 1 | cut -d "/" -f 1', dbpath)))
     database = string.format("%s/%s/", db_dir, db_name)
   elseif util.is_dir(dbpath) then
     database = dbpath

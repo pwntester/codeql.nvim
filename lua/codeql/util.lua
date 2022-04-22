@@ -7,8 +7,8 @@ local M = {}
 function M.list_from_archive(zipfile)
   local job = Job:new {
     enable_recording = true,
-    command = "zipinfo",
-    args = { "-1", zipfile },
+    command = "unzip",
+    args = { "-Z1", zipfile },
   }
   job:sync()
   local output = table.concat(job:result(), "\n")
