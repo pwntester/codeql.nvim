@@ -111,7 +111,7 @@ After running a query or quick evaluating a predicate, results will be rendered 
 
 - `o`: collapses/Expands result
 - `Enter` (on a visitable result node): opens node file in nvim and moves cursor to window with source code file 
-- `p`: similar to `Enter` but does not keep cursor on the results panel
+- `p`: similar to `Enter` but keeps cursor on the results panel
 - `n`: (on a Paths node): change to next path
 - `P`: (on a Paths node): change to previous path
 - `f`: filter issues by issue label
