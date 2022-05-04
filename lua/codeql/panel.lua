@@ -73,7 +73,10 @@ local function go_to_main_window()
   -- go to the wider window
   local widerwin = 0
   local widerwidth = 0
-  for _, w in ipairs(vim.api.nvim_list_wins()) do
+  local current_tab = vim.api.nvim_get_current_tabpage()
+  local tab_windows = vim.api.nvim_tabpage_list_wins(current_tab)
+
+  for _, w in ipairs(tab_windows) do
     if vim.api.nvim_win_get_width(w) > widerwidth then
       if vim.api.nvim_win_get_buf(w) ~= vim.fn.bufnr(panel_buffer_name) then
         widerwin = w
