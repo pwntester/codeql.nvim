@@ -112,9 +112,8 @@ M.create_split = function()
     if node.type == "label" then
       return
     end
-    local winid = vim.fn.win_getid()
-    local target_id = util.pick_window(winid)
-    vim.api.nvim_set_current_win(target_id)
+    local target_winid = require('window-picker').pick_window()
+    vim.api.nvim_set_current_win(target_winid)
     local bufname = string.format("codeql:/%s/%s", config.database.sourceLocationPrefix, node.id)
     if vim.fn.bufnr(bufname) == -1 then
       vim.api.nvim_command(string.format("edit %s", bufname))

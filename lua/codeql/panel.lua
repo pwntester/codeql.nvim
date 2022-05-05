@@ -716,10 +716,10 @@ function M.jump_to_code(stay_in_panel)
     local panel_winid = vim.fn.win_getid()
 
     -- choose the target window to open the file in
-    local target_id = util.pick_window(panel_winid)
+    local target_winid = require('window-picker').pick_window()
 
     -- go to the target window
-    vim.fn.win_gotoid(target_id)
+    vim.fn.win_gotoid(target_winid)
 
     -- create the codeql:// buffer
     local bufname = string.format("codeql://%s", node.filename)
