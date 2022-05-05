@@ -256,6 +256,7 @@ function M.load_sarif_results(path)
   panel.render(issues, {
     kind = "sarif",
     mode = "tree",
+    panel_name = "__CodeQLSarif__"
   })
   vim.api.nvim_command "redraw"
 end

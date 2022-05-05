@@ -388,7 +388,6 @@ function M.detach(bufnr)
 end
 
 function M.build_ast(jsonPath, bufnr)
-  print(1)
   if not util.is_file(jsonPath) then
     return
   end
