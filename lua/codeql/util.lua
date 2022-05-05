@@ -1,8 +1,16 @@
 local cli = require "codeql.cliserver"
 local config = require "codeql.config"
-local _, Job = pcall(require, "plenary.job")
+local Job = require "plenary.job"
 
 local M = {}
+
+local cache = {
+  database_upgrades = {},
+  library_paths = {},
+  databases = {},
+  ram = nil,
+  qlpacks = nil,
+}
 
 function M.list_from_archive(zipfile)
   local job = Job:new {
@@ -125,100 +133,6 @@ function M.message(...)
   vim.api.nvim_command "redraw"
 end
 
-function M.database_upgrades(dbscheme)
-  local status, json = pcall(
-    cli.runSync,
-    { "resolve", "upgrades", "-v", "--log-to-stderr", "--format=json", "--dbscheme", dbscheme }
-  )
-  if status then
-    local metadata, err = M.json_decode(json)
-    if not metadata then
-      print("Error resolving database upgrades: " .. err)
-      return nil
-    else
-      return metadata
-    end
-  else
-    print "Error resolving database upgrades"
-    return nil
-  end
-end
-
-function M.query_info(query)
-  local status, json = pcall(cli.runSync, { "resolve", "metadata", "-v", "--log-to-stderr", "--format=json", query })
-  if status then
-    local metadata, err = M.json_decode(json)
-    if not metadata then
-      print("Error resolving query metadata: " .. err)
-      return {}
-    else
-      return metadata
-    end
-  else
-    print "Error resolving query metadata"
-    return {}
-  end
-end
-
-function M.database_info(database)
-  local json = cli.runSync { "resolve", "database", "-v", "--log-to-stderr", "--format=json", database }
-  local metadata, err = M.json_decode(json)
-  if not metadata then
-    print("Error resolving database metadata: " .. err)
-    return nil
-  else
-    return metadata
-  end
-end
-
-function M.bqrs_info(bqrsPath)
-  local json = cli.runSync { "bqrs", "info", "-v", "--log-to-stderr", "--format=json", bqrsPath }
-  local decoded, err = M.json_decode(json)
-  if not decoded then
-    print("ERROR: Could not get BQRS info: " .. err)
-    return {}
-  end
-  return decoded
-end
-
-function M.resolve_library_path(queryPath)
-  local cmd = { "resolve", "library-path", "-v", "--log-to-stderr", "--format=json", "--query=" .. queryPath }
-  local conf = config.get_config()
-  if conf.search_path and #conf.search_path > 0 then
-    local additionalPacks = table.concat(conf.search_path, ":")
-    table.insert(cmd, string.format("--additional-packs=%s", additionalPacks))
-  end
-  local json = cli.runSync(cmd)
-  local decoded, err = M.json_decode(json)
-  if not decoded then
-    print("ERROR: Could not resolve library path: " .. err)
-    return {}
-  end
-  return decoded
-end
-
-function M.resolve_ram(jvm)
-  local cmd = "codeql resolve ram --format=json"
-  local conf = config.get_config()
-  if conf.max_ram and conf.max_ram > -1 then
-    cmd = cmd .. " -M " .. conf.max_ram
-  end
-  local json = M.run_cmd(cmd, true)
-  local ram_opts, err = M.json_decode(json)
-  if not ram_opts then
-    print("ERROR: Could not resolve RAM options: " .. err)
-    return {}
-  else
-    if jvm then
-      -- --off-heap-ram is not supported by some commands
-      ram_opts = vim.tbl_filter(function(i)
-        return vim.startswith(i, "-J")
-      end, ram_opts)
-    end
-    return ram_opts
-  end
-end
-
 function M.json_encode(data)
   local status, result = pcall(vim.fn.json_encode, data)
   if status then
@@ -276,29 +190,115 @@ function M.get_user_input_char()
   return vim.fn.nr2char(c)
 end
 
-local special_buffers = {
-  filetype = {
-    "help",
-    "fortifytestpane",
-    "fortifyauditpane",
-    "qf",
-    "goterm",
-    "codeql_panel",
-    "codeql_explorer",
-    "terminal",
-    "packer",
-    "NvimTree",
-    "octo",
-    "octo_panel",
-    "aerieal",
-    "Trouble",
-    "dashboard",
-    "frecency",
-    "TelescopePrompt",
-    "TelescopeResults",
-    "NeogitStatus",
-    "notify",
-  },
-}
+function M.database_upgrades(dbscheme)
+  if cache.database_upgrades[dbscheme] then
+    return cache.database_upgrades[dbscheme]
+  end
+  local json = cli.runSync { "resolve", "upgrades", "--format=json", "--dbscheme", dbscheme }
+  local metadata, err = M.json_decode(json)
+  if not metadata then
+    print("Error resolving database upgrades: " .. err)
+    return
+  end
+  cache.database_upgrades[dbscheme] = metadata
+  return metadata
+end
+
+function M.query_info(query)
+  local json = cli.runSync { "resolve", "metadata", "--format=json", query }
+  local metadata, err = M.json_decode(json)
+  if not metadata then
+    print("Error resolving query metadata: " .. err)
+    return
+  end
+  return metadata
+end
+
+function M.database_info(database)
+  if cache.databases[database] then
+    return cache.databases[database]
+  end
+  local json = cli.runSync { "resolve", "database", "--format=json", database }
+  local metadata, err = M.json_decode(json)
+  if not metadata then
+    print("Error resolving database metadata: " .. err)
+    return
+  end
+  cache.databases[database] = metadata
+  return metadata
+end
+
+function M.bqrs_info(bqrsPath)
+  local json = cli.runSync { "bqrs", "info", "--format=json", bqrsPath }
+  local decoded, err = M.json_decode(json)
+  if not decoded then
+    print("ERROR: Could not get BQRS info: " .. err)
+    return
+  end
+  return decoded
+end
+
+function M.resolve_library_path(queryPath)
+  if cache.library_paths[queryPath] then
+    return cache.library_paths[queryPath]
+  end
+  local cmd = { "resolve", "library-path", "-v", "--log-to-stderr", "--format=json", "--query=" .. queryPath }
+  local conf = config.get_config()
+  if conf.search_path and #conf.search_path > 0 then
+    local additionalPacks = table.concat(conf.search_path, ":")
+    table.insert(cmd, string.format("--additional-packs=%s", additionalPacks))
+  end
+  local json = cli.runSync(cmd)
+  local decoded, err = M.json_decode(json)
+  if not decoded then
+    print("ERROR: Could not resolve library path: " .. err)
+    return
+  end
+  cache.library_paths[queryPath] = decoded
+  return decoded
+end
+
+function M.resolve_qlpacks()
+  if cache.qlpacks then
+    return cache.qlpacks
+  end
+  local cmd = { "resolve", "qlpacks", "--format=json" }
+  local conf = config.get_config()
+  if conf.search_path and #conf.search_path > 0 then
+    local additionalPacks = table.concat(conf.search_path, ":")
+    table.insert(cmd, string.format("--additional-packs=%s", additionalPacks))
+  end
+  local json = cli.runSync(cmd)
+  local decoded, err = M.json_decode(json)
+  if not decoded then
+    print("ERROR: Could not resolve qlpacks: " .. err)
+    return
+  end
+  cache.qlpacks = decoded
+  return decoded
+end
+
+function M.resolve_ram()
+  if cache.ram then
+    return cache.ram
+  end
+  local cmd = {"resolve", "ram",  "--format=json"}
+  local conf = config.get_config()
+  if conf.max_ram and conf.max_ram > -1 then
+    table.insert(cmd, "-M")
+    table.insert(cmd, conf.max_ram)
+  end
+  local json = cli.runSync(cmd)
+  local ram_opts, err = M.json_decode(json)
+  if not ram_opts then
+    print("ERROR: Could not resolve RAM options: " .. err)
+    return
+  end
+  ram_opts = vim.tbl_filter(function(i)
+    return vim.startswith(i, "-J")
+  end, ram_opts)
+  cache.ram = ram_opts
+  return ram_opts
+end
 
 return M
