@@ -43,7 +43,7 @@ end
 
 function M.set_database(dbpath)
   local conf = config.get_config()
-  conf.ram_opts = util.resolve_ram(true)
+  conf.ram_opts = util.resolve_ram()
   dbpath = vim.fn.fnamemodify(vim.trim(dbpath), ":p")
   local database
   if not dbpath then
@@ -81,8 +81,8 @@ end
 
 local function is_predicate_identifier_node(predicate_node, node)
   return (predicate_node:type() == "charpred" and node:type() == "className")
-    or (predicate_node:type() == "classlessPredicate" and node:type() == "predicateName")
-    or (predicate_node:type() == "memberPredicate" and node:type() == "predicateName")
+      or (predicate_node:type() == "classlessPredicate" and node:type() == "predicateName")
+      or (predicate_node:type() == "memberPredicate" and node:type() == "predicateName")
 end
 
 function M.get_enclosing_predicate_position()
@@ -187,15 +187,15 @@ function M.query(quick_eval, position)
 end
 
 local templated_queries = {
-  c = "cpp/ql/src/%s.ql",
-  cpp = "cpp/ql/src/%s.ql",
-  java = "java/ql/src/%s.ql",
-  cs = "csharp/ql/src/%s.ql",
-  javascript = "javascript/ql/src/%s.ql",
-  python = "python/ql/src/%s.ql",
-  ql = "ql/ql/src/ide-contextual-queries/%s.ql",
-  ruby = "ruby/ql/src/ide-contextual-queries/%s.ql",
-  go = "ql/lib/%s.ql",
+  c = { qlpack = "codeql/cpp-queries" },
+  cpp = { qlpack = "codeql/cpp-queries" },
+  java = { qlpack = "codeql/java-queries" },
+  cs = { qlpack = "codeql/csharp-queries" },
+  javascript = { qlpack = "codeql/javascript-queries" },
+  python = { qlpack = "codeql/python-queries" },
+  ql = { qlpack = "codeql/ql", path = "ide-contextual/" },
+  ruby = { qlpack = "codeql/ruby-queries", path = "ide-contextual/" },
+  go = { qlpack = "codeql/go-all" },
 }
 
 function M.run_print_ast()
@@ -219,44 +219,41 @@ function M.run_templated_query(query_name, param)
     --util.err_message(format('%s does not support %s file type', query_name, ft))
     return
   end
-  local query = string.format(templated_queries[ft], query_name)
-  local queryPath
-  local conf = config.get_config()
-  for _, path in ipairs(conf.search_path) do
-    local candidate = string.format("%s/%s", path, query)
-    if util.is_file(candidate) then
-      queryPath = candidate
-      break
+  local qlpack = templated_queries[ft].qlpack
+  local path_modifier = templated_queries[ft].path or ""
+  local qlpacks = util.resolve_qlpacks()
+  if qlpacks[qlpack] then
+    local path = qlpacks[qlpack][1]
+    local queryPath = string.format("%s/%s%s.ql", path, path_modifier, query_name)
+    if util.is_file(queryPath) then
+      local templateValues = {
+        selectedSourceFile = {
+          values = {
+            tuples = { { { stringValue = "/" .. param } } },
+          },
+        },
+      }
+      local libPaths = util.resolve_library_path(queryPath)
+      if not libPaths then
+        vim.notify("Cannot resolve QL library paths for: " .. query_name, 2)
+        return
+      end
+      local opts = {
+        quick_eval = false,
+        bufnr = bufnr,
+        query = queryPath,
+        dbPath = dbPath,
+        metadata = util.query_info(queryPath),
+        libraryPath = libPaths.libraryPath,
+        dbschemePath = libPaths.dbscheme,
+        templateValues = templateValues,
+      }
+      require("codeql.queryserver").run_query(opts)
+    else
+      vim.notify("Cannot find a valid query: " .. queryPath, 2)
     end
   end
-  if not queryPath then
-    vim.notify(string.format("Cannot find a valid %s query", query_name), 2)
-    return
-  end
 
-  local templateValues = {
-    selectedSourceFile = {
-      values = {
-        tuples = { { { stringValue = "/" .. param } } },
-      },
-    },
-  }
-  local libPaths = util.resolve_library_path(queryPath)
-  if not libPaths then
-    vim.notify(string.format("Cannot resolve QL library paths for %s", query_name), 2)
-    return
-  end
-  local opts = {
-    quick_eval = false,
-    bufnr = bufnr,
-    query = queryPath,
-    dbPath = dbPath,
-    metadata = util.query_info(queryPath),
-    libraryPath = libPaths.libraryPath,
-    dbschemePath = libPaths.dbscheme,
-    templateValues = templateValues,
-  }
-  require("codeql.queryserver").run_query(opts)
 end
 
 local function set_source_buffer_options(bufnr)
