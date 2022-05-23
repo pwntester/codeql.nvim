@@ -282,7 +282,7 @@ function M.resolve_ram()
   if cache.ram then
     return cache.ram
   end
-  local cmd = {"resolve", "ram",  "--format=json"}
+  local cmd = { "resolve", "ram", "--format=json" }
   local conf = config.get_config()
   if conf.max_ram and conf.max_ram > -1 then
     table.insert(cmd, "-M")
@@ -299,6 +299,25 @@ function M.resolve_ram()
   end, ram_opts)
   cache.ram = ram_opts
   return ram_opts
+end
+
+function M.is_blank(s)
+  return (
+      s == nil
+          or s == vim.NIL
+          or (type(s) == "string" and string.match(s, "%S") == nil)
+          or (type(s) == "table" and next(s) == nil)
+      )
+end
+
+function M.get_flatten_artifacts_pages(text)
+  local results = {}
+  local page_outputs = vim.split(text, "\n")
+  for _, page in ipairs(page_outputs) do
+    local decoded_page = vim.fn.json_decode(page)
+    vim.list_extend(results, decoded_page.artifacts)
+  end
+  return results
 end
 
 return M

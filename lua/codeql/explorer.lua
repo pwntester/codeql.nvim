@@ -166,7 +166,6 @@ M.draw = function()
     local flatten_root = root:flatten_directories()
 
     local nui_nodes = M.create_nodes(flatten_root.children)
-    --vim.list_extend(nui_nodes, header)
     M.create_split()
     M.create_tree()
     M.tree:set_nodes(nui_nodes)

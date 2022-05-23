@@ -322,6 +322,7 @@ function M.setup(opts)
     vim.cmd [[command! PrintAST lua require'codeql'.run_print_ast()]]
     vim.cmd [[command! -nargs=1 -complete=file LoadSarif lua require'codeql.loader'.load_sarif_results(<f-args>)]]
     vim.cmd [[command! ArchiveTree lua require'codeql.explorer'.draw()]]
+    vim.cmd [[command! -nargs=1 LoadMVRAScan lua require'codeql.mvra'.load_scan(<f-args>)]]
 
     -- autocommands
     vim.cmd [[augroup codeql]]
