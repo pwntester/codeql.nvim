@@ -312,7 +312,7 @@ function M.setup(opts)
 
     -- commands
     vim.cmd [[command! -nargs=1 -complete=file SetDatabase lua require'codeql'.set_database(<f-args>)]]
-    vim.cmd [[command! UnsetDatabase lua require'codeql.queryserver'.unregister_database(<f-args>)]]
+    vim.cmd [[command! UnsetDatabase lua require'codeql.queryserver'.unregister_database()]]
     vim.cmd [[command! CancelQuery lua require'codeql.queryserver'.cancel_query()]]
     vim.cmd [[command! RunQuery lua require'codeql'.run_query()]]
     vim.cmd [[command! QuickEvalPredicate lua require'codeql'.quick_evaluate_enclosing_predicate()]]
