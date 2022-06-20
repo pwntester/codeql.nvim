@@ -280,10 +280,10 @@ function M.run_query(opts)
 end
 
 function M.register_database(database)
-  config.database = database
   if not M.client then
     M.client = M.start_server()
   end
+  config.database = database
   util.message(string.format("Registering database %s", config.database.datasetFolder))
   local params = {
     body = {
@@ -305,7 +305,7 @@ function M.register_database(database)
   end)
 end
 
-function M.unregister_database()
+function M.unregister_database(cb)
   if util.is_blank(config.database) then
     print("No database registered")
     return
@@ -331,6 +331,10 @@ function M.unregister_database()
     elseif #result.registeredDatabases == 0 then
       util.message(string.format("Successfully deregistered %s", config.database.datasetFolder))
       config.database = nil
+    end
+    -- call the callback
+    if cb then
+      cb()
     end
   end)
 end

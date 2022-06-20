@@ -50,7 +50,7 @@ function M.set_database(dbpath)
     util.err_message("Incorrect database: " .. dbpath)
   elseif Path:new(dbpath):is_file() and vim.endswith(dbpath, ".zip") then
     -- extract the zip file
-    local db_dir = string.format("%s/codeql_dbs", vim.fn.stdpath "data")
+    local db_dir = string.format("%s/codeql_dbs/%s", vim.fn.stdpath "data", vim.fn.fnamemodify(dbpath, ":t:r"))
     -- make sure db_dir exists
     vim.fn.mkdir(vim.fn.fnamemodify(db_dir, ":h"), "p", 0777)
     -- extract the zip file
@@ -69,7 +69,14 @@ function M.set_database(dbpath)
     print("Database set to " .. database)
     local metadata = util.database_info(database)
     metadata.path = database
-    queryserver.register_database(metadata)
+
+    if not util.is_blank(config.database) then
+      queryserver.unregister_database(function()
+        queryserver.register_database(metadata)
+      end)
+    else
+      queryserver.register_database(metadata)
+    end
     -- show the side tree
     vim.cmd [[ArchiveTree]]
   end
