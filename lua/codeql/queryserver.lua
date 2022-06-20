@@ -306,7 +306,7 @@ function M.register_database(database)
 end
 
 function M.unregister_database()
-  if not config.database then
+  if util.is_blank(config.database) then
     util.err_message "No database registered"
     return
   end
