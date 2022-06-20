@@ -307,7 +307,7 @@ end
 
 function M.unregister_database()
   if util.is_blank(config.database) then
-    util.err_message "No database registered"
+    print("No database registered")
     return
   end
   if not M.client then
