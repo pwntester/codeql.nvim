@@ -133,7 +133,7 @@ function M.find_at_cursor(kind)
     for _, location in ipairs(matching_locs) do
       local rel_fname = string.sub(location.fname, 2)
       table.insert(items, {
-        filename = string.format("%s:%s", prefix, rel_fname),
+        filename = string.format("%s://%s", prefix, rel_fname),
         module = location.fname,
         lnum = location.lnum,
         col = location.range[1],
