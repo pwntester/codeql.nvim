@@ -851,7 +851,7 @@ function M.open_panel(panel_name)
   local bufnr = vim.fn.bufnr(panel_name)
 
   -- check if audit pane is already opened
-  if get_panel_window(bufnr) and bufnr ~= -1 then
+if get_panel_window(bufnr) then
     return bufnr, get_panel_window(bufnr)
   end
 
