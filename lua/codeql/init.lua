@@ -81,9 +81,7 @@ function M.set_database(dbpath)
       queryserver.register_database(metadata, function()
         explorer.draw()
       end)
-    end
-    -- show the side tree
-    
+    end    
   end
 end
 
