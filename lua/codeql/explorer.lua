@@ -125,13 +125,23 @@ M.create_split = function()
   split:map("n", "o", function()
     local node = M.tree:get_node()
 
-    if node:is_expanded() then
-      if node:collapse() then
-        M.tree:render()
+    if node.type == "dir" then
+      if node:is_expanded() then
+        if node:collapse() then
+          M.tree:render()
+        end
+      else
+        if node:expand() then
+          M.tree:render()
+        end
       end
-    else
-      if node:expand() then
-        M.tree:render()
+    else 
+      -- make `o` close file's parent
+      if node.type == "file" then
+        local parent = M.tree:get_node(node:get_parent_id())
+        if parent:collapse() then
+          M.tree:render()
+        end
       end
     end
   end, map_options)
