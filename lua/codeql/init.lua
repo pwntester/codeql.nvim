@@ -2,6 +2,7 @@ local util = require "codeql.util"
 local queryserver = require "codeql.queryserver"
 local config = require "codeql.config"
 local Path = require "plenary.path"
+local explorer = require'codeql.explorer'
 
 local M = {}
 
@@ -72,13 +73,17 @@ function M.set_database(dbpath)
 
     if not util.is_blank(config.database) then
       queryserver.unregister_database(function()
-        queryserver.register_database(metadata)
+        queryserver.register_database(metadata, function() 
+          explorer.draw()
+        end)
       end)
     else
-      queryserver.register_database(metadata)
+      queryserver.register_database(metadata, function()
+        explorer.draw()
+      end)
     end
     -- show the side tree
-    vim.cmd [[ArchiveTree]]
+    
   end
 end
 

@@ -279,7 +279,7 @@ function M.run_query(opts)
 
 end
 
-function M.register_database(database)
+function M.register_database(database, cb)
   if not M.client then
     M.client = M.start_server()
   end
@@ -301,6 +301,10 @@ function M.register_database(database)
       util.err_message(string.format("Error registering database %s", vim.inspect(err)))
     else
       util.message(string.format("Successfully registered %s", result.registeredDatabases[1].dbDir))
+    end
+    -- call the callback
+    if cb then
+      cb()
     end
   end)
 end
