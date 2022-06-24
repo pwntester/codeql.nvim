@@ -301,6 +301,7 @@ function M.register_database(database)
       util.err_message(string.format("Error registering database %s", vim.inspect(err)))
     else
       util.message(string.format("Successfully registered %s", result.registeredDatabases[1].dbDir))
+      require'codeql.explorer'.draw()
     end
   end)
 end
