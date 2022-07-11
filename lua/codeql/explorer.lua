@@ -81,6 +81,9 @@ M.create_nodes = function(source_items, level)
 end
 
 M.create_split = function()
+  if not util.is_blank(M.split) then
+    M.split:unmount()
+  end
   local split = Split {
     relative = "win",
     position = "left",
