@@ -10,6 +10,7 @@ local M = {}
 
 M.tree = nil
 M.split = nil
+M.width = 50
 
 M.prepare_node = function(node)
   if node.type == "label" then
@@ -81,10 +82,14 @@ M.create_nodes = function(source_items, level)
 end
 
 M.create_split = function()
+  if not util.is_blank(M.split) then
+    M.width = vim.api.nvim_win_get_width(M.split.winid)
+    M.split:unmount()
+  end
   local split = Split {
     relative = "win",
     position = "left",
-    size = 50,
+    size = M.width,
     win_options = {
       number = false,
       relativenumber = false,
