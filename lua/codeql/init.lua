@@ -194,12 +194,12 @@ function M.query(quick_eval, position)
 end
 
 local templated_queries = {
-  c = { qlpack = "codeql/cpp-queries" },
-  cpp = { qlpack = "codeql/cpp-queries" },
-  java = { qlpack = "codeql/java-queries" },
-  cs = { qlpack = "codeql/csharp-queries" },
-  javascript = { qlpack = "codeql/javascript-queries" },
-  python = { qlpack = "codeql/python-queries" },
+  c = { qlpack = "codeql/cpp-all" },
+  cpp = { qlpack = "codeql/cpp-all" },
+  java = { qlpack = "codeql/java-all" },
+  cs = { qlpack = "codeql/csharp-all" },
+  javascript = { qlpack = "codeql/javascript-all" },
+  python = { qlpack = "codeql/python-all" },
   ql = { qlpack = "codeql/ql", path = "ide-contextual/" },
   ruby = { qlpack = "codeql/ruby-queries", path = "ide-contextual/" },
   go = { qlpack = "codeql/go-all" },
