@@ -10,6 +10,7 @@ local M = {}
 
 M.tree = nil
 M.split = nil
+M.width = 50
 
 M.prepare_node = function(node)
   if node.type == "label" then
@@ -81,10 +82,14 @@ M.create_nodes = function(source_items, level)
 end
 
 M.create_split = function()
+  if not util.is_blank(M.split) then
+    M.width = vim.api.nvim_win_get_width(M.split.winid)
+    M.split:unmount()
+  end
   local split = Split {
     relative = "win",
     position = "left",
-    size = 50,
+    size = M.width,
     win_options = {
       number = false,
       relativenumber = false,
@@ -125,13 +130,23 @@ M.create_split = function()
   split:map("n", "o", function()
     local node = M.tree:get_node()
 
-    if node:is_expanded() then
-      if node:collapse() then
-        M.tree:render()
+    if node.type == "dir" then
+      if node:is_expanded() then
+        if node:collapse() then
+          M.tree:render()
+        end
+      else
+        if node:expand() then
+          M.tree:render()
+        end
       end
-    else
-      if node:expand() then
-        M.tree:render()
+    else 
+      -- make `o` close file's parent
+      if node.type == "file" then
+        local parent = M.tree:get_node(node:get_parent_id())
+        if parent:collapse() then
+          M.tree:render()
+        end
       end
     end
   end, map_options)

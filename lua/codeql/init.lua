@@ -76,9 +76,7 @@ function M.set_database(dbpath)
       end)
     else
       queryserver.register_database(metadata)
-    end
-    -- show the side tree
-    vim.cmd [[ArchiveTree]]
+    end    
   end
 end
 

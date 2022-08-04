@@ -199,7 +199,7 @@ function M.process_sarif(opts)
             end
             local _path = paths[key]
             local message_node = {
-              label = string.gsub(r.message.text, "\n", " "),
+              label = string.gsub(string.gsub(r.message.text, "\n", " "), "\\", ""),
               mark = "≔",
               filename = nil,
               line = nil,
