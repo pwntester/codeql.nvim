@@ -29,13 +29,13 @@ local M = {}
 
 M.client = nil
 
-function M.start_client(config)
-  local cmd, cmd_args = util.cmd_parts(config.cmd)
+function M.start_client(opts)
+  local cmd, cmd_args = util.cmd_parts(opts.cmd)
 
   local client_id = next_client_id()
 
-  local callbacks = config.callbacks or {}
-  local name = config.name or tostring(client_id)
+  local callbacks = opts.callbacks or {}
+  local name = opts.name or tostring(client_id)
   local log_prefix = string.format("QueryServer[%s]", name)
   local handlers = {}
 
@@ -61,8 +61,8 @@ function M.start_client(config)
 
   function handlers.on_error(code, err)
     util.err_message(log_prefix, ": Error ", rpc.client_errors[code], ": ", vim.inspect(err))
-    if config.on_error then
-      local status, usererr = pcall(config.on_error, code, err)
+    if opts.on_error then
+      local status, usererr = pcall(opts.on_error, code, err)
       if not status then
         util.err_message(log_prefix, " user on_error failed: ", tostring(usererr))
       end
@@ -70,15 +70,15 @@ function M.start_client(config)
   end
 
   function handlers.on_exit(code, signal)
-    if config.on_exit then
-      pcall(config.on_exit, code, signal)
+    if opts.on_exit then
+      pcall(opts.on_exit, code, signal)
     end
   end
 
   -- Start the RPC client.
   local client = rpc.start(cmd, cmd_args, handlers, {
-    cwd = config.cmd_cwd,
-    env = config.cmd_env,
+    cwd = opts.cmd_cwd,
+    env = opts.cmd_env,
   })
   client.id = client_id
   return client
@@ -90,13 +90,13 @@ function M.start_server()
   end
 
   util.message "Starting CodeQL Query Server"
-  local cmd = { "codeql", "execute", "query-server", "--require-db-registration", "-v", "--log-to-stderr" }
+  local cmd = { "codeql", "execute", "query-server", "--require-db-registration", "--debug", "--tuple-counting", "-v", "--log-to-stderr" }
   local conf = config.get_config()
   vim.list_extend(cmd, conf.ram_opts)
 
   local last_message = ""
 
-  local client_config = {
+  local opts = {
     cmd = cmd,
     offset_encoding = { "utf-8", "utf-16" },
     callbacks = {
@@ -131,7 +131,7 @@ function M.start_server()
       end,
     },
   }
-  return M.start_client(client_config)
+  return M.start_client(opts)
 end
 
 function M.run_query(opts)
@@ -196,11 +196,17 @@ function M.run_query(opts)
     progressId = next_progress_id(),
   }
 
-  local runQueries_callback = function(err, _)
+  local runQueries_callback = function(err, result)
+    print("FOO", vim.inspect(result))
     if err then
       util.err_message "ERROR: runQuery failed"
     end
     if util.is_file(bqrsPath) then
+      print(bqrsPath)
+      print(dbPath)
+      print(queryPath)
+      print(opts.metadata["kind"])
+      print(opts.metadata["id"])
       loader.process_results {
         bqrs_path = bqrsPath,
         bufnr = bufnr,
@@ -234,6 +240,8 @@ function M.run_query(opts)
       if msg.severity == 0 then
         util.err_message(msg.message)
         failed = true
+      elseif msg.severity == 1 then
+        print(msg.message)
       end
     end
     if failed then
@@ -274,6 +282,7 @@ function M.run_query(opts)
 
   -- compile query
   util.message(string.format("Compiling query %s", queryPath))
+
   last_rpc_result, last_rpc_msg_id = M.client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
   print("CompileQuery", last_rpc_result, last_rpc_msg_id)
 
@@ -284,6 +293,12 @@ function M.register_database(database)
     M.client = M.start_server()
   end
   config.database = database
+  print("Database details:", vim.inspect(database))
+  local resp = util.database_upgrades(config.database.datasetFolder .. "/" .. config.database.languages[1] .. ".dbscheme")
+  print(vim.inspect(resp.scripts))
+  if resp ~= vim.NIL and #resp.scripts > 0 then
+    util.database_upgrade(config.database.path)
+  end
   util.message(string.format("Registering database %s", config.database.datasetFolder))
   local params = {
     body = {
@@ -301,7 +316,8 @@ function M.register_database(database)
       util.err_message(string.format("Error registering database %s", vim.inspect(err)))
     else
       util.message(string.format("Successfully registered %s", result.registeredDatabases[1].dbDir))
-      require'codeql.explorer'.draw()
+      -- TODO: add option to open the drawer automatically
+      --require 'codeql.explorer'.draw()
     end
   end)
 end

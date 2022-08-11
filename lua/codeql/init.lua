@@ -76,7 +76,7 @@ function M.set_database(dbpath)
       end)
     else
       queryserver.register_database(metadata)
-    end    
+    end
   end
 end
 

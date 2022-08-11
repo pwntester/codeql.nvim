@@ -204,6 +204,11 @@ function M.database_upgrades(dbscheme)
   return metadata
 end
 
+function M.database_upgrade(path)
+  print("Upgrading DB")
+  cli.runSync { "database", "upgrade", path }
+end
+
 function M.query_info(query)
   local json = cli.runSync { "resolve", "metadata", "--format=json", query }
   local metadata, err = M.json_decode(json)

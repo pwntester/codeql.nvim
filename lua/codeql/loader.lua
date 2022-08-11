@@ -18,6 +18,7 @@ function M.process_results(opts)
   local ram_opts = config.ram_opts
   local resultsPath = vim.fn.tempname()
 
+  print(bqrsPath)
   local info = util.bqrs_info(bqrsPath)
   if not info or info == vim.NIL or not info["result-sets"] then
     return
@@ -41,10 +42,9 @@ function M.process_results(opts)
   end
 
   -- process ASTs, definitions and references
-  if
-    vim.endswith(queryPath, "/localDefinitions.ql")
-    or vim.endswith(queryPath, "/localReferences.ql")
-    or vim.endswith(queryPath, "/printAst.ql")
+  if vim.endswith(queryPath, "/localDefinitions.ql")
+      or vim.endswith(queryPath, "/localReferences.ql")
+      or vim.endswith(queryPath, "/printAst.ql")
   then
     local cmd = {
       "bqrs",
