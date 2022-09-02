@@ -107,13 +107,18 @@ require("codeql").setup {
     context_lines = 3,
   },
   max_ram = 32000,
-  job_timeout = 30000,
+  job_timeout = 15000,
   format_on_save = true,
   search_path = {
     "/Users/pwntester/codeql-home/codeql",
     "/Users/pwntester/codeql-home/codeql-go",
     "/Users/pwntester/codeql-home/codeql-ruby",
     "./codeql",
+  },
+  mappings = {
+    run_query = { modes = { "n" }, lhs = "<space>qr", desc = "run query" },
+    quick_eval = { modes = { "x", "n" }, lhs = "<space>qe", desc = "quick evaluate" },
+    quick_eval_predicate = { modes = { "n" }, lhs = "<space>qp", desc = "quick evaluate enclosing predicate" },
   },
 }
 ```
