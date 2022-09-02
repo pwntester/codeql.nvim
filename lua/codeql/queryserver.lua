@@ -206,16 +206,10 @@ function M.run_query(opts)
   }
 
   local runQueries_callback = function(err, result)
-    print("FOO", vim.inspect(result))
     if err then
       util.err_message "ERROR: runQuery failed"
     end
     if util.is_file(bqrsPath) then
-      print(bqrsPath)
-      print(dbPath)
-      print(queryPath)
-      print(opts.metadata["kind"])
-      print(opts.metadata["id"])
       loader.process_results {
         bqrs_path = bqrsPath,
         bufnr = bufnr,
@@ -289,7 +283,6 @@ function M.run_query(opts)
         runQueries_params,
         runQueries_callback
       )
-      print("RunQuery", last_rpc_result, last_rpc_msg_id)
     end
   end
 
@@ -301,7 +294,6 @@ function M.run_query(opts)
     compileQuery_params,
     compileQuery_callback
   )
-  print("CompileQuery", last_rpc_result, last_rpc_msg_id)
 end
 
 function M.register_database(database)
@@ -309,11 +301,9 @@ function M.register_database(database)
     M.client = M.start_server()
   end
   config.database = database
-  print("Database details:", vim.inspect(database))
   local resp = util.database_upgrades(
     config.database.datasetFolder .. "/" .. config.database.languages[1] .. ".dbscheme"
   )
-  print(vim.inspect(resp.scripts))
   if resp ~= vim.NIL and #resp.scripts > 0 then
     util.database_upgrade(config.database.path)
   end

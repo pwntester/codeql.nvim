@@ -123,26 +123,6 @@ function M.get_enclosing_predicate_position()
   end
 end
 
-function M.get_current_position()
-  local srow, scol, erow, ecol
-
-  if vim.fn.getpos("'<")[2] == vim.fn.getcurpos()[2] and vim.fn.getpos("'<")[3] == vim.fn.getcurpos()[3] then
-    srow = vim.fn.getpos("'<")[2]
-    scol = vim.fn.getpos("'<")[3]
-    erow = vim.fn.getpos("'>")[2]
-    ecol = vim.fn.getpos("'>")[3]
-
-    ecol = ecol == 2147483647 and 1 + vim.fn.len(vim.fn.getline(erow)) or 1 + ecol
-  else
-    srow = vim.fn.getcurpos()[2]
-    scol = vim.fn.getcurpos()[3]
-    erow = vim.fn.getcurpos()[2]
-    ecol = vim.fn.getcurpos()[3]
-  end
-
-  return { srow, scol, erow, ecol }
-end
-
 function M.quick_evaluate_enclosing_predicate()
   local position = M.get_enclosing_predicate_position()
   if position then
@@ -151,11 +131,11 @@ function M.quick_evaluate_enclosing_predicate()
 end
 
 function M.quick_evaluate()
-  M.query(true, M.get_current_position())
+  M.query(true, util.get_current_position())
 end
 
 function M.run_query()
-  M.query(false, M.get_current_position())
+  M.query(false, util.get_current_position())
 end
 
 function M.query(quick_eval, position)
@@ -334,6 +314,8 @@ function M.setup(opts)
     vim.cmd [[au BufEnter * if &ft ==# 'codeql_panel' | execute("lua require'codeql.panel'.apply_mappings()") | endif]]
     vim.cmd [[au BufEnter codeql://* lua require'codeql'.setup_archive_buffer()]]
     vim.cmd [[au BufReadCmd codeql://* lua require'codeql'.load_source_buffer()]]
+    vim.cmd [[autocmd FileType ql lua require'codeql.util'.apply_mappings()]]
+
     if require("codeql.config").get_config().format_on_save then
       vim.cmd [[autocmd FileType ql autocmd BufWrite <buffer> lua vim.lsp.buf.formatting()]]
     end

@@ -131,8 +131,9 @@ require("codeql").setup {
 ## Mappings
 - `gd`: On a `codeql:/` file, jumps to the symbol definition.
 - `gr`: On a `codeql:/` file, show symbol references in the QuickFix window.
-- `qr`: Runs the current query.
-- `qe`: QuickEvals the selected predicate.
+- `<leader>qr`: Runs the current query.
+- `<leader>qe`: Quick evaluate the selected predicate.
+- `<leader>qp`: Quick evaluate the enclosing predicate.
 - `<Plug>(CodeQLGrepSource)`: shows a telescope menu to grep the source archive
 
 ## Result Browser

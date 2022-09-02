@@ -16,6 +16,11 @@ M.defaults = {
     group_by = "sink",
     context_lines = 3,
   },
+  mappings = {
+    run_query = { modes = { "n" }, lhs = "<space>qr", desc = "run query" },
+    quick_eval = { modes = { "x", "n" }, lhs = "<space>qe", desc = "quick evaluate" },
+    quick_eval_predicate = { modes = { "n" }, lhs = "<space>qp", desc = "quick evaluate enclosing predicate" },
+  },
 }
 
 M._config = M.defaults

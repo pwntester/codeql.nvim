@@ -12,6 +12,112 @@ local cache = {
   qlpacks = nil,
 }
 
+--- Apply mappings to a buffer
+function M.apply_mappings()
+  local mappings = require "codeql.mappings"
+  local conf = config.get_config()
+  for action, value in pairs(conf.mappings) do
+    if
+      not M.is_blank(value)
+      and not M.is_blank(action)
+      and not M.is_blank(value.lhs)
+      and not M.is_blank(mappings[action])
+    then
+      if M.is_blank(value.desc) then
+        value.desc = ""
+      end
+      local mapping_opts = { silent = true, noremap = true, desc = value.desc }
+      for _, mode in ipairs(value.modes) do
+        vim.api.nvim_buf_set_keymap(0, mode, value.lhs, mappings[action], mapping_opts)
+      end
+    end
+  end
+end
+
+function M.get_current_position()
+  local modeInfo = vim.api.nvim_get_mode()
+  local mode = modeInfo.mode
+
+  local cursor = vim.api.nvim_win_get_cursor(0)
+  local cline, ccol = cursor[1], cursor[2]
+  local vline, vcol = vim.fn.line "v", vim.fn.col "v"
+
+  local sline, scol
+  local eline, ecol
+  if cline == vline then
+    if ccol <= vcol then
+      sline, scol = cline, ccol
+      eline, ecol = vline, vcol
+      scol = scol + 1
+    else
+      sline, scol = vline, vcol
+      eline, ecol = cline, ccol
+      ecol = ecol + 1
+    end
+  elseif cline < vline then
+    sline, scol = cline, ccol
+    eline, ecol = vline, vcol
+    scol = scol + 1
+  else
+    sline, scol = vline, vcol
+    eline, ecol = cline, ccol
+    ecol = ecol + 1
+  end
+
+  if mode == "V" or mode == "CTRL-V" or mode == "\22" then
+    scol = 1
+    ecol = nil
+  end
+
+  local pos = { sline, scol, eline, ecol }
+  return pos
+end
+
+function M.get_current_selection()
+  local pos = M.get_current_position()
+  local sline, scol, eline, ecol = pos[1], pos[2], pos[3], pos[4]
+  local lines = vim.api.nvim_buf_get_lines(0, sline - 1, eline, 0)
+  if #lines == 0 then
+    return
+  end
+
+  local startText, endText
+  if #lines == 1 then
+    startText = string.sub(lines[1], scol, ecol)
+  else
+    startText = string.sub(lines[1], scol)
+    endText = string.sub(lines[#lines], 1, ecol)
+  end
+  local selection = { startText }
+  if #lines > 2 then
+    vim.list_extend(selection, vim.list_slice(lines, 2, #lines - 1))
+  end
+  table.insert(selection, endText)
+
+  return selection
+end
+
+function M.get_current_position_orig()
+  local srow, scol, erow, ecol
+
+  if vim.fn.getpos("'<")[2] == vim.fn.getcurpos()[2] and vim.fn.getpos("'<")[3] == vim.fn.getcurpos()[3] then
+    srow = vim.fn.getpos("'<")[2]
+    scol = vim.fn.getpos("'<")[3]
+    erow = vim.fn.getpos("'>")[2]
+    ecol = vim.fn.getpos("'>")[3]
+
+    ecol = ecol == 2147483647 and 1 + vim.fn.len(vim.fn.getline(erow)) or 1 + ecol
+  else
+    srow = vim.fn.getcurpos()[2]
+    scol = vim.fn.getcurpos()[3]
+    erow = vim.fn.getcurpos()[2]
+    ecol = vim.fn.getcurpos()[3]
+  end
+
+  local pos = { srow, scol, erow, ecol }
+  return pos
+end
+
 function M.list_from_archive(zipfile)
   local job = Job:new {
     enable_recording = true,
