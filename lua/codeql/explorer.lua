@@ -117,7 +117,7 @@ M.create_split = function()
     if node.type == "label" then
       return
     end
-    local target_winid = require('window-picker').pick_window()
+    local target_winid = require("window-picker").pick_window()
     vim.api.nvim_set_current_win(target_winid)
     local bufname = string.format("codeql:/%s/%s", config.database.sourceLocationPrefix, node.id)
     if vim.fn.bufnr(bufname) == -1 then
@@ -140,7 +140,7 @@ M.create_split = function()
           M.tree:render()
         end
       end
-    else 
+    else
       -- make `o` close file's parent
       if node.type == "file" then
         local parent = M.tree:get_node(node:get_parent_id())

@@ -90,7 +90,16 @@ function M.start_server()
   end
 
   util.message "Starting CodeQL Query Server"
-  local cmd = { "codeql", "execute", "query-server", "--require-db-registration", "--debug", "--tuple-counting", "-v", "--log-to-stderr" }
+  local cmd = {
+    "codeql",
+    "execute",
+    "query-server",
+    "--require-db-registration",
+    "--debug",
+    "--tuple-counting",
+    "-v",
+    "--log-to-stderr",
+  }
   local conf = config.get_config()
   vim.list_extend(cmd, conf.ram_opts)
 
@@ -228,9 +237,9 @@ function M.run_query(opts)
       -- this is possible if the language server crashed, etc
       if err then
         if err["message"] == "Internal error." and err["code"] == -32603 then
-          util.err_message("ERROR: Compilation failed. Encountered NullPointerException. Missing qlpack.yml?")
+          util.err_message "ERROR: Compilation failed. Encountered NullPointerException. Missing qlpack.yml?"
         else
-          util.err_message("ERROR: Compilation failed. Encountered unknown RPC error")
+          util.err_message "ERROR: Compilation failed. Encountered unknown RPC error"
           util.err_message(err)
         end
       end
@@ -275,7 +284,11 @@ function M.run_query(opts)
 
       -- run query
       util.message(string.format("Running query [%s]", M.client.pid))
-      last_rpc_result, last_rpc_msg_id = M.client.request("evaluation/runQueries", runQueries_params, runQueries_callback)
+      last_rpc_result, last_rpc_msg_id = M.client.request(
+        "evaluation/runQueries",
+        runQueries_params,
+        runQueries_callback
+      )
       print("RunQuery", last_rpc_result, last_rpc_msg_id)
     end
   end
@@ -283,9 +296,12 @@ function M.run_query(opts)
   -- compile query
   util.message(string.format("Compiling query %s", queryPath))
 
-  last_rpc_result, last_rpc_msg_id = M.client.request("compilation/compileQuery", compileQuery_params, compileQuery_callback)
+  last_rpc_result, last_rpc_msg_id = M.client.request(
+    "compilation/compileQuery",
+    compileQuery_params,
+    compileQuery_callback
+  )
   print("CompileQuery", last_rpc_result, last_rpc_msg_id)
-
 end
 
 function M.register_database(database)
@@ -294,7 +310,9 @@ function M.register_database(database)
   end
   config.database = database
   print("Database details:", vim.inspect(database))
-  local resp = util.database_upgrades(config.database.datasetFolder .. "/" .. config.database.languages[1] .. ".dbscheme")
+  local resp = util.database_upgrades(
+    config.database.datasetFolder .. "/" .. config.database.languages[1] .. ".dbscheme"
+  )
   print(vim.inspect(resp.scripts))
   if resp ~= vim.NIL and #resp.scripts > 0 then
     util.database_upgrade(config.database.path)
@@ -324,7 +342,7 @@ end
 
 function M.unregister_database(cb)
   if util.is_blank(config.database) then
-    print("No database registered")
+    print "No database registered"
     return
   end
   if not M.client then

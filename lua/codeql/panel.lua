@@ -11,7 +11,6 @@ local panel_short_help = true
 local icon_closed = "▶"
 local icon_open = "▼"
 
-
 -- Render process:
 --   render()
 --     render_content()
@@ -25,8 +24,8 @@ local icon_open = "▼"
 local M = {
   panels = {
     __CodeQLPanel__ = {},
-    __CodeQLSarif__ = {}
-  }
+    __CodeQLSarif__ = {},
+  },
 }
 
 local function generate_issue_label(node)
@@ -53,7 +52,6 @@ local function register(bufnr, obj)
 end
 
 local function print_to_panel(bufnr, text, matches)
-
   local lines = vim.split(text, "\n")
   text = table.concat(lines, " <CR> ")
 
@@ -603,7 +601,7 @@ function M.toggle_mode()
     kind = panel.kind,
     mode = panel.mode,
     columns = panel.columns,
-    panel_name = vim.fn.bufname(bufnr)
+    panel_name = vim.fn.bufname(bufnr),
   })
 end
 
@@ -613,9 +611,10 @@ local function get_enclosing_issue(line)
   local entry
   while line >= 7 do
     entry = line_map[line]
-    if entry
-        and (entry.kind == "node" or entry.kind == "issue" or entry.kind == "rule")
-        and vim.tbl_contains(vim.tbl_keys(entry.obj), "is_folded")
+    if
+      entry
+      and (entry.kind == "node" or entry.kind == "issue" or entry.kind == "rule")
+      and vim.tbl_contains(vim.tbl_keys(entry.obj), "is_folded")
     then
       return entry.obj
     end
@@ -705,8 +704,9 @@ function M.jump_to_code(stay_in_panel)
   end
 
   -- open from ZIP archive or SARIF file
-  if (config.database.sourceArchiveZip and util.is_file(config.database.sourceArchiveZip))
-      or (config.sarif.path and util.is_file(config.sarif.path) and config.sarif.hasArtifacts)
+  if
+    (config.database.sourceArchiveZip and util.is_file(config.database.sourceArchiveZip))
+    or (config.sarif.path and util.is_file(config.sarif.path) and config.sarif.hasArtifacts)
   then
     if string.sub(node.filename, 1, 1) == "/" then
       node.filename = string.sub(node.filename, 2)
@@ -716,7 +716,7 @@ function M.jump_to_code(stay_in_panel)
     local panel_winid = vim.fn.win_getid()
 
     -- choose the target window to open the file in
-    local target_winid = require('window-picker').pick_window()
+    local target_winid = require("window-picker").pick_window()
 
     -- go to the target window
     vim.fn.win_gotoid(target_winid)
@@ -851,7 +851,7 @@ function M.open_panel(panel_name)
   local bufnr = vim.fn.bufnr(panel_name)
 
   -- check if audit pane is already opened
-if get_panel_window(bufnr) then
+  if get_panel_window(bufnr) then
     return bufnr, get_panel_window(bufnr)
   end
 

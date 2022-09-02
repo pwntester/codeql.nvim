@@ -4,6 +4,7 @@ local M = {}
 M.defaults = {
   search_path = {},
   max_ram = nil,
+  job_timeout = 15000,
   format_on_save = false,
   results = {
     max_paths = 4,

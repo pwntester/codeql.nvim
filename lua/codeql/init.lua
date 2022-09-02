@@ -86,8 +86,8 @@ end
 
 local function is_predicate_identifier_node(predicate_node, node)
   return (predicate_node:type() == "charpred" and node:type() == "className")
-      or (predicate_node:type() == "classlessPredicate" and node:type() == "predicateName")
-      or (predicate_node:type() == "memberPredicate" and node:type() == "predicateName")
+    or (predicate_node:type() == "classlessPredicate" and node:type() == "predicateName")
+    or (predicate_node:type() == "memberPredicate" and node:type() == "predicateName")
 end
 
 function M.get_enclosing_predicate_position()
@@ -258,7 +258,6 @@ function M.run_templated_query(query_name, param)
       vim.notify("Cannot find a valid query: " .. queryPath, 2)
     end
   end
-
 end
 
 local function set_source_buffer_options(bufnr)

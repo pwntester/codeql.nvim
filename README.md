@@ -90,6 +90,7 @@ Use `RunQuery` or `QuickEval` commands or `qr`, `qe` shortcuts respectively to r
 ## Configuration options
 - search_path: List of codeql search paths
 - max_ram: Max RAM memory to be used by CodeQL
+- job_timeout: Timeout for running sync jobs (default: 15000)
 
 eg:
 
@@ -106,6 +107,7 @@ require("codeql").setup {
     context_lines = 3,
   },
   max_ram = 32000,
+  job_timeout = 30000,
   format_on_save = true,
   search_path = {
     "/Users/pwntester/codeql-home/codeql",

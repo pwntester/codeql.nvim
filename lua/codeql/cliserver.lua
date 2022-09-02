@@ -24,6 +24,7 @@ local function start()
       stderr:close()
       handle:close()
     end
+
     local spawn_params = {
       args = cmd_args,
       stdio = { stdin, stdout, stderr },
@@ -82,7 +83,7 @@ function M.runAsync(cmd, callback)
 end
 
 function M.runSync(cmd)
-  local timeout = 15000
+  local timeout = require("codeql.config").get_config().job_timeout
   local done = false
   local result
   M.runAsync(cmd, function(res)

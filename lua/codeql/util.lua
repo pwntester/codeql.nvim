@@ -205,7 +205,7 @@ function M.database_upgrades(dbscheme)
 end
 
 function M.database_upgrade(path)
-  print("Upgrading DB")
+  print "Upgrading DB"
   cli.runSync { "database", "upgrade", path }
 end
 
@@ -308,11 +308,11 @@ end
 
 function M.is_blank(s)
   return (
-      s == nil
-          or s == vim.NIL
-          or (type(s) == "string" and string.match(s, "%S") == nil)
-          or (type(s) == "table" and next(s) == nil)
-      )
+    s == nil
+    or s == vim.NIL
+    or (type(s) == "string" and string.match(s, "%S") == nil)
+    or (type(s) == "table" and next(s) == nil)
+  )
 end
 
 function M.get_flatten_artifacts_pages(text)

@@ -30,7 +30,9 @@ function M.process_sarif(opts)
   end
   config.sarif.path = opts.path
   local decoded = util.read_json_file(opts.path)
-  if not decoded then return end
+  if not decoded then
+    return
+  end
 
   -- TODO: handle multiple runs if thats even a thing
   local results = decoded.runs[1].results
@@ -179,19 +181,19 @@ function M.process_sarif(opts)
             local source = nodes[1]
             local sink = nodes[#nodes]
             local source_key = source.filename
-                .. "::"
-                .. source.url.startLine
-                .. "::"
-                .. source.url.startColumn
-                .. "::"
-                .. source.url.endColumn
+              .. "::"
+              .. source.url.startLine
+              .. "::"
+              .. source.url.startColumn
+              .. "::"
+              .. source.url.endColumn
             local sink_key = sink.filename
-                .. "::"
-                .. sink.url.startLine
-                .. "::"
-                .. sink.url.startColumn
-                .. "::"
-                .. sink.url.endColumn
+              .. "::"
+              .. sink.url.startLine
+              .. "::"
+              .. sink.url.startColumn
+              .. "::"
+              .. sink.url.endColumn
             local key = source_key .. "::" .. sink_key
 
             if not paths[key] then

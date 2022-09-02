@@ -42,9 +42,10 @@ function M.process_results(opts)
   end
 
   -- process ASTs, definitions and references
-  if vim.endswith(queryPath, "/localDefinitions.ql")
-      or vim.endswith(queryPath, "/localReferences.ql")
-      or vim.endswith(queryPath, "/printAst.ql")
+  if
+    vim.endswith(queryPath, "/localDefinitions.ql")
+    or vim.endswith(queryPath, "/localReferences.ql")
+    or vim.endswith(queryPath, "/printAst.ql")
   then
     local cmd = {
       "bqrs",
@@ -256,7 +257,7 @@ function M.load_sarif_results(path)
   panel.render(issues, {
     kind = "sarif",
     mode = "tree",
-    panel_name = "__CodeQLSarif__"
+    panel_name = "__CodeQLSarif__",
   })
   vim.api.nvim_command "redraw"
 end

@@ -56,13 +56,15 @@ function M.download(opts)
       io.close(file)
       opts.cb(opts.path)
     else
-      vim.api.nvim_err_writeln("No output")
+      vim.api.nvim_err_writeln "No output"
     end
   end)
 end
 
 local close_handle = function(handle)
-  if handle and not handle:is_closing() then handle:close() end
+  if handle and not handle:is_closing() then
+    handle:close()
+  end
 end
 
 function M.buf_to_stdin(cmd, args, handler)
@@ -71,17 +73,25 @@ function M.buf_to_stdin(cmd, args, handler)
   local stderr_output = ""
 
   local handle_stdout = vim.schedule_wrap(function(err, chunk)
-    if err then error("stdout error: " .. err) end
+    if err then
+      error("stdout error: " .. err)
+    end
 
-    if chunk then output = output .. chunk end
+    if chunk then
+      output = output .. chunk
+    end
     if not chunk then
       handler(stderr_output ~= "" and stderr_output or nil, output)
     end
   end)
 
   local handle_stderr = function(err, chunk)
-    if err then error("stderr error: " .. err) end
-    if chunk then stderr_output = stderr_output .. chunk end
+    if err then
+      error("stderr error: " .. err)
+    end
+    if chunk then
+      stderr_output = stderr_output .. chunk
+    end
   end
 
   local stdin = uv.new_pipe(true)
