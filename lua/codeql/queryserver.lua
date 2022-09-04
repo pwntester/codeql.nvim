@@ -301,9 +301,18 @@ function M.register_database(database)
     M.client = M.start_server()
   end
   config.database = database
-  local resp = util.database_upgrades(
-    config.database.datasetFolder .. "/" .. config.database.languages[1] .. ".dbscheme"
-  )
+  local lang = config.database.languages[1]
+  local dbschemePath = config.database.datasetFolder .. "/" .. lang .. ".dbscheme"
+  if not vim.fn.filereadable(dbschemePath) then
+    dbschemePath = config.database.datasetFolder .. "/semmlecode." .. lang .. ".dbscheme"
+  end
+  if not vim.fn.filereadable(dbschemePath) then
+    util.err_message("Cannot find dbscheme file")
+    return
+  else
+    util.message(string.format("Using dbscheme file %s", dbschemePath))
+  end
+  local resp = util.database_upgrades(dbschemePath)
   if resp ~= vim.NIL and #resp.scripts > 0 then
     util.database_upgrade(config.database.path)
   end
