@@ -301,9 +301,25 @@ function M.register_database(database)
     M.client = M.start_server()
   end
   config.database = database
-  local resp = util.database_upgrades(
-    config.database.datasetFolder .. "/" .. config.database.languages[1] .. ".dbscheme"
-  )
+  local lang = config.database.languages[1]
+  -- https://github.com/github/vscode-codeql/blob/e913165249a272e13a785f542fa50c6a9d4eeb38/extensions/ql-vscode/src/helpers.ts#L432-L440
+  local langTodbScheme = {
+    javascript = 'semmlecode.javascript.dbscheme',
+    cpp = 'semmlecode.cpp.dbscheme',
+    java = 'semmlecode.dbscheme',
+    python = 'semmlecode.python.dbscheme',
+    csharp = 'semmlecode.csharp.dbscheme',
+    go = 'go.dbscheme',
+    ruby = 'ruby.dbscheme'
+  }
+  local dbschemePath = config.database.datasetFolder .. "/" .. langTodbScheme[lang]
+  if not vim.fn.filereadable(dbschemePath) then
+    util.err_message("Cannot find dbscheme file")
+    return
+  else
+    util.message(string.format("Using dbscheme file %s", dbschemePath))
+  end
+  local resp = util.database_upgrades(dbschemePath)
   if resp ~= vim.NIL and #resp.scripts > 0 then
     util.database_upgrade(config.database.path)
   end
