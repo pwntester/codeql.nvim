@@ -35,6 +35,13 @@ function M.process_results(opts)
   util.message(string.format("Processing %s results", queryPath))
   util.message(string.format("%d rows found", count))
 
+  if count > 1000 then
+    local continue = vim.fn.input(string.format("Too many results (%d)", count))
+    if string.lower(continue) ~= "y" then
+      return
+    end
+  end
+
   if count == 0 then
     util.err_message "No results"
     panel.render()
@@ -42,10 +49,9 @@ function M.process_results(opts)
   end
 
   -- process ASTs, definitions and references
-  if
-    vim.endswith(queryPath, "/localDefinitions.ql")
-    or vim.endswith(queryPath, "/localReferences.ql")
-    or vim.endswith(queryPath, "/printAst.ql")
+  if vim.endswith(queryPath, "/localDefinitions.ql")
+      or vim.endswith(queryPath, "/localReferences.ql")
+      or vim.endswith(queryPath, "/printAst.ql")
   then
     local cmd = {
       "bqrs",
