@@ -86,8 +86,8 @@ end
 
 local function is_predicate_identifier_node(predicate_node, node)
   return (predicate_node:type() == "charpred" and node:type() == "className")
-    or (predicate_node:type() == "classlessPredicate" and node:type() == "predicateName")
-    or (predicate_node:type() == "memberPredicate" and node:type() == "predicateName")
+      or (predicate_node:type() == "classlessPredicate" and node:type() == "predicateName")
+      or (predicate_node:type() == "memberPredicate" and node:type() == "predicateName")
 end
 
 function M.get_enclosing_predicate_position()

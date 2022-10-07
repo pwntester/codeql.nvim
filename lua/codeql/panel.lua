@@ -732,11 +732,13 @@ function M.jump_to_code(stay_in_panel)
     vim.cmd "norm! zz"
 
     -- highlight node
+    -- TODO SARIF does not send the endLine (or Im not processing it correctly)
+    -- TODO SARIF and RAW send different endColumn (SARIF requires -1, RAW does not)
     vim.api.nvim_buf_clear_namespace(0, range_ns, 0, -1)
     local startLine = node.url.startLine - 1
     local endLine = node.url.endLine - 1
     local startColumn = node.url.startColumn - 1
-    local endColumn = node.url.endColumn
+    local endColumn = node.url.endColumn - 1
     if startLine == endLine then
       pcall(vim.api.nvim_buf_add_highlight, 0, range_ns, "CodeqlRange", startLine, startColumn, endColumn)
     else
@@ -744,10 +746,10 @@ function M.jump_to_code(stay_in_panel)
         local hl_startColumn, hl_endColumn
         if i == startLine then
           hl_startColumn = startColumn
-          hl_endColumn = #vim.fn.getline(".")
+          hl_endColumn = #vim.fn.getline(i)
         elseif i < endLine and i > startLine then
           hl_startColumn = 1
-          hl_endColumn = #vim.fn.getline(".")
+          hl_endColumn = #vim.fn.getline(i)
         elseif i == endLine then
           hl_startColumn = 1
           hl_endColumn = endColumn
@@ -755,7 +757,6 @@ function M.jump_to_code(stay_in_panel)
         pcall(vim.api.nvim_buf_add_highlight, 0, range_ns, "CodeqlRange", i, hl_startColumn, hl_endColumn)
       end
     end
-
     -- jump to main window if requested
     if stay_in_panel then
       vim.fn.win_gotoid(panel_winid)

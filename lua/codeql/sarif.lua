@@ -21,6 +21,7 @@ local M = {}
 -- the url is a table with the following fields:
 ---- uri: path of the file
 ---- startLine: line number of the node
+---- endLine: line number of the node
 ---- startColumn: start column number of the node
 ---- endColumn: end column number of the node
 
@@ -101,6 +102,7 @@ function M.process_sarif(opts)
           url = {
             uri = uri,
             startLine = region and region.startLine or -1,
+            endLine = region and region.endLine or region.startLine,
             startColumn = region and region.startColumn or -1,
             endColumn = region and region.endColumn or -1,
           },
@@ -161,6 +163,7 @@ function M.process_sarif(opts)
               url = {
                 uri = uri,
                 startLine = region and region.startLine or -1,
+                endLine = region and region.endLine or region.startLine,
                 startColumn = region and region.startColumn or -1,
                 endColumn = region and region.endColumn or -1,
               },
@@ -181,19 +184,23 @@ function M.process_sarif(opts)
             local source = nodes[1]
             local sink = nodes[#nodes]
             local source_key = source.filename
-              .. "::"
-              .. source.url.startLine
-              .. "::"
-              .. source.url.startColumn
-              .. "::"
-              .. source.url.endColumn
+                .. "::"
+                .. source.url.startLine
+                .. "::"
+                .. source.url.endLine
+                .. "::"
+                .. source.url.startColumn
+                .. "::"
+                .. source.url.endColumn
             local sink_key = sink.filename
-              .. "::"
-              .. sink.url.startLine
-              .. "::"
-              .. sink.url.startColumn
-              .. "::"
-              .. sink.url.endColumn
+                .. "::"
+                .. sink.url.startLine
+                .. "::"
+                .. sink.url.endLine
+                .. "::"
+                .. sink.url.startColumn
+                .. "::"
+                .. sink.url.endColumn
             local key = source_key .. "::" .. sink_key
 
             if not paths[key] then

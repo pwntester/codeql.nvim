@@ -174,6 +174,9 @@ function M.load_raw_results(path)
   for _, tuple in ipairs(tuples) do
     path = {}
     for _, element in ipairs(tuple) do
+      if element.url.endColumn then
+        element.url.endColumn = element.url.endColumn + 1
+      end
       local node = {}
       -- objects with url info
       if type(element) == "table" and nil ~= element.url then
