@@ -611,10 +611,9 @@ local function get_enclosing_issue(line)
   local entry
   while line >= 7 do
     entry = line_map[line]
-    if
-      entry
-      and (entry.kind == "node" or entry.kind == "issue" or entry.kind == "rule")
-      and vim.tbl_contains(vim.tbl_keys(entry.obj), "is_folded")
+    if entry
+        and (entry.kind == "node" or entry.kind == "issue" or entry.kind == "rule")
+        and vim.tbl_contains(vim.tbl_keys(entry.obj), "is_folded")
     then
       return entry.obj
     end
@@ -704,9 +703,8 @@ function M.jump_to_code(stay_in_panel)
   end
 
   -- open from ZIP archive or SARIF file
-  if
-    (config.database.sourceArchiveZip and util.is_file(config.database.sourceArchiveZip))
-    or (config.sarif.path and util.is_file(config.sarif.path) and config.sarif.hasArtifacts)
+  if (config.database.sourceArchiveZip and util.is_file(config.database.sourceArchiveZip))
+      or (config.sarif.path and util.is_file(config.sarif.path) and config.sarif.hasArtifacts)
   then
     if string.sub(node.filename, 1, 1) == "/" then
       node.filename = string.sub(node.filename, 2)
@@ -735,10 +733,28 @@ function M.jump_to_code(stay_in_panel)
 
     -- highlight node
     vim.api.nvim_buf_clear_namespace(0, range_ns, 0, -1)
-    local startLine = node.url.startLine
-    local startColumn = node.url.startColumn
+    local startLine = node.url.startLine - 1
+    local endLine = node.url.endLine - 1
+    local startColumn = node.url.startColumn - 1
     local endColumn = node.url.endColumn
-    pcall(vim.api.nvim_buf_add_highlight, 0, range_ns, "CodeqlRange", startLine - 1, startColumn - 1, endColumn)
+    if startLine == endLine then
+      pcall(vim.api.nvim_buf_add_highlight, 0, range_ns, "CodeqlRange", startLine, startColumn, endColumn)
+    else
+      for i = startLine, endLine do
+        local hl_startColumn, hl_endColumn
+        if i == startLine then
+          hl_startColumn = startColumn
+          hl_endColumn = #vim.fn.getline(".")
+        elseif i < endLine and i > startLine then
+          hl_startColumn = 1
+          hl_endColumn = #vim.fn.getline(".")
+        elseif i == endLine then
+          hl_startColumn = 1
+          hl_endColumn = endColumn
+        end
+        pcall(vim.api.nvim_buf_add_highlight, 0, range_ns, "CodeqlRange", i, hl_startColumn, hl_endColumn)
+      end
+    end
 
     -- jump to main window if requested
     if stay_in_panel then
