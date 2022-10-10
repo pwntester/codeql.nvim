@@ -22,10 +22,7 @@ local icon_open = "▼"
 
 -- global variables
 local M = {
-  panels = {
-    __CodeQLPanel__ = {},
-    __CodeQLSarif__ = {},
-  },
+  panels = {},
 }
 
 local function generate_issue_label(node)
@@ -48,7 +45,7 @@ end
 
 local function register(bufnr, obj)
   local curline = vim.api.nvim_buf_line_count(bufnr)
-  M.panels[vim.fn.bufname(bufnr)].line_map[curline] = obj
+  M.panels[bufnr].line_map[curline] = obj
 end
 
 local function print_to_panel(bufnr, text, matches)
@@ -209,7 +206,7 @@ local function get_table_nodes(issue, max_lengths)
 end
 
 local function print_tree_nodes(bufnr, issue, indent_level)
-  local line_map = M.panels[vim.fn.bufname(bufnr)].line_map
+  local line_map = M.panels[bufnr].line_map
   local curline = vim.api.nvim_buf_line_count(bufnr)
 
   local paths = issue.paths
@@ -397,7 +394,7 @@ local function render_content(bufnr)
     util.err_message "Error opening CodeQL panel"
     return
   end
-  local panel = M.panels[vim.fn.bufname(bufnr)]
+  local panel = M.panels[bufnr]
 
   vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
   vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, {})
@@ -563,14 +560,14 @@ end
 
 function M.clear_filter()
   local bufnr = vim.api.nvim_get_current_buf()
-  local panel = M.panels[vim.fn.bufname(bufnr)]
+  local panel = M.panels[bufnr]
   unhide_issues(panel.issues)
   render_content(bufnr)
 end
 
 function M.label_filter()
   local bufnr = vim.api.nvim_get_current_buf()
-  local panel = M.panels[vim.fn.bufname(bufnr)]
+  local panel = M.panels[bufnr]
   local pattern = vim.fn.input "Pattern: "
   unhide_issues(panel.issues)
   filter_issues(
@@ -582,7 +579,7 @@ end
 
 function M.generic_filter()
   local bufnr = vim.api.nvim_get_current_buf()
-  local panel = M.panels[vim.fn.bufname(bufnr)]
+  local panel = M.panels[bufnr]
   local pattern = vim.fn.input "Pattern: "
   unhide_issues(panel.issues)
   filter_issues(panel.issues, pattern)
@@ -591,7 +588,7 @@ end
 
 function M.toggle_mode()
   local bufnr = vim.api.nvim_get_current_buf()
-  local panel = M.panels[vim.fn.bufname(bufnr)]
+  local panel = M.panels[bufnr]
   if panel.mode == "tree" then
     panel.mode = "table"
   elseif panel.mode == "table" then
@@ -607,7 +604,7 @@ end
 
 local function get_enclosing_issue(line)
   local bufnr = vim.api.nvim_get_current_buf()
-  local line_map = M.panels[vim.fn.bufname(bufnr)].line_map
+  local line_map = M.panels[bufnr].line_map
   local entry
   while line >= 7 do
     entry = line_map[line]
@@ -643,7 +640,7 @@ end
 
 function M.set_fold_level(level)
   local bufnr = vim.api.nvim_get_current_buf()
-  local line_map = M.panels[vim.fn.bufname(bufnr)].line_map
+  local line_map = M.panels[bufnr].line_map
   for k, _ in pairs(line_map) do
     line_map[k].obj.is_folded = level
   end
@@ -679,7 +676,7 @@ end
 
 local function get_current_node()
   local bufnr = vim.api.nvim_get_current_buf()
-  local line_map = M.panels[vim.fn.bufname(bufnr)].line_map
+  local line_map = M.panels[bufnr].line_map
   if not line_map[vim.fn.line "."] then
     return
   end
@@ -926,7 +923,7 @@ function M.render(issues, opts)
   local panel_name = opts.panel_name or "__CodeQLPanel__"
   local bufnr = M.open_panel(panel_name)
 
-  M.panels[panel_name] = {
+  M.panels[bufnr] = {
     issues = issues or {},
     kind = opts.kind or "raw",
     columns = opts.columns or {},
@@ -955,7 +952,7 @@ function M.render(issues, opts)
     }
     table.insert(rules, rule)
   end
-  M.panels[panel_name].rules = rules
+  M.panels[bufnr].rules = rules
 
   render_content(bufnr)
 end

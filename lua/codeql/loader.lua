@@ -174,12 +174,12 @@ function M.load_raw_results(path)
   for _, tuple in ipairs(tuples) do
     path = {}
     for _, element in ipairs(tuple) do
-      if element.url.endColumn then
+      if element.url and element.url.endColumn then
         element.url.endColumn = element.url.endColumn + 1
       end
       local node = {}
       -- objects with url info
-      if type(element) == "table" and nil ~= element.url then
+      if type(element) == "table" and element.url then
         local filename = util.uri_to_fname(element.url.uri)
         local line = element.url.startLine
         node = {
@@ -192,14 +192,14 @@ function M.load_raw_results(path)
         }
 
         -- objects with no url info
-      elseif type(element) == "table" and nil == element.url then
+      elseif type(element) == "table" and not element.url then
         node = {
           label = element.label,
           mark = "≔",
           filename = nil,
           line = nil,
           visitable = false,
-          url = element.url,
+          url = nil,
         }
 
         -- string literal
@@ -266,7 +266,6 @@ function M.load_sarif_results(path)
   panel.render(issues, {
     kind = "sarif",
     mode = "tree",
-    panel_name = "__CodeQLSarif__",
   })
   vim.api.nvim_command "redraw"
 end

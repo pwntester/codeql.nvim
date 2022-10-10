@@ -140,12 +140,12 @@ end
 
 function M.query(quick_eval, position)
   local db = config.database
-  if not db then
+  if not db or not db.path then
     util.err_message "Missing database. Use :SetDatabase command"
     return
   end
 
-  local dbPath = config.database.path
+  local dbPath = db.path
   local queryPath = vim.fn.expand "%:p"
 
   local libPaths = util.resolve_library_path(queryPath)
