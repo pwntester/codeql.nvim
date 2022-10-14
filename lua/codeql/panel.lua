@@ -612,7 +612,7 @@ local function get_enclosing_issue(line)
         and (entry.kind == "node" or entry.kind == "issue" or entry.kind == "rule")
         and vim.tbl_contains(vim.tbl_keys(entry.obj), "is_folded")
     then
-      return entry.obj
+      return line, entry.obj
     end
     line = line - 1
   end
@@ -624,10 +624,11 @@ function M.toggle_fold()
   vim.cmd "match none"
 
   local line = vim.fn.line "."
-  local issue = get_enclosing_issue(line)
+  local enc_line, issue = get_enclosing_issue(line)
   if issue and vim.tbl_contains(vim.tbl_keys(issue), "is_folded") then
     issue.is_folded = not issue.is_folded
     render_keep_view(bufnr, line)
+    vim.api.nvim_win_set_cursor(0, { enc_line, 0 })
   end
 end
 
@@ -650,7 +651,7 @@ end
 function M.change_path(offset)
   local bufnr = vim.api.nvim_get_current_buf()
   local line = vim.fn.line "."
-  local issue = get_enclosing_issue(line)
+  local enc_line, issue = get_enclosing_issue(line)
 
   if issue.active_path then
     if issue.active_path == 1 and offset == -1 then
@@ -661,6 +662,7 @@ function M.change_path(offset)
       issue.active_path = issue.active_path + offset
     end
     render_keep_view(bufnr, line + 1)
+    vim.api.nvim_win_set_cursor(0, { enc_line, 0 })
   end
 end
 

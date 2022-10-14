@@ -3,6 +3,7 @@ local loader = require "codeql.loader"
 local config = require "codeql.config"
 local rpc = require "vim.lsp.rpc"
 local protocol = require "vim.lsp.protocol"
+local hasNotifier, notifier = pcall(require, "notifier.status")
 
 local client_index = 0
 local evaluate_id = 0
@@ -113,21 +114,24 @@ function M.start_server()
       ["ql/progressUpdated"] = function(_, params, _)
         local message = params.message
         if message ~= last_message and nil == string.match(message, "^Stage%s%d.*%d%s%-%s*$") then
-          util.message(message, {
-            title = "CodeQL",
-            group = "Query server"
-          })
+          if hasNotifier then
+            notifier.push("lsp", { mandat = message, dim = true }, "QueryServer")
+          else
+            util.message(message)
+          end
         end
         last_message = message
       end,
 
       -- query completed
       ["evaluation/queryCompleted"] = function(_, result, _)
-        util.message(string.format("Query completed in %s ms", result.evaluationTime), {
-          title = "CodeQL",
-          group = "Query server",
-          done = true
-        })
+        local msg = string.format("Query completed in %s ms", result.evaluationTime)
+        if hasNotifier then
+          notifier.push("lsp", { mandat = msg, dim = true }, "QueryServer")
+          notifier.pop("lsp", "QueryServer")
+        else
+          util.message(msg)
+        end
         if result.resultType == 0 then
           return {}
         elseif result.resultType == 1 then

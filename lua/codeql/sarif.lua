@@ -153,21 +153,41 @@ function M.process_sarif(opts)
               uri = string.format("file:%s/%s", uriBaseId, uri)
             end
             local region = l.location.physicalLocation.region
-
-            local node = {
-              label = l.location.message.text,
-              mark = mark,
-              filename = util.uri_to_fname(uri) or uri,
-              line = region and region.startLine or -1,
-              visitable = region or false,
-              url = {
-                uri = uri,
-                startLine = region and region.startLine or -1,
-                endLine = region and region.endLine or region.startLine,
-                startColumn = region and region.startColumn or -1,
-                endColumn = region and region.endColumn or -1,
-              },
-            }
+            if region and region.startLine and not region.endLine then
+              region.endLine = region.startLine
+            end
+            local node
+            if region then
+              node = {
+                label = l.location.message.text,
+                mark = mark,
+                filename = util.uri_to_fname(uri) or uri,
+                line = region.startLine,
+                visitable = true,
+                url = {
+                  uri = uri,
+                  startLine = region.startLine,
+                  endLine = region.endLine,
+                  startColumn = region.startColumn,
+                  endColumn = region.endColumn,
+                },
+              }
+            else
+              node = {
+                label = l.location.message.text,
+                mark = mark,
+                filename = util.uri_to_fname(uri) or uri,
+                line = -1,
+                visitable = false,
+                url = {
+                  uri = uri,
+                  startLine = -1,
+                  endLine = -1,
+                  startColumn = -1,
+                  endColumn = -1,
+                },
+              }
+            end
 
             -- check if the SARIF file contains source code snippets
             if l.location.physicalLocation.contextRegion and l.location.physicalLocation.contextRegion.snippet then
