@@ -229,14 +229,14 @@ function M.for_each_buf_window(bufnr, fn)
   end
 end
 
-function M.err_message(...)
-  vim.api.nvim_err_writeln(table.concat(vim.tbl_flatten { ... }))
-  vim.api.nvim_command "redraw"
+function M.err_message(msg, opts)
+  opts = opts or { title = "CodeQL"}
+  vim.notify(msg, vim.log.levels.ERROR, opts)
 end
 
-function M.message(...)
-  vim.api.nvim_out_write(table.concat(vim.tbl_flatten { ... }) .. "\n")
-  vim.api.nvim_command "redraw"
+function M.message(msg, opts)
+  opts = opts or { title = "CodeQL"}
+  vim.notify(msg, vim.log.levels.INFO, opts)
 end
 
 function M.json_encode(data)
@@ -303,7 +303,7 @@ function M.database_upgrades(dbscheme)
   local json = cli.runSync { "resolve", "upgrades", "--format=json", "--dbscheme", dbscheme }
   local metadata, err = M.json_decode(json)
   if not metadata then
-    print("Error resolving database upgrades: " .. err)
+    M.err_message("Error resolving database upgrades: " .. err)
     return
   end
   cache.database_upgrades[dbscheme] = metadata
@@ -311,7 +311,7 @@ function M.database_upgrades(dbscheme)
 end
 
 function M.database_upgrade(path)
-  print "Upgrading DB"
+  M.message("Upgrading DB")
   cli.runSync { "database", "upgrade", path }
 end
 
@@ -319,7 +319,7 @@ function M.query_info(query)
   local json = cli.runSync { "resolve", "metadata", "--format=json", query }
   local metadata, err = M.json_decode(json)
   if not metadata then
-    print("Error resolving query metadata: " .. err)
+    M.err_message("Error resolving query metadata: " .. err)
     return
   end
   return metadata
@@ -332,7 +332,7 @@ function M.database_info(database)
   local json = cli.runSync { "resolve", "database", "--format=json", database }
   local metadata, err = M.json_decode(json)
   if not metadata then
-    print("Error resolving database metadata: " .. err)
+    M.err_message("Error resolving database metadata: " .. err)
     return
   end
   cache.databases[database] = metadata
@@ -343,7 +343,7 @@ function M.bqrs_info(bqrsPath)
   local json = cli.runSync { "bqrs", "info", "--format=json", bqrsPath }
   local decoded, err = M.json_decode(json)
   if not decoded then
-    print("ERROR: Could not get BQRS info: " .. err)
+    M.err_message("ERROR: Could not get BQRS info: " .. err)
     return
   end
   return decoded
@@ -362,7 +362,7 @@ function M.resolve_library_path(queryPath)
   local json = cli.runSync(cmd)
   local decoded, err = M.json_decode(json)
   if not decoded then
-    print("ERROR: Could not resolve library path: " .. err)
+    M.err_message("ERROR: Could not resolve library path: " .. err)
     return
   end
   cache.library_paths[queryPath] = decoded
@@ -382,7 +382,7 @@ function M.resolve_qlpacks()
   local json = cli.runSync(cmd)
   local decoded, err = M.json_decode(json)
   if not decoded then
-    print("ERROR: Could not resolve qlpacks: " .. err)
+    M.err_message("ERROR: Could not resolve qlpacks: " .. err)
     return
   end
   cache.qlpacks = decoded
@@ -402,7 +402,7 @@ function M.resolve_ram()
   local json = cli.runSync(cmd)
   local ram_opts, err = M.json_decode(json)
   if not ram_opts then
-    print("ERROR: Could not resolve RAM options: " .. err)
+    M.err_message("ERROR: Could not resolve RAM options: " .. err)
     return
   end
   ram_opts = vim.tbl_filter(function(i)

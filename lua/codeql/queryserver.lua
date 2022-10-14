@@ -7,7 +7,6 @@ local protocol = require "vim.lsp.protocol"
 local client_index = 0
 local evaluate_id = 0
 local progress_id = 0
-local last_rpc_result = false
 local last_rpc_msg_id = -1
 
 local function next_client_id()
@@ -60,11 +59,11 @@ function M.start_client(opts)
   end
 
   function handlers.on_error(code, err)
-    util.err_message(log_prefix, ": Error ", rpc.client_errors[code], ": ", vim.inspect(err))
+    util.err_message(string.format("%s: Error %s: %s", log_prefix, rpc.client_errors[code], vim.inspect(err)))
     if opts.on_error then
       local status, usererr = pcall(opts.on_error, code, err)
       if not status then
-        util.err_message(log_prefix, " user on_error failed: ", tostring(usererr))
+        util.err_message(string.format("%s user on_error failed: ", log_prefix, tostring(usererr)))
       end
     end
   end
@@ -114,7 +113,10 @@ function M.start_server()
       ["ql/progressUpdated"] = function(_, params, _)
         local message = params.message
         if message ~= last_message and nil == string.match(message, "^Stage%s%d.*%d%s%-%s*$") then
-          util.message(message)
+          util.message(message, {
+            title = "CodeQL",
+            group = "Query server"
+          })
         end
         last_message = message
       end,
@@ -244,7 +246,7 @@ function M.run_query(opts)
         util.err_message(msg.message)
         failed = true
       elseif msg.severity == 1 then
-        print(msg.message)
+        util.message(msg.message)
       end
     end
     if failed then
@@ -278,7 +280,7 @@ function M.run_query(opts)
 
       -- run query
       util.message(string.format("Running query [%s]", M.client.pid))
-      last_rpc_result, last_rpc_msg_id = M.client.request(
+      _, last_rpc_msg_id = M.client.request(
         "evaluation/runQueries",
         runQueries_params,
         runQueries_callback
@@ -289,7 +291,7 @@ function M.run_query(opts)
   -- compile query
   util.message(string.format("Compiling query %s", queryPath))
 
-  last_rpc_result, last_rpc_msg_id = M.client.request(
+  _, last_rpc_msg_id = M.client.request(
     "compilation/compileQuery",
     compileQuery_params,
     compileQuery_callback
@@ -348,7 +350,7 @@ end
 
 function M.unregister_database(cb)
   if util.is_blank(config.database) then
-    print "No database registered"
+    vim.notify("No database registered")
     return
   end
   if not M.client then
@@ -387,7 +389,7 @@ function M.cancel_query()
   if not M.client then
     M.client = M.start_server()
   end
-  print(M.client.notify("$/cancelRequest", {
+  util.message(M.client.notify("$/cancelRequest", {
     id = last_rpc_msg_id,
   }))
 end

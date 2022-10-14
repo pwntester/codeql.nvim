@@ -66,7 +66,7 @@ function M.set_database(dbpath)
     util.err_message("Incorrect database: " .. dbpath)
   end
   if database then
-    print("Database set to " .. database)
+    util.message("Database set to " .. database)
     local metadata = util.database_info(database)
     metadata.path = database
 
@@ -110,7 +110,7 @@ function M.get_enclosing_predicate_position()
   if is_predicate_node(node) then
     for child in node:iter_children() do
       if is_predicate_identifier_node(node, child) then
-        print(string.format("Evaluating '%s' predicate", child))
+        util.message(string.format("Evaluating '%s' predicate", child))
         local srow, scol, erow, ecol = child:range()
         local midname = math.floor((scol + ecol) / 2)
         return { srow + 1, midname, erow + 1, midname }

@@ -49,7 +49,7 @@ function M.download(opts)
     if not util.is_blank(stderr) then
       vim.api.nvim_err_writeln(stderr)
     elseif not util.is_blank(output) then
-      print("size: " .. #output)
+      util.message("size: " .. #output)
       local file = io.open(opts.path, "w")
       io.output(file)
       io.write(output)
@@ -68,7 +68,7 @@ local close_handle = function(handle)
 end
 
 function M.buf_to_stdin(cmd, args, handler)
-  print(cmd, table.concat(args, " "))
+  util.message(cmd, table.concat(args, " "))
   local output = ""
   local stderr_output = ""
 

@@ -25,7 +25,6 @@ end
 function Tree:flatten_directories()
   for _, child in ipairs(self.children) do
     if child.type == "dir" and #child.children == 1 and child.children[1].type == "dir" then
-      --print(child.id, " :: ", child.children[1].id)
       child.id = child.children[1].id
       child.type = child.children[1].type
       child.name = child.children[1].name

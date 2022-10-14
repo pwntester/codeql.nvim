@@ -3,7 +3,8 @@ local M = {}
 M.client = nil
 
 local function start()
-  print "Starting CodeQL CLI Server"
+  local util = require("codeql.util")
+  util.message("Starting CodeQL CLI Server")
 
   local cmd = "codeql"
   local cmd_args = { "execute", "cli-server", "--logdir", "/tmp/codeql_queryserver" }
@@ -83,6 +84,7 @@ function M.runAsync(cmd, callback)
 end
 
 function M.runSync(cmd)
+  local util = require("codeql.util")
   local timeout = require("codeql.config").get_config().job_timeout
   local done = false
   local result
@@ -95,7 +97,7 @@ function M.runSync(cmd)
     return done
   end, 200)
   if not wait_result then
-    print(string.format("'%s' was unable to complete in %s ms", table.concat(cmd, " "), timeout))
+    util.message(string.format("'%s' was unable to complete in %s ms", table.concat(cmd, " "), timeout))
     return nil
   else
     return result

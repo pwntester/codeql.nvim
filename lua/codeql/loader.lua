@@ -18,7 +18,6 @@ function M.process_results(opts)
   local ram_opts = config.ram_opts
   local resultsPath = vim.fn.tempname()
 
-  print(bqrsPath)
   local info = util.bqrs_info(bqrsPath)
   if not info or info == vim.NIL or not info["result-sets"] then
     return

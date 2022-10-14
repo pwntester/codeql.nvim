@@ -49,8 +49,8 @@ function M.process_sarif(opts)
     end
   end
 
-  print("Sarif: " .. opts.path)
-  print("Results: " .. #results)
+  util.message("Sarif: " .. opts.path)
+  util.message("Results: " .. #results)
 
   local issues = {}
 
