@@ -123,7 +123,11 @@ function M.start_server()
 
       -- query completed
       ["evaluation/queryCompleted"] = function(_, result, _)
-        util.message(string.format("Evaluation time: %s", result.evaluationTime))
+        util.message(string.format("Query completed in %s ms", result.evaluationTime), {
+          title = "CodeQL",
+          group = "Query server",
+          done = true
+        })
         if result.resultType == 0 then
           return {}
         elseif result.resultType == 1 then
