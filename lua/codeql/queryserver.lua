@@ -3,12 +3,13 @@ local loader = require "codeql.loader"
 local config = require "codeql.config"
 local rpc = require "vim.lsp.rpc"
 local protocol = require "vim.lsp.protocol"
-local hasNotifier, notifier = pcall(require, "notifier.status")
 
 local client_index = 0
 local evaluate_id = 0
 local progress_id = 0
 local last_rpc_msg_id = -1
+local token = nil
+local lsp_client_id
 
 local function next_client_id()
   client_index = client_index + 1
@@ -85,6 +86,13 @@ function M.start_client(opts)
 end
 
 function M.start_server()
+
+  local lsp_clients = vim.lsp.get_active_clients()
+  for _, lsp_client in ipairs(lsp_clients) do
+    if lsp_client.name == "codeqlls" then
+      lsp_client_id = lsp_client.id
+    end
+  end
   if M.client then
     return M.client
   end
@@ -114,8 +122,38 @@ function M.start_server()
       ["ql/progressUpdated"] = function(_, params, _)
         local message = params.message
         if message ~= last_message and nil == string.match(message, "^Stage%s%d.*%d%s%-%s*$") then
-          if hasNotifier then
-            notifier.push("lsp", { mandat = message, dim = true }, "QueryServer")
+          local lsp_handler = vim.lsp.handlers["$/progress"]
+          if lsp_handler and type(lsp_handler) == "function" then
+            if not token then
+              token = "CodeQLToken"
+              lsp_handler(nil, {
+                value = {
+                  message = message,
+                  name = "CodeQL",
+                  percentage = 1,
+                  progress = true,
+                  title = "CodeQL title",
+                  kind = "begin",
+                },
+                token = token
+              }, {
+                client_id = lsp_client_id
+              })
+            else
+              lsp_handler(nil, {
+                value = {
+                  message = message,
+                  name = "CodeQL",
+                  percentage = (100 * params.step) / params.maxStep,
+                  progress = true,
+                  title = "CodeQL title",
+                  kind = "report", -- begin, report, end
+                },
+                token = token
+              }, {
+                client_id = lsp_client_id
+              })
+            end
           else
             util.message(message)
           end
@@ -125,12 +163,25 @@ function M.start_server()
 
       -- query completed
       ["evaluation/queryCompleted"] = function(_, result, _)
-        local msg = string.format("Query completed in %s ms", result.evaluationTime)
-        if hasNotifier then
-          notifier.push("lsp", { mandat = msg, dim = true }, "QueryServer")
-          notifier.pop("lsp", "QueryServer")
+        local message = string.format("Query completed in %s ms", result.evaluationTime)
+        local lsp_handler = vim.lsp.handlers["$/progress"]
+        if lsp_handler and type(lsp_handler) == "function" then
+          lsp_handler(nil, {
+            value = {
+              message = message,
+              name = "CodeQL",
+              percentage = 100,
+              progress = true,
+              title = "CodeQL title",
+              kind = "end",
+            },
+            token = token
+          }, {
+            client_id = lsp_client_id
+          })
+          token = nil
         else
-          util.message(msg)
+          util.message(message)
         end
         if result.resultType == 0 then
           return {}
@@ -287,7 +338,10 @@ function M.run_query(opts)
       }
 
       -- run query
-      util.message(string.format("Running query [%s]", M.client.pid))
+      local message = string.format("Running query [%s]", M.client.pid)
+      util.message(message)
+
+      -- Compile query
       _, last_rpc_msg_id = M.client.request(
         "evaluation/runQueries",
         runQueries_params,
