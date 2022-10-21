@@ -132,7 +132,7 @@ function M.start_server()
                   name = "CodeQL",
                   percentage = 1,
                   progress = true,
-                  title = "CodeQL title",
+                  title = "CodeQL",
                   kind = "begin",
                 },
                 token = token
@@ -146,8 +146,8 @@ function M.start_server()
                   name = "CodeQL",
                   percentage = (100 * params.step) / params.maxStep,
                   progress = true,
-                  title = "CodeQL title",
-                  kind = "report", -- begin, report, end
+                  title = "CodeQL",
+                  kind = "report",
                 },
                 token = token
               }, {
@@ -172,7 +172,7 @@ function M.start_server()
               name = "CodeQL",
               percentage = 100,
               progress = true,
-              title = "CodeQL title",
+              title = "CodeQL",
               kind = "end",
             },
             token = token
