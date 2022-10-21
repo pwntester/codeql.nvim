@@ -173,12 +173,12 @@ function M.load_raw_results(path)
   for _, tuple in ipairs(tuples) do
     path = {}
     for _, element in ipairs(tuple) do
-      if element.url and element.url.endColumn then
-        element.url.endColumn = element.url.endColumn + 1
-      end
       local node = {}
       -- objects with url info
       if type(element) == "table" and element.url then
+        if element.url and element.url.endColumn then
+          element.url.endColumn = element.url.endColumn + 1
+        end
         local filename = util.uri_to_fname(element.url.uri)
         local line = element.url.startLine
         node = {
