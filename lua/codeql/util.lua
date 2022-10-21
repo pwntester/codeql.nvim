@@ -17,11 +17,10 @@ function M.apply_mappings()
   local mappings = require "codeql.mappings"
   local conf = config.get_config()
   for action, value in pairs(conf.mappings) do
-    if
-      not M.is_blank(value)
-      and not M.is_blank(action)
-      and not M.is_blank(value.lhs)
-      and not M.is_blank(mappings[action])
+    if not M.is_blank(value)
+        and not M.is_blank(action)
+        and not M.is_blank(value.lhs)
+        and not M.is_blank(mappings[action])
     then
       if M.is_blank(value.desc) then
         value.desc = ""
@@ -230,12 +229,12 @@ function M.for_each_buf_window(bufnr, fn)
 end
 
 function M.err_message(msg, opts)
-  opts = opts or { title = "CodeQL"}
+  opts = opts or { title = "CodeQL" }
   vim.notify(msg, vim.log.levels.ERROR, opts)
 end
 
 function M.message(msg, opts)
-  opts = opts or { title = "CodeQL"}
+  opts = opts or { title = "CodeQL" }
   vim.notify(msg, vim.log.levels.INFO, opts)
 end
 
@@ -409,16 +408,17 @@ function M.resolve_ram()
     return vim.startswith(i, "-J")
   end, ram_opts)
   cache.ram = ram_opts
+  M.message("Memory options " .. vim.inspect(ram_opts))
   return ram_opts
 end
 
 function M.is_blank(s)
   return (
-    s == nil
-    or s == vim.NIL
-    or (type(s) == "string" and string.match(s, "%S") == nil)
-    or (type(s) == "table" and next(s) == nil)
-  )
+      s == nil
+          or s == vim.NIL
+          or (type(s) == "string" and string.match(s, "%S") == nil)
+          or (type(s) == "table" and next(s) == nil)
+      )
 end
 
 function M.get_flatten_artifacts_pages(text)

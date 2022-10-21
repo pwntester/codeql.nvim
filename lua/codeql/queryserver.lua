@@ -374,7 +374,8 @@ function M.register_database(database)
     python = 'semmlecode.python.dbscheme',
     csharp = 'semmlecode.csharp.dbscheme',
     go = 'go.dbscheme',
-    ruby = 'ruby.dbscheme'
+    ruby = 'ruby.dbscheme',
+    ql = 'ql.dbscheme'
   }
   local dbschemePath = config.database.datasetFolder .. "/" .. langTodbScheme[lang]
   if not vim.fn.filereadable(dbschemePath) then
