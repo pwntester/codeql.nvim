@@ -178,8 +178,8 @@ local templated_queries = {
   cs = { qlpack = "codeql/csharp-all" },
   javascript = { qlpack = "codeql/javascript-all" },
   python = { qlpack = "codeql/python-all" },
-  ql = { qlpack = "codeql/ql", path = "ide-contextual/" },
-  ruby = { qlpack = "codeql/ruby-queries", path = "ide-contextual/" },
+  ql = { qlpack = "codeql/ql", path = "ide-contextual-queries/" },
+  ruby = { qlpack = "codeql/ruby-all", path = "ide-contextual-queries/" },
   go = { qlpack = "codeql/go-all" },
 }
 

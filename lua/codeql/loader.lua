@@ -42,7 +42,6 @@ function M.process_results(opts)
   end
 
   if count == 0 then
-    util.err_message "No results"
     panel.render()
     return
   end
@@ -165,7 +164,6 @@ function M.load_raw_results(path)
   end
 
   if not tuples or vim.tbl_isempty(tuples) then
-    util.err_message "No results"
     panel.render()
     return
   end
