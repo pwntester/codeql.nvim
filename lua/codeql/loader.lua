@@ -35,7 +35,7 @@ function M.process_results(opts)
   util.message(string.format("%d rows found", count))
 
   if count > 1000 then
-    local continue = vim.fn.input(string.format("Too many results (%d)", count))
+    local continue = vim.fn.input(string.format("Too many results (%d). Open it? (Y/N): ", count))
     if string.lower(continue) ~= "y" then
       return
     end
