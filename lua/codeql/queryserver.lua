@@ -139,7 +139,7 @@ function M.start_server()
               }, {
                 client_id = lsp_client_id
               })
-            else
+            elseif lsp_client_id then
               lsp_handler(nil, {
                 value = {
                   message = message,

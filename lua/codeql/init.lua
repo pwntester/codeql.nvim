@@ -68,6 +68,9 @@ function M.set_database(dbpath)
   if database then
     util.message("Database set to " .. database)
     local metadata = util.database_info(database)
+    if not metadata then
+      util.err_message("Could not load the database " .. vim.inspect(database))
+    end
     metadata.path = database
 
     if not util.is_blank(config.database) then
