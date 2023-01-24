@@ -88,7 +88,7 @@ Use `UnsetDatabase` to unregister the current registered database.
 Use `RunQuery` or `QuickEval` commands or `qr`, `qe` shortcuts respectively to run the query or evaluate the predicate under the cursor.
 
 ## Configuration options
-- search_path: List of codeql search paths
+- additional_packs: List of codeql qlpacks to use 
 - max_ram: Max RAM memory to be used by CodeQL
 - job_timeout: Timeout for running sync jobs (default: 15000)
 
@@ -109,7 +109,7 @@ require("codeql").setup {
   max_ram = 32000,
   job_timeout = 15000,
   format_on_save = true,
-  search_path = {
+  additional_packs = {
     "/Users/pwntester/codeql-home/codeql",
     "/Users/pwntester/codeql-home/codeql-go",
     "/Users/pwntester/codeql-home/codeql-ruby",
@@ -178,12 +178,12 @@ local nvim_lsp = require 'nvim_lsp'
 nvim_lsp.codeqlls.setup{
     on_attach = on_attach_callback;
     settings = {
-        search_path = {'~/codeql-home/codeql-repo'};
+        additional_packs = {'~/codeql-home/codeql-repo'};
     };
 }
 ```
 
-NOTE: change `search_path` to the path where the [CodeQL](https://github.com/github/codeql) repo has been installed to.
+NOTE: change `additional_packs` to the path where the [CodeQL](https://github.com/github/codeql) repo has been installed to.
 
 It is also recommended to add an `on_attach` callback to define LSP mappings. E.g:
 
@@ -206,7 +206,7 @@ local nvim_lsp = require 'nvim_lsp'
 nvim_lsp.codeqlls.setup{
     on_attach = on_attach_callback;
     settings = {
-        search_path = {'~/codeql-home/codeql-repo'};
+        additional_packs = {'~/codeql-home/codeql-repo'};
     };
 }
 ```
