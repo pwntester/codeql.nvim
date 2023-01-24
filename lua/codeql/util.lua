@@ -338,14 +338,17 @@ function M.database_info(database)
   return metadata
 end
 
-function M.bqrs_info(bqrsPath)
+function M.bqrs_info(bqrsPath, queryPath)
   local json = cli.runSync { "bqrs", "info", "--format=json", bqrsPath }
-  local decoded, err = M.json_decode(json)
-  if not decoded then
-    M.err_message("ERROR: Could not get BQRS info: " .. err)
-    return
+  if json ~= "" and json ~= vim.NIL and json then
+    local decoded, err = M.json_decode(json)
+    if not decoded then
+      M.err_message(string.format("ERROR: Could not get BQRS info for %s: %s", queryPath, vim.inspect(err)))
+      return
+    end
+    return decoded
   end
-  return decoded
+  M.err_message(string.format("ERROR: Could not get BQRS info for %s.", queryPath))
 end
 
 function M.resolve_library_path(queryPath)

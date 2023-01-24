@@ -18,7 +18,7 @@ function M.process_results(opts)
   local ram_opts = config.ram_opts
   local resultsPath = vim.fn.tempname()
 
-  local info = util.bqrs_info(bqrsPath)
+  local info = util.bqrs_info(bqrsPath, queryPath)
   if not info or info == vim.NIL or not info["result-sets"] then
     return
   end
@@ -31,8 +31,7 @@ function M.process_results(opts)
       count = resultset.rows
     end
   end
-  util.message(string.format("Processing %s results", queryPath))
-  util.message(string.format("%d rows found", count))
+  util.message(string.format("Processing %d results for %s", count, queryPath))
 
   if count > 1000 then
     local continue = vim.fn.input(string.format("Too many results (%d). Open it? (Y/N): ", count))

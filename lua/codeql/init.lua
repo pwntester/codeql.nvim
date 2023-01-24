@@ -215,11 +215,7 @@ function M.run_templated_query(query_name, param)
     local queryPath = string.format("%s/%s%s.ql", path, path_modifier, query_name)
     if util.is_file(queryPath) then
       local templateValues = {
-        selectedSourceFile = {
-          values = {
-            tuples = { { { stringValue = "/" .. param } } },
-          },
-        },
+        selectedSourceFile = "/" .. param,
       }
       local libPaths = util.resolve_library_path(queryPath)
       if not libPaths then
