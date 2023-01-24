@@ -5,8 +5,7 @@ local rpc = require "vim.lsp.rpc"
 local protocol = require "vim.lsp.protocol"
 
 local client_index = 0
-local evaluate_id = 0
-local progress_id = 0
+local progress_id = -1
 local last_rpc_msg_id = -1
 local token = nil
 local lsp_client_id
@@ -19,11 +18,6 @@ end
 local function next_progress_id()
   progress_id = progress_id + 1
   return progress_id
-end
-
-local function next_evaluate_id()
-  evaluate_id = evaluate_id + 1
-  return evaluate_id
 end
 
 local M = {}
@@ -101,10 +95,9 @@ function M.start_server()
   local cmd = {
     "codeql",
     "execute",
-    "query-server",
-    "--require-db-registration",
-    "--debug",
-    "--tuple-counting",
+    "query-server2",
+    "--debug", "--tuple-counting",
+    "--evaluator-log-level", "5",
     "-v",
     "--log-to-stderr",
   }
@@ -121,92 +114,76 @@ function M.start_server()
       -- progress update
       ["ql/progressUpdated"] = function(_, params, _)
         local message = params.message
-        if message ~= last_message and nil == string.match(message, "^Stage%s%d.*%d%s%-%s*$") then
-          local lsp_handler = vim.lsp.handlers["$/progress"]
-          if lsp_handler and type(lsp_handler) == "function" then
-            if not token then
+        local handler
+        local lsp_handler = vim.lsp.handlers["$/progress"]
+        if lsp_client_id and lsp_handler and type(lsp_handler) == "function" then
+          -- use LSP progress handler
+          handler = lsp_handler
+        else
+          -- Use vim.notify
+          handler = function(_, opts, _)
+            util.message("Query execution progress: " .. opts.value.message)
+          end
+        end
+        local progress = (100 * params.step) / params.maxStep
+        if params.step == params.maxStep - 1 then
+          progress = 100
+        end
+        if message ~= last_message then
+          if progress == 0 then
+            handler(nil, {
+              value = {
+                message = message,
+                name = "CodeQL",
+                percentage = 0,
+                progress = true,
+                title = "CodeQL",
+                kind = "begin",
+              },
               token = "CodeQLToken"
-              lsp_handler(nil, {
-                value = {
-                  message = message,
-                  name = "CodeQL",
-                  percentage = 1,
-                  progress = true,
-                  title = "CodeQL",
-                  kind = "begin",
-                },
-                token = token
-              }, {
-                client_id = lsp_client_id
-              })
-            elseif lsp_client_id then
-              lsp_handler(nil, {
-                value = {
-                  message = message,
-                  name = "CodeQL",
-                  percentage = (100 * params.step) / params.maxStep,
-                  progress = true,
-                  title = "CodeQL",
-                  kind = "report",
-                },
-                token = token
-              }, {
-                client_id = lsp_client_id
-              })
-            end
-          else
-            util.message(message)
+            }, {
+              client_id = lsp_client_id
+            })
+          elseif progress < 100 then
+            handler(nil, {
+              value = {
+                message = message,
+                name = "CodeQL",
+                percentage = progress,
+                progress = true,
+                title = "CodeQL",
+                kind = "report",
+              },
+              token = "CodeQLToken"
+            }, {
+              client_id = lsp_client_id
+            })
+          elseif progress == 100 then
+            handler(nil, {
+              value = {
+                message = message,
+                name = "CodeQL",
+                percentage = 100,
+                progress = true,
+                title = "CodeQL",
+                kind = "end",
+              },
+              token = "CodeQLToken"
+            }, {
+              client_id = lsp_client_id
+            })
           end
         end
         last_message = message
       end,
-
-      -- query completed
-      ["evaluation/queryCompleted"] = function(_, result, _)
-        local message = string.format("Query completed in %s ms", result.evaluationTime)
-        local lsp_handler = vim.lsp.handlers["$/progress"]
-        if lsp_handler and type(lsp_handler) == "function" then
-          lsp_handler(nil, {
-            value = {
-              message = message,
-              name = "CodeQL",
-              percentage = 100,
-              progress = true,
-              title = "CodeQL",
-              kind = "end",
-            },
-            token = token
-          }, {
-            client_id = lsp_client_id
-          })
-          token = nil
-        else
-          util.message(message)
-        end
-        if result.resultType == 0 then
-          return {}
-        elseif result.resultType == 1 then
-          util.err_message(result.message or "ERROR: Other")
-          return {}
-        elseif result.resultType == 2 then
-          util.err_message(result.message or "ERROR: OOM")
-          return {}
-        elseif result.resultType == 3 then
-          util.err_message(result.message or "ERROR: Timeout")
-          return {}
-        elseif result.resultType == 4 then
-          util.err_message(result.message or "ERROR: Query was cancelled")
-          return {}
-        end
-      end,
-    },
+    }
   }
   return M.start_client(opts)
 end
 
 function M.run_query(opts)
-  local dbDir = config.database.datasetFolder
-  if not dbDir then
+  local dbPath = config.database.path
+  if not dbPath then
     --util.err_message "Cannot find dataset folder. Did you :SetDatabase?"
     return
   end
@@ -217,38 +194,22 @@ function M.run_query(opts)
 
   local bufnr = opts.bufnr
   local queryPath = opts.query
-  local qloPath = string.format(vim.fn.tempname(), ".qlo")
   local bqrsPath = string.format(vim.fn.tempname(), ".bqrs")
-  local libraryPath = opts.libraryPath
-  local dbschemePath = opts.dbschemePath
-  local dbPath = opts.dbPath
-  if not vim.endswith(dbPath, "/") then
-    dbPath = string.format("%s/", dbPath)
-  end
 
-  -- https://github.com/github/vscode-codeql/blob/master/extensions/ql-vscode/src/messages.ts
-  -- https://github.com/github/vscode-codeql/blob/eec72e0cbd65fd0d5fea19c7f63104df2ebc8b07/extensions/ql-vscode/src/run-queries.ts#L171-L180
-  local compileQuery_params = {
+  local runQuery_params = {
     body = {
-      compilationOptions = {
-        computeNoLocationUrls = true,
-        failOnWarnings = false,
-        fastCompilation = false,
-        includeDilInQlo = true,
-        localChecking = false,
-        noComputeGetUrl = false,
-        noComputeToString = false,
-        computeDefaultStrings = true,
+      db = dbPath,
+      additionalPacks = {
+        "/Users/pwntester/src/github.com/github/codeql"
       },
-      extraOptions = {
-        timeoutSecs = 0,
-      },
-      queryToCheck = {
-        libraryPath = libraryPath,
-        dbschemePath = dbschemePath,
-        queryPath = queryPath,
-      },
-      resultPath = qloPath,
+      externalInputs = {},
+      singletonExternalInputs = opts.templateValues or {},
+      outputPath = bqrsPath,
+      queryPath = queryPath,
+      -- do we want Datalog Intermediary Language dumps?
+      -- https://codeql.github.com/docs/codeql-overview/codeql-glossary/#dil
+      -- dilPath = "",
+      -- logPath = "",
       target = opts.quick_eval and {
         quickEval = {
           quickEvalPos = {
@@ -266,97 +227,51 @@ function M.run_query(opts)
     progressId = next_progress_id(),
   }
 
-  local runQueries_callback = function(err, result)
+  local runQuery_callback = function(err, resp)
     if err then
-      util.err_message "ERROR: runQuery failed"
+      util.err_message("ERROR: " .. vim.inspect(err))
     end
-    if util.is_file(bqrsPath) then
-      loader.process_results {
-        bqrs_path = bqrsPath,
-        bufnr = bufnr,
-        db_path = dbPath,
-        query_path = queryPath,
-        query_kind = opts.metadata["kind"],
-        query_id = opts.metadata["id"],
-        save_bqrs = true,
-      }
+    if not resp then
+      -- we may have got an RPC error, so print it
+      -- this is possible if the language server crashed, etc
+      return
+    end
+    if resp["resultType"] == 0 then
+      if util.is_file(bqrsPath) then
+        loader.process_results {
+          bqrs_path = bqrsPath,
+          bufnr = bufnr,
+          db_path = dbPath,
+          query_path = queryPath,
+          query_kind = opts.metadata["kind"],
+          query_id = opts.metadata["id"],
+          save_bqrs = true,
+        }
+      end
+    elseif resp["resultType"] == 1 then
+      util.err_message("ERROR: Other: " .. resp["message"])
+    elseif resp["resultType"] == 2 then
+      util.err_message("ERROR: Compilation Error: " .. resp["message"])
+    elseif resp["resultType"] == 3 then
+      util.err_message("ERROR: OOM Error: " .. resp["message"])
+    elseif resp["resultType"] == 4 then
+      util.err_message("ERROR: Query cancelled: " .. resp["message"])
+    elseif resp["resultType"] == 5 then
+      util.err_message("ERROR: DB Scheme mismatch: " .. resp["message"])
+    elseif resp["resultType"] == 6 then
+      util.err_message("ERROR: DB Scheme no upgrade found: " .. resp["message"])
     else
       util.err_message "Query run failed. Database may be locked by a different Query Server"
     end
   end
 
-  local compileQuery_callback = function(err, result)
-    local failed = false
-    if not result then
-      -- we may have got an RPC error, so print it
-      -- this is possible if the language server crashed, etc
-      if err then
-        if err["message"] == "Internal error." and err["code"] == -32603 then
-          util.err_message "ERROR: Compilation failed. Encountered NullPointerException. Missing qlpack.yml?"
-        else
-          util.err_message "ERROR: Compilation failed. Encountered unknown RPC error"
-          util.err_message(err)
-        end
-      end
-      return
-    end
-    for _, msg in ipairs(result.messages) do
-      if msg.severity == 0 then
-        util.err_message(msg.message)
-        failed = true
-      elseif msg.severity == 1 then
-        util.message(msg.message)
-      end
-    end
-    if failed then
-      return
-    else
-      -- prepare `runQueries` params
-      -- https://github.com/github/vscode-codeql/blob/81e60286f299660e0326d6036e0e0a0969ebbf51/extensions/ql-vscode/src/pure/messages.ts#L722
-      -- https://github.com/github/vscode-codeql/blob/eec72e0cbd65fd0d5fea19c7f63104df2ebc8b07/extensions/ql-vscode/src/run-queries.ts#L123
-      local runQueries_params = {
-        body = {
-          db = {
-            dbDir = dbDir,
-            workingSet = "default",
-          },
-          evaluateId = next_evaluate_id(),
-          queries = {
-            {
-              resultsPath = bqrsPath,
-              qlo = string.format("file://%s", qloPath),
-              allowUnknownTemplates = true,
-              templateValues = opts.templateValues or nil,
-              id = 0,
-              timeoutSecs = 0,
-            },
-          },
-          stopOnError = false,
-          useSequenceHint = false,
-        },
-        progressId = next_progress_id(),
-      }
-
-      -- run query
-      local message = string.format("Running query [%s]", M.client.pid)
-      util.message(message)
-
-      -- Compile query
-      _, last_rpc_msg_id = M.client.request(
-        "evaluation/runQueries",
-        runQueries_params,
-        runQueries_callback
-      )
-    end
-  end
-
-  -- compile query
-  util.message(string.format("Compiling query %s", queryPath))
+  -- run query
+  util.message(string.format("Running query %s", queryPath))
 
   _, last_rpc_msg_id = M.client.request(
-    "compilation/compileQuery",
-    compileQuery_params,
-    compileQuery_callback
+    "evaluation/runQuery",
+    runQuery_params,
+    runQuery_callback
   )
 end
 
@@ -388,14 +303,11 @@ function M.register_database(database)
   if resp ~= vim.NIL and #resp.scripts > 0 then
     util.database_upgrade(config.database.path)
   end
-  util.message(string.format("Registering database %s", config.database.datasetFolder))
+  util.message(string.format("Registering database %s", config.database.path))
   local params = {
     body = {
       databases = {
-        {
-          dbDir = config.database.datasetFolder,
-          workingSet = "default",
-        },
+        config.database.path
       },
       progressId = next_progress_id(),
     },
@@ -404,7 +316,7 @@ function M.register_database(database)
     if err then
       util.err_message(string.format("Error registering database %s", vim.inspect(err)))
     else
-      util.message(string.format("Successfully registered %s", result.registeredDatabases[1].dbDir))
+      util.message(string.format("Successfully registered %s", result.registeredDatabases[1]))
       -- TODO: add option to open the drawer automatically
       --require 'codeql.explorer'.draw()
     end
@@ -419,14 +331,11 @@ function M.unregister_database(cb)
   if not M.client then
     M.client = M.start_server()
   end
-  util.message(string.format("Unregistering database %s", config.database.datasetFolder))
+  util.message(string.format("Deregistering database %s", config.database.path))
   local params = {
     body = {
       databases = {
-        {
-          dbDir = config.database.datasetFolder,
-          workingSet = "default",
-        },
+        config.database.path,
       },
       progressId = next_progress_id(),
     },
@@ -435,7 +344,7 @@ function M.unregister_database(cb)
     if err then
       util.err_message(string.format("Error registering database %s", vim.inspect(err)))
     elseif #result.registeredDatabases == 0 then
-      util.message(string.format("Successfully deregistered %s", config.database.datasetFolder))
+      util.message(string.format("Successfully deregistered %s", config.database.path))
       config.database = nil
     end
     -- call the callback

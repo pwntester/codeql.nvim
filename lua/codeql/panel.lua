@@ -415,7 +415,6 @@ local function render_content(bufnr)
     print_to_panel(bufnr, "No results found.")
   end
   vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
-  util.message " "
 end
 
 local function render_keep_view(bufnr, line)

@@ -32,8 +32,7 @@ function M.process(kind, results_path)
     return
   end
 
-  util.message(string.format("Processing %s from %s", kind, results_path))
-  util.message ""
+  util.message(string.format("Processing %s", kind))
   local results = util.read_json_file(results_path)
 
   -- no results, exiting
