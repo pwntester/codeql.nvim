@@ -196,11 +196,14 @@ function M.run_query(opts)
   local queryPath = opts.query
   local bqrsPath = string.format(vim.fn.tempname(), ".bqrs")
 
+  local additionalPacks = util.get_additional_packs()
+  util.message("DEBUG: " .. additionalPacks)
+
   local runQuery_params = {
     body = {
       db = dbPath,
       additionalPacks = {
-        "/Users/pwntester/src/github.com/github/codeql"
+        additionalPacks or ""
       },
       externalInputs = {},
       singletonExternalInputs = opts.templateValues or {},

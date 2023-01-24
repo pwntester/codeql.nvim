@@ -110,7 +110,4 @@ function M.shutdownServer()
   end)
 end
 
---M.runAsync({"resolve", "library-path", "-v", "--log-to-stderr", "--format=json", "--query=/Users/pwntester/Research/projects/bean_validation/onedev/attack_surface.ql", "--search-path=/Users/pwntester/codeql-home/codeql-repo", "--search-path=/Users/pwntester/codeql-home/codeql-go-repo", "--search-path=/Users/pwntester/codeql-home/pwntester-repo"}, function(res) print(res) end)
---M.runAsync({"resolve", "database", "-v", "--log-to-stderr", "--format=json", "/Users/pwntester/Research/projects/bean_validation/onedev/codeql_db/"}, function(res) print(res) end)
---M.runAsync({"resolve", "database", "-v", "--log-to-stderr", "--format=json", "/Users/pwntester/Research/projects/bean_validation/onedev/codeql_db/"}, function(res) print(res) end)
 return M

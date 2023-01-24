@@ -357,9 +357,9 @@ function M.resolve_library_path(queryPath)
   end
   local cmd = { "resolve", "library-path", "-v", "--log-to-stderr", "--format=json", "--query=" .. queryPath }
   local conf = config.get_config()
-  if conf.search_path and #conf.search_path > 0 then
-    local additionalPacks = table.concat(conf.search_path, ":")
-    table.insert(cmd, string.format("--additional-packs=%s", additionalPacks))
+  if conf.additional_packs and #conf.additional_packs > 0 then
+    local additional_packs = table.concat(conf.additional_packs, ":")
+    table.insert(cmd, string.format("--additional-packs=%s", additional_packs))
   end
   local json = cli.runSync(cmd)
   local decoded, err = M.json_decode(json)
@@ -371,14 +371,34 @@ function M.resolve_library_path(queryPath)
   return decoded
 end
 
+function M.get_additional_packs()
+  local config_path = vim.fn.fnamemodify('~/.config/codeql/config', ':p')
+  if M.is_file(config_path) then
+    local config_contents = vim.fn.readfile(config_path)
+    for _, l in ipairs(config_contents) do
+      l = vim.trim(l)
+      local tokens = vim.split(l, " ")
+      for i, t in ipairs(tokens) do
+        if t == "--additional-packs" then
+          return tokens[i+1]
+        end
+      end
+    end
+  else
+    local conf = config.get_config()
+    if conf.additional_packs and #conf.additional_packs > 0 then
+      return table.concat(conf.additional_packs, ":")
+    end
+  end
+end
+
 function M.resolve_qlpacks()
   if cache.qlpacks then
     return cache.qlpacks
   end
   local cmd = { "resolve", "qlpacks", "--format=json" }
-  local conf = config.get_config()
-  if conf.search_path and #conf.search_path > 0 then
-    local additionalPacks = table.concat(conf.search_path, ":")
+  local additionalPacks = M.get_additional_packs()
+  if additionalPacks then
     table.insert(cmd, string.format("--additional-packs=%s", additionalPacks))
   end
   local json = cli.runSync(cmd)

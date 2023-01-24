@@ -2,7 +2,7 @@ local M = {}
 
 -- user configurable options
 M.defaults = {
-  search_path = {},
+  additional_packs = {},
   max_ram = nil,
   job_timeout = 15000,
   format_on_save = false,
