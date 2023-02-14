@@ -7,8 +7,9 @@ local protocol = require "vim.lsp.protocol"
 local client_index = 0
 local progress_id = -1
 local last_rpc_msg_id = -1
-local token = nil
 local lsp_client_id
+local lsp_progress_handler
+local progress_stage
 
 local function next_client_id()
   client_index = client_index + 1
@@ -72,21 +73,36 @@ function M.start_client(opts)
 
   -- Start the RPC client.
   local client = rpc.start(cmd, cmd_args, handlers, {
-    cwd = opts.cmd_cwd,
     env = opts.cmd_env,
   })
   client.id = client_id
   return client
 end
 
-function M.start_server()
-
+function M.get_lsp_client_id()
+  if lsp_client_id then
+    return lsp_client_id
+  else
   local lsp_clients = vim.lsp.get_active_clients()
-  for _, lsp_client in ipairs(lsp_clients) do
-    if lsp_client.name == "codeqlls" then
-      lsp_client_id = lsp_client.id
+    for _, lsp_client in ipairs(lsp_clients) do
+      if lsp_client.name == "codeqlls" then
+        lsp_client_id = lsp_client.id
+        return lsp_client_id
+      end
     end
   end
+end
+
+function M.get_lsp_handler()
+  if lsp_progress_handler then
+    return lsp_progress_handler
+  end
+  lsp_progress_handler = vim.lsp.handlers["$/progress"]
+  return lsp_progress_handler
+end
+
+function M.start_server()
+
   if M.client then
     return M.client
   end
@@ -104,8 +120,6 @@ function M.start_server()
   local conf = config.get_config()
   vim.list_extend(cmd, conf.ram_opts)
 
-  local last_message = ""
-
   local opts = {
     cmd = cmd,
     offset_encoding = { "utf-8", "utf-16" },
@@ -113,68 +127,66 @@ function M.start_server()
 
       -- progress update
       ["ql/progressUpdated"] = function(_, params, _)
+        local client_id = M.get_lsp_client_id()
+        local lsp_handler = M.get_lsp_handler()
         local message = params.message
+        local progress = (100 * params.step) / params.maxStep
+        if progress == 0 and not progress_stage then
+          progress_stage = "begin"
+        elseif progress == 0 then
+          return
+        elseif params.step >= params.maxStep - 1 then
+          progress_stage = "end"
+        end
+
         local handler
-        local lsp_handler = vim.lsp.handlers["$/progress"]
-        if lsp_client_id and lsp_handler and type(lsp_handler) == "function" then
+        if client_id and lsp_handler and type(lsp_handler) == "function" then
           -- use LSP progress handler
-          handler = lsp_handler
+          handler = function(result)
+            -- https://github.com/neovim/neovim/blob/b8ad1bfe8bc23ed5ffbfe43df5fda3501f1d2802/runtime/lua/vim/lsp/handlers.lua#L24
+            local ctx = {
+              client_id = M.get_lsp_client_id()
+            }
+            --vim.lsp.handlers["$/progress"](nil, {value = { message = "foo"}, token = "foo"}, { client_id = vim.lsp.get_active_clients()[1].id })
+            --print(vim.inspect(result), vim.inspect(ctx))
+            lsp_handler(nil, result, ctx)
+          end
         else
           -- Use vim.notify
-          handler = function(_, opts, _)
-            util.message("Query execution progress: " .. opts.value.message)
+          handler = function(result)
+            util.message("Query execution progress: " .. result.value.message)
           end
         end
-        local progress = (100 * params.step) / params.maxStep
-        if params.step == params.maxStep - 1 then
-          progress = 100
+
+        if progress_stage == "begin" then
+          handler({
+            token = "CodeQLToken",
+            value = {
+              kind = progress_stage,
+              title = "CodeQL",
+              percentage = 0,
+            },
+          })
+          progress_stage = "report"
+        elseif progress_stage == "report" then
+          handler({
+            token = "CodeQLToken",
+            value = {
+              kind = progress_stage,
+              message = message,
+              percentage = progress,
+            },
+          })
+        elseif progress_stage == "end" then
+          handler({
+            token = "CodeQLToken",
+            value = {
+              kind = progress_stage,
+              percentage = 100,
+            },
+          })
+          progress_stage = nil
         end
-        if message ~= last_message then
-          if progress == 0 then
-            handler(nil, {
-              value = {
-                message = message,
-                name = "CodeQL",
-                percentage = 0,
-                progress = true,
-                title = "CodeQL",
-                kind = "begin",
-              },
-              token = "CodeQLToken"
-            }, {
-              client_id = lsp_client_id
-            })
-          elseif progress < 100 then
-            handler(nil, {
-              value = {
-                message = message,
-                name = "CodeQL",
-                percentage = progress,
-                progress = true,
-                title = "CodeQL",
-                kind = "report",
-              },
-              token = "CodeQLToken"
-            }, {
-              client_id = lsp_client_id
-            })
-          elseif progress == 100 then
-            handler(nil, {
-              value = {
-                message = message,
-                name = "CodeQL",
-                percentage = 100,
-                progress = true,
-                title = "CodeQL",
-                kind = "end",
-              },
-              token = "CodeQLToken"
-            }, {
-              client_id = lsp_client_id
-            })
-          end
-        end
-        last_message = message
       end,
     }
   }
@@ -197,7 +209,6 @@ function M.run_query(opts)
   local bqrsPath = string.format(vim.fn.tempname(), ".bqrs")
 
   local additionalPacks = util.get_additional_packs()
-  util.message("DEBUG: " .. additionalPacks)
 
   local runQuery_params = {
     body = {
@@ -241,7 +252,7 @@ function M.run_query(opts)
     end
     if resp["resultType"] == 0 then
       if util.is_file(bqrsPath) then
-        loader.process_results {
+        util.bqrs_info({
           bqrs_path = bqrsPath,
           bufnr = bufnr,
           db_path = dbPath,
@@ -249,7 +260,7 @@ function M.run_query(opts)
           query_kind = opts.metadata["kind"],
           query_id = opts.metadata["id"],
           save_bqrs = true,
-        }
+        }, loader.process_results)
       end
     elseif resp["resultType"] == 1 then
       util.err_message("ERROR: Other: " .. resp["message"])

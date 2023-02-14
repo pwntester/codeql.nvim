@@ -2,6 +2,8 @@ local util = require "codeql.util"
 local queryserver = require "codeql.queryserver"
 local config = require "codeql.config"
 local Path = require "plenary.path"
+local ts_utils_installed, ts_utils = pcall(require, "nvim-treesitter.ts_utils")
+local ts_parsers_installed, ts_parsers = pcall(require, "nvim-treesitter.parsers")
 
 local M = {}
 
@@ -87,33 +89,59 @@ local function is_predicate_node(node)
   return node:type() == "charpred" or node:type() == "memberPredicate" or node:type() == "classlessPredicate"
 end
 
-local function is_predicate_identifier_node(predicate_node, node)
-  return (predicate_node:type() == "charpred" and node:type() == "className")
-      or (predicate_node:type() == "classlessPredicate" and node:type() == "predicateName")
-      or (predicate_node:type() == "memberPredicate" and node:type() == "predicateName")
+local function is_predicate_identifier_node(parent, node)
+  if parent then
+    return (parent:type() == "charpred" and node:type() == "className")
+        or (parent:type() == "classlessPredicate" and node:type() == "predicateName")
+        or (parent:type() == "memberPredicate" and node:type() == "predicateName")
+  end
 end
 
-function M.get_enclosing_predicate_position()
-  local ok, ts_utils = pcall(require, "nvim-treesitter.ts_utils")
-  if not ok then
-    return nil
+function M.get_node_at_cursor()
+  if not ts_parsers_installed then
+    return
   end
   local winnr = vim.api.nvim_get_current_win()
-  local ok, node = pcall(ts_utils.get_node_at_cursor, winnr)
-  if not ok or not node then
+  local bufnr = vim.api.nvim_get_current_buf()
+  local cursor = vim.api.nvim_win_get_cursor(winnr)
+  local cursor_range = { cursor[1] - 1, cursor[2] }
+  local root_lang_tree = ts_parsers.get_parser(bufnr)
+  if not root_lang_tree then
+    return
+  end
+  local root = root_lang_tree:trees()[1]:root()
+  return root:named_descendant_for_range(cursor_range[1], cursor_range[2], cursor_range[1], cursor_range[2]), root
+end
+
+function M.get_eval_position()
+  local bufnr = vim.api.nvim_get_current_buf()
+  if not ts_utils_installed then
+    return
+  end
+  local node, root = M.get_node_at_cursor()
+  local orig_node = node
+  if not node then
     util.err_message "Error getting node at cursor. Make sure treesitter CodeQL parser is installed"
     return
   end
   local parent = node:parent()
-  local root = ts_utils.get_root_for_node(node)
-  while parent and parent ~= root and not is_predicate_node(node) do
+  -- ascend the AST until we get to a predicate node
+  while parent and parent ~= root and not is_predicate_node(node) and not is_predicate_identifier_node(parent, node) do
     node = parent
     parent = node:parent()
   end
-  if is_predicate_node(node) then
+  if parent == root then
+    -- We got to the root node, evaluate the whole query
+    return
+  elseif is_predicate_identifier_node(parent, node) then
+    local srow, scol, erow, ecol = node:range()
+    local midname = math.floor((scol + ecol) / 2)
+    return { srow + 1, midname, erow + 1, midname }
+  elseif is_predicate_node(node) then
+    -- descend the predicate node till we find the name node
     for child in node:iter_children() do
       if is_predicate_identifier_node(node, child) then
-        util.message(string.format("Evaluating '%s' predicate", child))
+        util.message(string.format("Evaluating '%s' predicate", ts_utils.get_node_text(child, bufnr)[1]))
         local srow, scol, erow, ecol = child:range()
         local midname = math.floor((scol + ecol) / 2)
         return { srow + 1, midname, erow + 1, midname }
@@ -122,14 +150,16 @@ function M.get_enclosing_predicate_position()
     vim.notify("No predicate identifier node found", 2)
     return
   else
-    vim.notify("No predicate node found", 2)
+    vim.notify("No predicate node found " .. vim.inspect(orig_node:type()), 2)
   end
 end
 
-function M.quick_evaluate_enclosing_predicate()
-  local position = M.get_enclosing_predicate_position()
+function M.smart_quick_evaluate()
+  local position = M.get_eval_position()
   if position then
     M.query(true, position)
+  else
+    M.query(false, util.get_current_position())
   end
 end
 
@@ -298,7 +328,7 @@ function M.setup(opts)
     vim.cmd [[command! UnsetDatabase lua require'codeql.queryserver'.unregister_database()]]
     vim.cmd [[command! CancelQuery lua require'codeql.queryserver'.cancel_query()]]
     vim.cmd [[command! RunQuery lua require'codeql'.run_query()]]
-    vim.cmd [[command! QuickEvalPredicate lua require'codeql'.quick_evaluate_enclosing_predicate()]]
+    vim.cmd [[command! QuickEvalPredicate lua require'codeql'.smart_quick_evaluate()]]
     vim.cmd [[command! -range QuickEval lua require'codeql'.quick_evaluate()]]
     vim.cmd [[command! StopServer lua require'codeql.queryserver'.stop_server()]]
     vim.cmd [[command! History lua require'codeql.history'.menu()]]

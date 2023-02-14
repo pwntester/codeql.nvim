@@ -10,7 +10,7 @@ local M = {}
 ---- active_path: active path index
 ---- hidden: true if the issue is hidden
 ---- node: primary node of the actie path
----- rule_id: the id of the rule generating the issue
+---- query_id: the id of the query generating the issue
 -- each path is a list of nodes where each node is a table with the following fields:
 ---- label: label of the node
 ---- mark: mark (bullet)
@@ -56,7 +56,7 @@ function M.process_sarif(opts)
 
   for i, r in ipairs(results) do
     local message = r.message.text
-    local rule_id = r.ruleId
+    local query_id = r.ruleId
 
     if r.codeFlows == nil then
       -- results with NO codeFlows
@@ -125,7 +125,7 @@ function M.process_sarif(opts)
         active_path = 1,
         hidden = false,
         node = primary_node,
-        rule_id = rule_id,
+        query_id = query_id,
       }
       table.insert(issues, issue)
     else
@@ -262,7 +262,7 @@ function M.process_sarif(opts)
           active_path = 1,
           hidden = false,
           node = primary_node,
-          rule_id = rule_id,
+          query_id = query_id,
         }
         table.insert(issues, issue)
       end

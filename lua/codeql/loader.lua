@@ -6,43 +6,44 @@ local sarif = require "codeql.sarif"
 
 local M = {}
 
-function M.process_results(opts)
+function M.process_results(opts, info)
   local conf = config.get_config()
   local bqrsPath = opts.bqrs_path
-  local dbPath = opts.db_path
   local queryPath = opts.query_path
+  local dbPath = opts.db_path
   local kind = opts.query_kind
   local id = opts.query_id
   local save_bqrs = opts.save_bqrs
   local bufnr = opts.bufnr
   local ram_opts = config.ram_opts
   local resultsPath = vim.fn.tempname()
-
-  local info = util.bqrs_info(bqrsPath, queryPath)
   if not info or info == vim.NIL or not info["result-sets"] then
     return
   end
 
   local query_kinds = info["compatible-query-kinds"]
 
-  local count = info["result-sets"][1]["rows"]
+  local count, total_count = 0, 0
+  local found_select_rs = false
   for _, resultset in ipairs(info["result-sets"]) do
     if resultset.name == "#select" then
+      found_select_rs = true
       count = resultset.rows
+      break
+    else
+      total_count = total_count + resultset.rows
     end
   end
-  util.message(string.format("Processing %d results for %s", count, queryPath))
-
-  if count > 1000 then
-    local continue = vim.fn.input(string.format("Too many results (%d). Open it? (Y/N): ", count))
-    if string.lower(continue) ~= "y" then
-      return
-    end
+  if not found_select_rs then
+    count = total_count
   end
 
   if count == 0 then
+    util.message(string.format("No results for %s", queryPath))
     panel.render()
     return
+  else
+    util.message(string.format("Processing %d results for %s", count, queryPath))
   end
 
   -- process ASTs, definitions and references
@@ -64,21 +65,32 @@ function M.process_results(opts)
     cli.runAsync(
       cmd,
       vim.schedule_wrap(function(_)
+        local qkind
         if util.is_file(resultsPath) then
           if vim.endswith(string.lower(queryPath), "/localdefinitions.ql") then
+            qkind = "definitions"
             require("codeql.defs").process_defs(resultsPath)
           elseif vim.endswith(string.lower(queryPath), "/localreferences.ql") then
+            qkind = "references"
             require("codeql.defs").process_refs(resultsPath)
           elseif vim.endswith(string.lower(queryPath), "/printast.ql") then
+            qkind = "AST"
             require("codeql.ast").build_ast(resultsPath, bufnr)
           end
         else
-          util.err_message("Cant find results at " .. resultsPath)
+          util.err_message("Error: Failed to decode " .. qkind .. " results from " .. resultsPath)
           panel.render()
         end
       end)
     )
     return
+  end
+
+  if count > 1000 then
+    local continue = vim.fn.input(string.format("Too many results (%d). Open it? (Y/N): ", count))
+    if string.lower(continue) ~= "y" then
+      return
+    end
   end
 
   -- process SARIF results
@@ -102,7 +114,7 @@ function M.process_results(opts)
         if util.is_file(resultsPath) then
           M.load_sarif_results(resultsPath)
         else
-          util.err_message("Cant find results at " .. resultsPath)
+          util.err_message("Error: Cant find SARIF results at " .. resultsPath)
           panel.render()
         end
       end)
@@ -135,7 +147,7 @@ function M.process_results(opts)
       if util.is_file(resultsPath) then
         M.load_raw_results(resultsPath)
       else
-        util.err_message("Cant find results at " .. resultsPath)
+        util.err_message("Error: Cant find raw results at " .. resultsPath)
         panel.render()
       end
     end)
@@ -151,105 +163,105 @@ function M.load_raw_results(path)
     return
   end
   local results = util.read_json_file(path)
-  local issues = {}
-  local tuples, columns
-  if results["#select"] then
-    tuples = results["#select"].tuples
-    columns = results["#select"].columns
-  else
-    for k, _ in pairs(results) do
-      tuples = results[k].tuples
-    end
-  end
+  if results then
+    local issues = {}
+    local col_names = {}
+    for name, v in pairs(results) do
+      local tuples = v.tuples
+      local columns = v.columns
 
-  if not tuples or vim.tbl_isempty(tuples) then
-    panel.render()
-    return
-  end
+      for _, tuple in ipairs(tuples) do
+        path = {}
+        for _, element in ipairs(tuple) do
+          local node = {}
+          -- objects with url info
+          if type(element) == "table" and element.url then
+            if element.url and element.url.endColumn then
+              element.url.endColumn = element.url.endColumn + 1
+            end
+            local filename = util.uri_to_fname(element.url.uri)
+            local line = element.url.startLine
+            node = {
+              label = element["label"],
+              mark = "→",
+              filename = filename,
+              line = line,
+              visitable = true,
+              url = element.url,
+            }
 
-  for _, tuple in ipairs(tuples) do
-    path = {}
-    for _, element in ipairs(tuple) do
-      local node = {}
-      -- objects with url info
-      if type(element) == "table" and element.url then
-        if element.url and element.url.endColumn then
-          element.url.endColumn = element.url.endColumn + 1
+            -- objects with no url info
+          elseif type(element) == "table" and not element.url then
+            node = {
+              label = element.label,
+              mark = "≔",
+              filename = nil,
+              line = nil,
+              visitable = false,
+              url = nil,
+            }
+
+            -- string literal
+          elseif type(element) == "string" or type(element) == "number" then
+            node = {
+              label = element,
+              mark = "≔",
+              filename = nil,
+              line = nil,
+              visitable = false,
+              url = nil,
+            }
+
+            -- ???
+          else
+            util.err_message(string.format("Error processing node (%s)", type(element)))
+          end
+          table.insert(path, node)
         end
-        local filename = util.uri_to_fname(element.url.uri)
-        local line = element.url.startLine
-        node = {
-          label = element["label"],
-          mark = "→",
-          filename = filename,
-          line = line,
-          visitable = true,
-          url = element.url,
-        }
 
-        -- objects with no url info
-      elseif type(element) == "table" and not element.url then
-        node = {
-          label = element.label,
-          mark = "≔",
-          filename = nil,
-          line = nil,
-          visitable = false,
-          url = nil,
-        }
+        -- add issue paths to issues list
+        local paths = { path }
 
-        -- string literal
-      elseif type(element) == "string" or type(element) == "number" then
-        node = {
-          label = element,
-          mark = "≔",
-          filename = nil,
-          line = nil,
-          visitable = false,
-          url = nil,
-        }
-
-        -- ???
-      else
-        util.err_message "Error processing node"
+        table.insert(issues, {
+          is_folded = true,
+          paths = paths,
+          active_path = 1,
+          hidden = false,
+          node = paths[1][1],
+          query_id = name,
+        })
       end
-      table.insert(path, node)
-    end
 
-    -- add issue paths to issues list
-    local paths = { path }
-
-    table.insert(issues, {
-      is_folded = true,
-      paths = paths,
-      active_path = 1,
-      hidden = false,
-      node = paths[1][1],
-      rule_id = "custom_query",
-    })
-  end
-
-  local col_names = {}
-  if columns then
-    for _, col in ipairs(columns) do
-      if col.name then
-        table.insert(col_names, col.name)
+      col_names[name] = {}
+      if columns then
+        for _, col in ipairs(columns) do
+          if col.name then
+            table.insert(col_names[name], col.name)
+          else
+            table.insert(col_names[name], "---")
+          end
+        end
       else
-        table.insert(col_names, "---")
+        for _ = 1, #tuples[1] do
+          table.insert(col_names[name], "---")
+        end
       end
     end
-  else
-    for _ = 1, #tuples[1] do
-      table.insert(col_names, "---")
+
+    if vim.tbl_isempty(issues) then
+      panel.render()
+      return
+    else
+      panel.render({
+        source = "raw",
+        mode = "table",
+        issues = issues,
+        columns = col_names,
+      })
+      vim.api.nvim_command "redraw"
     end
   end
 
-  panel.render(issues, {
-    kind = "raw",
-    columns = col_names,
-    mode = "table",
-  })
-  vim.api.nvim_command "redraw"
 end
 
 function M.load_sarif_results(path)
@@ -259,9 +271,10 @@ function M.load_sarif_results(path)
     max_length = conf.results.max_path_depth,
     group_by = conf.panel.group_by,
   }
-  panel.render(issues, {
-    kind = "sarif",
+  panel.render({
+    source = "sarif",
     mode = "tree",
+    issues = issues,
   })
   vim.api.nvim_command "redraw"
 end

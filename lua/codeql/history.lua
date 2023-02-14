@@ -45,7 +45,7 @@ function M.menu()
   elseif choice < 1 + #history then
     local entry = history[choice]
     if entry then
-      require("codeql.loader").process_results {
+      util.bqrs_info({
         bqrs_path = entry.bqrs,
         bufnr = entry.bufnr,
         db_path = entry.database,
@@ -53,7 +53,7 @@ function M.menu()
         query_kind = entry.kind,
         query_id = entry.id,
         save_bqrs = false,
-      }
+      }, require("codeql.loader").process_results)
     end
   end
 end

@@ -258,15 +258,15 @@ end
 local function print_issues(bufnr, results)
   if results.mode == "tree" then
     -- print group name
-    local rule_foldmarker = not results.is_folded and icon_open or icon_closed
-    local rule_label = string.format("%s %s", rule_foldmarker, results.label)
+    local query_foldmarker = not results.is_folded and icon_open or icon_closed
+    local query_label = string.format("%s %s", query_foldmarker, results.label)
 
-    print_to_panel(bufnr, string.format("%s (%d)", rule_label, #results.issues), {
-      CodeqlPanelFoldIcon = { { 0, string.len(rule_foldmarker) } },
-      CodeqlPanelRuleId = { { string.len(rule_foldmarker), string.len(rule_label) } },
+    print_to_panel(bufnr, string.format("%s (%d)", query_label, #results.issues), {
+      CodeqlPanelFoldIcon = { { 0, string.len(query_foldmarker) } },
+      CodeqlPanelQueryId = { { string.len(query_foldmarker), string.len(query_label) } },
     })
     register(bufnr, {
-      kind = "rule",
+      kind = "query",
       obj = results,
     })
 
@@ -280,7 +280,7 @@ local function print_issues(bufnr, results)
           local label = string.format("  %s %s", foldmarker, generate_issue_label(issue.node))
           print_to_panel(bufnr, label, {
             CodeqlPanelFoldIcon = { { 0, 2 + string.len(foldmarker) } },
-            --CodeqlPanelRuleId = { { 2 + string.len(foldmarker), string.len(label) } },
+            --CodeqlPanelQueryId = { { 2 + string.len(foldmarker), string.len(label) } },
           })
 
           register(bufnr, {
@@ -294,9 +294,14 @@ local function print_issues(bufnr, results)
         end
       end
     end
+    print_to_panel(bufnr, "")
   elseif results.mode == "table" then
     -- TODO: node.label may need to be tweaked (eg: replace new lines with "")
     -- and this is the place to do it
+
+    print_to_panel(bufnr, string.format("%s (%d)", results.label, #results.issues), {
+      CodeqlPanelQueryId = { { 0, string.len(results.label) } },
+    })
 
     -- calculate max length for each cell
     local max_lengths = {}
@@ -386,6 +391,7 @@ local function print_issues(bufnr, results)
     end
     local footer = string.format("└─%s─┘", table.concat(bars, "─┴─"))
     print_to_panel(bufnr, footer, { CodeqlPanelSeparator = { { 0, -1 } } })
+    print_to_panel(bufnr, "")
   end
 end
 
@@ -404,8 +410,8 @@ local function render_content(bufnr)
   if #panel.issues > 0 then
     print_header(bufnr, panel.issues)
     print_to_panel(bufnr, "")
-    for _, rule in ipairs(panel.rules) do
-      print_issues(bufnr, rule)
+    for _, query in ipairs(panel.queries) do
+      print_issues(bufnr, query)
     end
 
     local win = get_panel_window(bufnr)
@@ -593,8 +599,9 @@ function M.toggle_mode()
   elseif panel.mode == "table" then
     panel.mode = "tree"
   end
-  M.render(panel.issues, {
-    kind = panel.kind,
+  M.render({
+    issues = panel.issues,
+    source = panel.source,
     mode = panel.mode,
     columns = panel.columns,
     panel_name = vim.fn.bufname(bufnr),
@@ -608,7 +615,7 @@ local function get_enclosing_issue(line)
   while line >= 7 do
     entry = line_map[line]
     if entry
-        and (entry.kind == "node" or entry.kind == "issue" or entry.kind == "rule")
+        and (entry.kind == "node" or entry.kind == "issue" or entry.kind == "query")
         and vim.tbl_contains(vim.tbl_keys(entry.obj), "is_folded")
     then
       return line, entry.obj
@@ -918,42 +925,43 @@ function M.close_panel()
   vim.api.nvim_win_close(0, true)
 end
 
-function M.render(issues, opts)
-  issues = issues or {}
+function M.render(opts)
   opts = opts or {}
+  local issues = opts.issues or {}
   local panel_name = opts.panel_name or "__CodeQLPanel__"
   local bufnr = M.open_panel(panel_name)
 
   M.panels[bufnr] = {
     issues = issues or {},
-    kind = opts.kind or "raw",
+    source = opts.source or "raw",
     columns = opts.columns or {},
     mode = opts.mode or "table",
     line_map = {},
   }
 
-  local rule_groups = {}
+  -- split issues in groups according to the query that generated them
+  local query_groups = {}
   for _, issue in ipairs(issues) do
-    if rule_groups[issue.rule_id] then
-      table.insert(rule_groups[issue.rule_id], issue)
+    if query_groups[issue.query_id] then
+      table.insert(query_groups[issue.query_id], issue)
     else
-      rule_groups[issue.rule_id] = { issue }
+      query_groups[issue.query_id] = { issue }
     end
   end
 
-  local rules = {}
-  local folded = #vim.tbl_keys(rule_groups) > 1 and true or false
-  for group, rule_issues in pairs(rule_groups) do
-    local rule = {
+  local queries = {}
+  local folded = #vim.tbl_keys(query_groups) > 1 and true or false
+  for query_id, query_issues in pairs(query_groups) do
+    local query = {
       mode = opts.mode or "table",
-      columns = opts.columns or {},
-      issues = rule_issues,
+      columns = opts.columns and opts[query_id] or {},
+      issues = query_issues,
       is_folded = folded,
-      label = group,
+      label = query_id,
     }
-    table.insert(rules, rule)
+    table.insert(queries, query)
   end
-  M.panels[bufnr].rules = rules
+  M.panels[bufnr].queries= queries
 
   render_content(bufnr)
 end

@@ -338,17 +338,22 @@ function M.database_info(database)
   return metadata
 end
 
-function M.bqrs_info(bqrsPath, queryPath)
-  local json = cli.runSync { "bqrs", "info", "--format=json", bqrsPath }
-  if json ~= "" and json ~= vim.NIL and json then
-    local decoded, err = M.json_decode(json)
-    if not decoded then
-      M.err_message(string.format("ERROR: Could not get BQRS info for %s: %s", queryPath, vim.inspect(err)))
-      return
-    end
-    return decoded
-  end
-  M.err_message(string.format("ERROR: Could not get BQRS info for %s.", queryPath))
+function M.bqrs_info(opts, cb)
+  cli.runAsync(
+    { "bqrs", "info", "--format=json", opts.bqrs_path },
+    vim.schedule_wrap(function(json)
+      if json and json ~= "" and json ~= vim.NIL then
+        local decoded, err = M.json_decode(json)
+        if not decoded then
+          M.err_message(string.format("ERROR1: Could not get BQRS info for %s: %s", opts.query_path, vim.inspect(err)))
+        else
+          cb(opts, decoded)
+          return
+        end
+      end
+      M.err_message(string.format("ERROR2: Could not get BQRS info for %s.", opts.query_path))
+    end)
+  )
 end
 
 function M.resolve_library_path(queryPath)
@@ -369,6 +374,10 @@ function M.resolve_library_path(queryPath)
   end
   cache.library_paths[queryPath] = decoded
   return decoded
+end
+
+function M.get_version()
+  return cli.runSync({ "--version" })
 end
 
 function M.get_additional_packs()

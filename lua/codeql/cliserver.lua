@@ -6,8 +6,10 @@ local function start()
   local util = require("codeql.util")
   util.message("Starting CodeQL CLI Server")
 
-  local cmd = "codeql"
-  local cmd_args = { "execute", "cli-server", "--logdir", "/tmp/codeql_queryserver" }
+  --local cmd = "codeql"
+  --local cmd_args = { "execute", "cli-server", "--logdir", "/tmp/codeql_queryserver" }
+  local cmd = "sh"
+  local cmd_args = { "-c", "codeql execute cli-server --logdir /tmp/codeql_queryserver" }
 
   if not (vim.fn.executable(cmd) == 1) then
     require("codeql.util").err_message(string.format("The given command %q is not executable.", cmd))
