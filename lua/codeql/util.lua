@@ -381,6 +381,13 @@ function M.get_version()
 end
 
 function M.get_additional_packs()
+  -- Check if CODEQL_DIST is set
+  local additional_packs = vim.fn.environ()["CODEQL_DIST"]
+  if additional_packs then
+    return additional_packs
+  end
+
+  -- Check if ~/.config/codeql/config exists
   local config_path = vim.fn.fnamemodify('~/.config/codeql/config', ':p')
   if M.is_file(config_path) then
     local config_contents = vim.fn.readfile(config_path)
@@ -389,16 +396,19 @@ function M.get_additional_packs()
       local tokens = vim.split(l, " ")
       for i, t in ipairs(tokens) do
         if t == "--additional-packs" then
-          return tokens[i+1]
+          return tokens[i + 1]
         end
       end
     end
-  else
-    local conf = config.get_config()
-    if conf.additional_packs and #conf.additional_packs > 0 then
-      return table.concat(conf.additional_packs, ":")
-    end
   end
+
+  -- Check if additional_packs is set in config
+  local conf = config.get_config()
+  if conf.additional_packs and #conf.additional_packs > 0 then
+    return table.concat(conf.additional_packs, ":")
+  end
+
+  return ""
 end
 
 function M.resolve_qlpacks()
