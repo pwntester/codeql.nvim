@@ -1,6 +1,8 @@
 local cli = require "codeql.cliserver"
 local config = require "codeql.config"
 local Job = require "plenary.job"
+local gh = require "octo.gh"
+local graphql = require "octo.gh.graphql"
 local vim = vim
 
 local M = {}
@@ -472,6 +474,60 @@ function M.get_flatten_artifacts_pages(text)
     vim.list_extend(results, decoded_page.artifacts)
   end
   return results
+end
+
+M.file_cache = {}
+function M.get_file_contents(owner, name, commit, path, cb)
+  local key = string.format("%s::%s::%s::%s", owner, name, commit, path)
+  if M.file_cache[key] then
+    cb(M.file_cache[key])
+    return
+  end
+  local query = graphql("file_content_query", owner, name, commit, path)
+  gh.run {
+    args = { "api", "graphql", "-f", string.format("query=%s", query) },
+    cb = function(output, stderr)
+      if stderr and not M.is_blank(stderr) then
+        M.err_message(stderr)
+      elseif output then
+        local resp = vim.fn.json_decode(output)
+        local blob = resp.data.repository.object
+        local lines = {}
+        if blob and blob ~= vim.NIL and type(blob.text) == "string" then
+          lines = vim.split(blob.text, "\n")
+        end
+        M.file_cache[key] = lines
+        cb(lines)
+        return
+      end
+    end,
+  }
+end
+
+function M.highlight_range(ns, startLine, endLine, startColumn, endColumn)
+    vim.api.nvim_buf_clear_namespace(0, ns, 0, -1)
+    startLine = startLine - 1
+    endLine = endLine - 1
+    startColumn = startColumn - 1
+    endColumn = endColumn - 1
+    if startLine == endLine then
+      pcall(vim.api.nvim_buf_add_highlight, 0, ns, "CodeqlRange", startLine, startColumn, endColumn)
+    else
+      for i = startLine, endLine do
+        local hl_startColumn, hl_endColumn
+        if i == startLine then
+          hl_startColumn = startColumn
+          hl_endColumn = #vim.fn.getline(i)
+        elseif i < endLine and i > startLine then
+          hl_startColumn = 1
+          hl_endColumn = #vim.fn.getline(i)
+        elseif i == endLine then
+          hl_startColumn = 1
+          hl_endColumn = endColumn
+        end
+        pcall(vim.api.nvim_buf_add_highlight, 0, ns, "CodeqlRange", i, hl_startColumn, hl_endColumn)
+      end
+    end
 end
 
 return M

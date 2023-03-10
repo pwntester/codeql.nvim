@@ -719,6 +719,8 @@ function M.jump_to_code(stay_in_panel)
     source = "sarif"
   elseif util.is_file(vim.fn.getcwd() .. util.uri_to_fname("/" .. filename)) then
     source = "file_system"
+  elseif node.versionControlProvenance then
+    source = "vcs"
   end
   -- open from ZIP archive or SARIF file
   if source then
@@ -737,6 +739,13 @@ function M.jump_to_code(stay_in_panel)
       bufname = string.format("codeql://%s", filename)
     elseif source == "file_system" then
       bufname = vim.fn.getcwd() .. "/" .. filename
+    elseif source == "vcs" then
+      local repositoryUri = node.versionControlProvenance.repositoryUri
+      local revisionId = node.versionControlProvenance.revisionId
+      local nwo = vim.split(repositoryUri, "github.com/")[2]
+      bufname = string.format("versionControlProvenance://%s/%s/%s?line=%s&startLine=%s&endLine=%s&startColumn=%s&endColumn=%s&stay=%s&panelId=%s"
+        , nwo, revisionId, filename, node.line, node.url.startLine, node.url.endLine, node.url.startColumn,
+        node.url.endColumn, stay_in_panel, panel_winid)
     end
 
     if vim.fn.bufnr(bufname) == -1 then
@@ -745,39 +754,18 @@ function M.jump_to_code(stay_in_panel)
       vim.api.nvim_command(string.format("buffer %s", bufname))
     end
 
-    -- move cursor to the node's line
-    pcall(vim.api.nvim_win_set_cursor, 0, { node.line, 0 })
-    vim.cmd "norm! zz"
+    if source ~= "vcs" then
+      -- move cursor to the node's line
+      pcall(vim.api.nvim_win_set_cursor, 0, { node.line, 0 })
+      vim.cmd "norm! zz"
 
-    -- highlight node
-    -- TODO SARIF does not send the endLine (or Im not processing it correctly)
-    -- TODO SARIF and RAW send different endColumn (SARIF requires -1, RAW does not)
-    vim.api.nvim_buf_clear_namespace(0, range_ns, 0, -1)
-    local startLine = node.url.startLine - 1
-    local endLine = node.url.endLine - 1
-    local startColumn = node.url.startColumn - 1
-    local endColumn = node.url.endColumn - 1
-    if startLine == endLine then
-      pcall(vim.api.nvim_buf_add_highlight, 0, range_ns, "CodeqlRange", startLine, startColumn, endColumn)
-    else
-      for i = startLine, endLine do
-        local hl_startColumn, hl_endColumn
-        if i == startLine then
-          hl_startColumn = startColumn
-          hl_endColumn = #vim.fn.getline(i)
-        elseif i < endLine and i > startLine then
-          hl_startColumn = 1
-          hl_endColumn = #vim.fn.getline(i)
-        elseif i == endLine then
-          hl_startColumn = 1
-          hl_endColumn = endColumn
-        end
-        pcall(vim.api.nvim_buf_add_highlight, 0, range_ns, "CodeqlRange", i, hl_startColumn, hl_endColumn)
+      -- highlight node
+      util.highlight_range(range_ns, node.url.startLine, node.url.endLine, node.url.startColumn, node.url.endColumn)
+
+      -- jump to main window if requested
+      if stay_in_panel then
+        vim.fn.win_gotoid(panel_winid)
       end
-    end
-    -- jump to main window if requested
-    if stay_in_panel then
-      vim.fn.win_gotoid(panel_winid)
     end
   else
     util.err_message("Cannot find source code for " .. filename)

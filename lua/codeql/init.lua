@@ -4,6 +4,8 @@ local config = require "codeql.config"
 local Path = require "plenary.path"
 local ts_utils_installed, ts_utils = pcall(require, "nvim-treesitter.ts_utils")
 local ts_parsers_installed, ts_parsers = pcall(require, "nvim-treesitter.parsers")
+local vim = vim
+local range_ns = vim.api.nvim_create_namespace "codeql"
 
 local M = {}
 
@@ -315,6 +317,42 @@ function M.load_source_buffer()
   set_source_buffer_options(bufnr)
 end
 
+function M.load_vcs_buffer()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local bufname = vim.api.nvim_buf_get_name(bufnr)
+  local uri = string.match(bufname, "versionControlProvenance://(.*)")
+  local chunks = vim.split(vim.split(uri, "?")[1], "/")
+  local params = vim.split(uri, "?")[2]
+  local node = {}
+  if params then
+    local pairs = vim.split(params, "&")
+    for _,pair in ipairs(pairs) do
+      local kv = vim.split(pair, "=")
+      node[kv[1]] = kv[2]
+    end
+  end
+  local owner = chunks[1]
+  local name = chunks[2]
+  local revisionId = chunks[3]
+  local path = table.concat(chunks, "/", 4, #chunks)
+  util.get_file_contents(owner, name, revisionId, path, function(lines)
+    vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, lines)
+    set_source_buffer_options(bufnr)
+    -- move cursor to the node's line
+    pcall(vim.api.nvim_win_set_cursor, 0, { tonumber(node.line), 0 })
+    vim.cmd "norm! zz"
+
+    -- highlight node
+    util.highlight_range(range_ns, tonumber(node.startLine), tonumber(node.endLine), tonumber(node.startColumn), tonumber(node.endColumn))
+
+    -- jump to main window if requested
+    if node.stay == "true" then
+      vim.fn.win_gotoid(node.panelId)
+    end
+  end)
+
+end
+
 function M.setup(opts)
   if vim.fn.executable "codeql" then
     config.setup(opts or {})
@@ -343,6 +381,7 @@ function M.setup(opts)
     vim.cmd [[au BufEnter * if &ft ==# 'codeql_panel' | execute("lua require'codeql.panel'.apply_mappings()") | endif]]
     vim.cmd [[au BufEnter codeql://* lua require'codeql'.setup_archive_buffer()]]
     vim.cmd [[au BufReadCmd codeql://* lua require'codeql'.load_source_buffer()]]
+    vim.cmd [[au BufReadCmd versionControlProvenance://* lua require'codeql'.load_vcs_buffer()]]
     vim.cmd [[autocmd FileType ql lua require'codeql.util'.apply_mappings()]]
 
     if require("codeql.config").get_config().format_on_save then
