@@ -1,5 +1,6 @@
 local util = require "codeql.util"
 local config = require "codeql.config"
+local vim = vim
 
 local M = {}
 
@@ -48,6 +49,8 @@ function M.process_sarif(opts)
       end
     end
   end
+
+  local versionControlProvenance = decoded.runs[1].versionControlProvenance[1]
 
   util.message("Sarif: " .. opts.path)
   util.message("Results: " .. #results)
@@ -99,6 +102,7 @@ function M.process_sarif(opts)
           filename = util.uri_to_fname(uri) or uri,
           line = region and region.startLine or -1,
           visitable = region or false,
+          versionControlProvenance = versionControlProvenance,
           url = {
             uri = uri,
             startLine = region and region.startLine or -1,
@@ -164,6 +168,7 @@ function M.process_sarif(opts)
                 filename = util.uri_to_fname(uri) or uri,
                 line = region.startLine,
                 visitable = true,
+                versionControlProvenance = versionControlProvenance,
                 url = {
                   uri = uri,
                   startLine = region.startLine,
@@ -179,6 +184,7 @@ function M.process_sarif(opts)
                 filename = util.uri_to_fname(uri) or uri,
                 line = -1,
                 visitable = false,
+                versionControlProvenance = versionControlProvenance,
                 url = {
                   uri = uri,
                   startLine = -1,
