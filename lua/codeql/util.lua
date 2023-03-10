@@ -1,6 +1,7 @@
 local cli = require "codeql.cliserver"
 local config = require "codeql.config"
 local Job = require "plenary.job"
+local vim = vim
 
 local M = {}
 

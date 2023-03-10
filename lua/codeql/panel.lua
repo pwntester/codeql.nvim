@@ -3,6 +3,7 @@ local config = require "codeql.config"
 local Popup = require "nui.popup"
 local autocmd = require "nui.utils.autocmd"
 local event = autocmd.event
+local vim = vim
 
 local range_ns = vim.api.nvim_create_namespace "codeql"
 local panel_pos = "right"
@@ -707,14 +708,20 @@ function M.jump_to_code(stay_in_panel)
     return
   end
 
+  local filename = node.filename
+  if string.sub(filename, 1, 1) == "/" then
+    filename = string.sub(filename, 2)
+  end
+  local source
+  if config.database.sourceArchiveZip and util.is_file(config.database.sourceArchiveZip) then
+    source = "source_archive"
+  elseif config.sarif.path and util.is_file(config.sarif.path) and config.sarif.hasArtifacts then
+    source = "sarif"
+  elseif util.is_file(vim.fn.getcwd() .. util.uri_to_fname("/" .. filename)) then
+    source = "file_system"
+  end
   -- open from ZIP archive or SARIF file
-  if (config.database.sourceArchiveZip and util.is_file(config.database.sourceArchiveZip))
-      or (config.sarif.path and util.is_file(config.sarif.path) and config.sarif.hasArtifacts)
-  then
-    if string.sub(node.filename, 1, 1) == "/" then
-      node.filename = string.sub(node.filename, 2)
-    end
-
+  if source then
     -- save audit pane window
     local panel_winid = vim.fn.win_getid()
 
@@ -724,8 +731,14 @@ function M.jump_to_code(stay_in_panel)
     -- go to the target window
     vim.fn.win_gotoid(target_winid)
 
-    -- create the codeql:// buffer
-    local bufname = string.format("codeql://%s", node.filename)
+    local bufname
+    if source == "source_archive" or source == "sarif" then
+      -- create the codeql:// buffer
+      bufname = string.format("codeql://%s", filename)
+    elseif source == "file_system" then
+      bufname = vim.fn.getcwd() .. "/" .. filename
+    end
+
     if vim.fn.bufnr(bufname) == -1 then
       vim.api.nvim_command(string.format("edit %s", bufname))
     else
@@ -767,7 +780,7 @@ function M.jump_to_code(stay_in_panel)
       vim.fn.win_gotoid(panel_winid)
     end
   else
-    util.err_message("Cannot find source code for " .. node.filename)
+    util.err_message("Cannot find source code for " .. filename)
   end
 end
 
@@ -961,7 +974,7 @@ function M.render(opts)
     }
     table.insert(queries, query)
   end
-  M.panels[bufnr].queries= queries
+  M.panels[bufnr].queries = queries
 
   render_content(bufnr)
 end
