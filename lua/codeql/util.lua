@@ -1,8 +1,6 @@
 local cli = require "codeql.cliserver"
 local config = require "codeql.config"
 local Job = require "plenary.job"
-local gh = require "codeql.gh"
-local graphql = require "codeql.gh.graphql"
 local vim = vim
 
 local M = {}
@@ -478,6 +476,8 @@ end
 
 M.file_cache = {}
 function M.get_file_contents(owner, name, commit, path, cb)
+  local gh = require "codeql.gh"
+  local graphql = require "codeql.gh.graphql"
   local key = string.format("%s::%s::%s::%s", owner, name, commit, path)
   if M.file_cache[key] then
     cb(M.file_cache[key])

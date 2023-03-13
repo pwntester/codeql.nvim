@@ -50,7 +50,10 @@ function M.process_sarif(opts)
     end
   end
 
-  local versionControlProvenance = decoded.runs[1].versionControlProvenance[1]
+  local versionControlProvenance
+  if decoded.runs[1].versionControlProvenance then
+    versionControlProvenance = decoded.runs[1].versionControlProvenance[1]
+  end
 
   util.message("Sarif: " .. opts.path)
   util.message("Results: " .. #results)
