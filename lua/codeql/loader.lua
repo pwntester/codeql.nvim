@@ -7,7 +7,7 @@ local sarif = require "codeql.sarif"
 local M = {}
 
 function M.process_results(opts, info)
-  local conf = config.get_config()
+  local conf = config.config
   local bqrsPath = opts.bqrs_path
   local queryPath = opts.query_path
   local dbPath = opts.db_path
@@ -265,7 +265,7 @@ function M.load_raw_results(path)
 end
 
 function M.load_sarif_results(path)
-  local conf = config.get_config()
+  local conf = config.config
   local issues = sarif.process_sarif {
     path = path,
     max_length = conf.results.max_path_depth,

@@ -16,7 +16,7 @@ local cache = {
 --- Apply mappings to a buffer
 function M.apply_mappings()
   local mappings = require "codeql.mappings"
-  local conf = config.get_config()
+  local conf = config.config
   for action, value in pairs(conf.mappings) do
     if not M.is_blank(value)
         and not M.is_blank(action)
@@ -362,7 +362,7 @@ function M.resolve_library_path(queryPath)
     return cache.library_paths[queryPath]
   end
   local cmd = { "resolve", "library-path", "-v", "--log-to-stderr", "--format=json", "--query=" .. queryPath }
-  local conf = config.get_config()
+  local conf = config.config
   if conf.additional_packs and #conf.additional_packs > 0 then
     local additional_packs = table.concat(conf.additional_packs, ":")
     table.insert(cmd, string.format("--additional-packs=%s", additional_packs))
@@ -404,7 +404,7 @@ function M.get_additional_packs()
   end
 
   -- Check if additional_packs is set in config
-  local conf = config.get_config()
+  local conf = config.config
   if conf.additional_packs and #conf.additional_packs > 0 then
     return table.concat(conf.additional_packs, ":")
   end
@@ -436,7 +436,7 @@ function M.resolve_ram()
     return cache.ram
   end
   local cmd = { "resolve", "ram", "--format=json" }
-  local conf = config.get_config()
+  local conf = config.config
   if conf.max_ram and conf.max_ram > -1 then
     table.insert(cmd, "-M")
     table.insert(cmd, conf.max_ram)
@@ -527,6 +527,23 @@ function M.highlight_range(ns, startLine, endLine, startColumn, endColumn)
       end
       pcall(vim.api.nvim_buf_add_highlight, 0, ns, "CodeqlRange", i, hl_startColumn, hl_endColumn)
     end
+  end
+end
+
+function M.tableMerge(t1, t2)
+  if t1 and t2 then
+    for k,v in pairs(t2) do
+        if type(v) == "table" then
+            if type(t1[k] or false) == "table" then
+                M.tableMerge(t1[k] or {}, t2[k] or {})
+            else
+                t1[k] = v
+            end
+        else
+            t1[k] = v
+        end
+    end
+    return t1
   end
 end
 

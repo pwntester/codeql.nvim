@@ -85,7 +85,7 @@ Use `UnsetDatabase` to unregister the current registered database.
 
 ### Run query or eval predicates
 
-Use `RunQuery` or `QuickEval` commands or `qr`, `qe` shortcuts respectively to run the query or evaluate the predicate under the cursor.
+Use `RunQuery` or `QuickEval`, or `QuickEvalPredicate` commands or `qr`, `qe`, `qp` shortcuts respectively to run the query or evaluate the predicate under the cursor.
 
 ## Configuration options
 - additional_packs: List of codeql qlpacks to use 
@@ -101,6 +101,8 @@ require("codeql").setup {
     max_path_depth = nil,
   },
   panel = {
+    width = 50,
+    pos = "botright",
     group_by = "sink", -- "source"
     show_filename = true,
     long_filename = false,

@@ -117,7 +117,7 @@ function M.start_server()
     "-v",
     "--log-to-stderr",
   }
-  local conf = config.get_config()
+  local conf = config.config
   vim.list_extend(cmd, conf.ram_opts)
 
   local opts = {

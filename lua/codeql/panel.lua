@@ -26,7 +26,7 @@ local M = {
 
 local function generate_issue_label(node)
   local label = node.label
-  local conf = config.get_config()
+  local conf = config.config
   if conf.panel.show_filename and node["filename"] and node["filename"] ~= nil then
     if conf.panel.long_filename then
       label = node.filename
@@ -136,7 +136,7 @@ local function get_node_location(node)
       line = string.format(":%d", node.line)
     end
     local filename
-    local conf = config.get_config()
+    local conf = config.config
     if conf.panel.long_filename then
       filename = node.filename
     else
@@ -741,7 +741,8 @@ function M.jump_to_code(stay_in_panel)
       local repositoryUri = node.versionControlProvenance.repositoryUri
       local revisionId = node.versionControlProvenance.revisionId
       local nwo = vim.split(repositoryUri, "github.com/")[2]
-      bufname = string.format("versionControlProvenance://%s/%s/%s?line=%s&startLine=%s&endLine=%s&startColumn=%s&endColumn=%s&stay=%s&panelId=%s"
+      bufname = string.format(
+        "versionControlProvenance://%s/%s/%s?line=%s&startLine=%s&endLine=%s&startColumn=%s&endColumn=%s&stay=%s&panelId=%s"
         , nwo, revisionId, filename, node.line, node.url.startLine, node.url.endLine, node.url.startColumn,
         node.url.endColumn, stay_in_panel, panel_winid)
     end
@@ -775,7 +776,7 @@ function M.preview_snippet()
   if not node or not node.visitable then
     return
   end
-  local conf = config.get_config()
+  local conf = config.config
   local context_lines = conf.panel.context_lines
   local snippet = {}
   local max_len = 0
@@ -870,6 +871,7 @@ end
 
 function M.open_panel(panel_name)
   local bufnr = vim.fn.bufnr(panel_name)
+  local conf = config.config
 
   -- check if audit pane is already opened
   if get_panel_window(bufnr) then
@@ -883,7 +885,6 @@ function M.open_panel(panel_name)
   go_to_main_window(panel_name)
 
   -- split
-  local conf = config.get_config()
   vim.fn.execute("silent keepalt " .. conf.panel.pos .. " vertical " .. conf.panel.width .. "split " .. panel_name)
   bufnr = vim.fn.bufnr(panel_name)
 

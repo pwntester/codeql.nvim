@@ -46,7 +46,7 @@ function M.load_definitions(bufnr)
 end
 
 function M.set_database(dbpath)
-  local conf = config.get_config()
+  local conf = config.config
   conf.ram_opts = util.resolve_ram()
   dbpath = vim.fn.fnamemodify(vim.trim(dbpath), ":p")
   local database
@@ -385,7 +385,7 @@ function M.setup(opts)
     vim.cmd [[au BufReadCmd versionControlProvenance://* lua require'codeql'.load_vcs_buffer()]]
     vim.cmd [[autocmd FileType ql lua require'codeql.util'.apply_mappings()]]
 
-    if require("codeql.config").get_config().format_on_save then
+    if require("codeql.config").config.format_on_save then
       vim.cmd [[autocmd FileType ql autocmd BufWrite <buffer> lua vim.lsp.buf.formatting()]]
     end
     vim.cmd [[augroup END]]
