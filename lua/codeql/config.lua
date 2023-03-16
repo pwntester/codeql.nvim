@@ -11,6 +11,8 @@ M.defaults = {
     max_path_depth = nil,
   },
   panel = {
+    widh = 50,
+    pos = "botright",
     show_filename = true,
     long_filename = false,
     group_by = "sink",

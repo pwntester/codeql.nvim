@@ -6,8 +6,6 @@ local event = autocmd.event
 local vim = vim
 
 local range_ns = vim.api.nvim_create_namespace "codeql"
-local panel_pos = "right"
-local panel_width = 50
 local panel_short_help = true
 local icon_closed = "▶"
 local icon_open = "▼"
@@ -878,17 +876,6 @@ function M.open_panel(panel_name)
     return bufnr, get_panel_window(bufnr)
   end
 
-  -- prepare split arguments
-  local pos = ""
-  if panel_pos == "right" then
-    pos = "botright"
-  elseif panel_pos == "left" then
-    pos = "topleft"
-  else
-    util.err_message "Incorrect panel_pos value"
-    return
-  end
-
   -- get current win id
   local current_window = vim.fn.win_getid()
 
@@ -896,7 +883,8 @@ function M.open_panel(panel_name)
   go_to_main_window(panel_name)
 
   -- split
-  vim.fn.execute("silent keepalt " .. pos .. " vertical " .. panel_width .. "split " .. panel_name)
+  local conf = config.get_config()
+  vim.fn.execute("silent keepalt " .. conf.panel.pos .. " vertical " .. conf.panel.width .. "split " .. panel_name)
   bufnr = vim.fn.bufnr(panel_name)
 
   -- go to original window

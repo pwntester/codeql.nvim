@@ -74,6 +74,7 @@ function M.set_database(dbpath)
     local metadata = util.database_info(database)
     if not metadata then
       util.err_message("Could not load the database " .. vim.inspect(database))
+      return
     end
     metadata.path = database
 
