@@ -154,7 +154,9 @@ function M.start_server()
         else
           -- Use vim.notify
           handler = function(result)
-            util.message("Query execution progress: " .. result.value.message)
+            if result.message then
+              util.message("Query execution progress: " .. result.value.message)
+            end
           end
         end
 
