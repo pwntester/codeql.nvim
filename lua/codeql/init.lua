@@ -322,7 +322,13 @@ function M.load_vcs_buffer()
   local bufnr = vim.api.nvim_get_current_buf()
   local bufname = vim.api.nvim_buf_get_name(bufnr)
   local uri = string.match(bufname, "versionControlProvenance://(.*)")
-  local chunks = vim.split(vim.split(uri, "?")[1], "/")
+  local paramlessUri = vim.split(uri, "?")[1]
+  local parts={}
+  for part in string.gmatch(paramlessUri, "[^%.]+") do
+    table.insert(parts, part)
+  end
+  local extension = parts[#parts]
+  local chunks = vim.split(paramlessUri, "/")
   local params = vim.split(uri, "?")[2]
   local node = {}
   if params then
@@ -338,6 +344,8 @@ function M.load_vcs_buffer()
   local path = table.concat(chunks, "/", 4, #chunks)
   util.get_file_contents(owner, name, revisionId, path, function(lines)
     vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, lines)
+    print(extension)
+    vim.api.nvim_buf_set_option(bufnr, "filetype", extension)
     set_source_buffer_options(bufnr)
     -- move cursor to the node's line
     pcall(vim.api.nvim_win_set_cursor, 0, { tonumber(node.line), 0 })
