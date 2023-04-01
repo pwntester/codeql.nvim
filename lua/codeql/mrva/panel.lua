@@ -48,12 +48,18 @@ M.draw = function(name)
   -- total finding count
   table.insert(nodes, NuiTree.Node({ type = "label", label = "Findings: " .. status.total_findings_count }))
 
+  -- sort by stars
+  table.sort(status.repositories_with_findings, function(a, b)
+    return a.stars > b.stars
+  end)
+
   for _, item in ipairs(status.repositories_with_findings) do
     table.insert(nodes, NuiTree.Node({
       type = "result",
       nwo = item.nwo,
       name = name,
-      results_count = item.count,
+      count = item.count,
+      stars = item.stars,
     }))
   end
 
@@ -91,7 +97,9 @@ M.draw = function(name)
         line:append(" ")
         line:append(node.nwo, "String")
         line:append(" ")
-        line:append("(" .. tostring(node.results_count) .. ")", "Comment")
+        line:append(tostring(node.count) .. " 💥", "Comment")
+        line:append(" ")
+        line:append(tostring(node.stars).. " ✨", "Comment")
       end
       return line
     end
