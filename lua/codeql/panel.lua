@@ -240,7 +240,9 @@ local function print_header(bufnr, issues)
     print_to_panel(bufnr, "Database: " .. config.database.path, hl)
   elseif config.sarif.path then
     local hl = { CodeqlPanelInfo = { { 0, string.len "SARIF:" } } }
-    print_to_panel(bufnr, "SARIF: " .. config.sarif.path, hl)
+    local parts = vim.split(config.sarif.path, "/")
+    local filename = parts[#parts]
+    print_to_panel(bufnr, "SARIF: " .. filename, hl)
   end
   local hl = { CodeqlPanelInfo = { { 0, string.len "Issues:" } } }
   print_to_panel(bufnr, "Issues:   " .. table.getn(issues), hl)
