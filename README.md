@@ -2,8 +2,6 @@
 
 Neovim plugin to help writing and testing CodeQL queries.
 
-[![asciicast](https://asciinema.org/a/318276.svg)](https://asciinema.org/a/318276)
-
 ## Features 
 
 - Syntax highlighting for CodeQL query language
@@ -13,6 +11,8 @@ Neovim plugin to help writing and testing CodeQL queries.
 - Result browser
 - Source archive grepper
 - Source archive explorer
+- SARIF viewer
+- MRVA results browser (requires [`gh-mrva`](https://github.com/GitHubSecurityLab/gh-mrva))
 
 ## Requirements
 
@@ -64,28 +64,16 @@ use {
 
 ## Usage
 
-### Query pack 
-
-Create `qlpack.yaml` (see [QL packs](https://codeql.github.com/docs/codeql-cli/about-ql-packs/)). E.g:
-
-```
-name: test 
-version: 0.0.1
-libraryPathDependencies: [codeql-java]
-```
-
 ### Query
-
-Create `.ql` file with query 
 
 ### Database
 
-Use `SetDatabase <path to db>` to let the plugin know what DB to work with.
-Use `UnsetDatabase` to unregister the current registered database.
+Use `QL database set <path to db>` to let the plugin know what DB to work with.
+Use `QL database unset` to unregister the current registered database.
 
 ### Run query or eval predicates
 
-Use `RunQuery` or `QuickEval`, or `QuickEvalPredicate` commands or `qr`, `qe`, `qp` shortcuts respectively to run the query or evaluate the predicate under the cursor.
+Use `QL query run` or `QL query quick-eval` commands or `qr`, `qp` shortcuts respectively to run the query or evaluate the predicate under the cursor.
 
 ## Configuration options
 - additional_packs: List of codeql qlpacks to use 
@@ -126,14 +114,18 @@ require("codeql").setup {
 ```
 
 ## Commands
-- `SetDatabase <path to db>`: Required before running any query.
-- `RunQuery`: Runs the query on the current buffer. Requires a DB to be set first.
-- `QuickEval`: Quick evals the predicate or selection under cursor. Requires a DB to be set first.
-- `History`: Shows a menu to render results of previous queries (on the same nvim session).
-- `StopServer`: Stops the query server associated with the query buffer. A new one will be started upon query evaluation.
-- `PrintAST`: On a `codeql:/` buffer, prints the AST of the current file.
-- `LoadSarif`: Loads the issues of a SARIF file. To browse the results, use `SetDatabase` before.
-- `ArchiveTree`: Shows source archive tree explorer
+- `QL database set <path to db>`: Required before running any query.
+- `QL database unset`: Unregister current database.
+- `QL database browse`: Shows source archive tree explorer
+- `QL query run`: Runs the query on the current buffer. Requires a DB to be set first.
+- `QL query eval`: Quick evals the predicate or selection under cursor. Requires a DB to be set first.
+- `QL query cancel`: Cancels current query.
+- `QL history list`: Shows a menu to render results of previous queries (on the same nvim session).
+- `QL server stop`: Stops the query server associated with the query buffer. A new one will be started upon query evaluation.
+- `QL ast print`: On a `codeql:/` buffer, prints the AST of the current file.
+- `QL sarif load <path to SARIF file>`: Loads the issues of a SARIF file. To browse the results, use `SetDatabase` before.
+- `QL sarif copy-permalink`: Copies a permalink to the current line of a SARIF file.
+- `QL mrva load <name of MRVA session>`: Loads results of MRVA scan.
 
 ## Mappings
 - `gd`: On a `codeql:/` file, jumps to the symbol definition.

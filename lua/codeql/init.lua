@@ -303,6 +303,25 @@ local function open_from_sarif(bufnr, path)
   end
 end
 
+function M.copy_permalink()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local bufname = vim.api.nvim_buf_get_name(bufnr)
+  local line = vim.api.nvim_win_get_cursor(0)[1]
+  local uri = string.match(bufname, "versionControlProvenance://(.*)")
+  if not uri then
+    util.err_message("Cannot copy permalink for this buffer")
+    return
+  end
+  local paramlessUri = vim.split(uri, "?")[1]
+  local chunks = vim.split(paramlessUri, "/")
+  local owner = chunks[1]
+  local name = chunks[2]
+  local revisionId = chunks[3]
+  local path = table.concat(chunks, "/", 4, #chunks)
+  local permalink = string.format("https://github.com/%s/%s/blob/%s/%s#L%d", owner, name, revisionId, path, line)
+  vim.fn.setreg("+", permalink)
+end
+
 function M.load_source_buffer()
   local bufnr = vim.api.nvim_get_current_buf()
   local bufname = vim.api.nvim_buf_get_name(bufnr)
@@ -323,7 +342,7 @@ function M.load_vcs_buffer()
   local bufname = vim.api.nvim_buf_get_name(bufnr)
   local uri = string.match(bufname, "versionControlProvenance://(.*)")
   local paramlessUri = vim.split(uri, "?")[1]
-  local parts={}
+  local parts = {}
   for part in string.gmatch(paramlessUri, "[^%.]+") do
     table.insert(parts, part)
   end
@@ -333,7 +352,7 @@ function M.load_vcs_buffer()
   local node = {}
   if params then
     local pairs = vim.split(params, "&")
-    for _,pair in ipairs(pairs) do
+    for _, pair in ipairs(pairs) do
       local kv = vim.split(pair, "=")
       node[kv[1]] = kv[2]
     end
@@ -352,14 +371,14 @@ function M.load_vcs_buffer()
     vim.cmd "norm! zz"
 
     -- highlight node
-    util.highlight_range(range_ns, tonumber(node.startLine), tonumber(node.endLine), tonumber(node.startColumn), tonumber(node.endColumn))
+    util.highlight_range(range_ns, tonumber(node.startLine), tonumber(node.endLine), tonumber(node.startColumn),
+      tonumber(node.endColumn))
 
     -- jump to main window if requested
     if node.stay == "true" then
       vim.fn.win_gotoid(node.panelId)
     end
   end)
-
 end
 
 function M.setup(opts)
@@ -383,7 +402,10 @@ function M.setup(opts)
     vim.cmd [[command! -nargs=1 -complete=file LoadSarif lua require'codeql.loader'.load_sarif_results(<f-args>)]]
     vim.cmd [[command! ArchiveTree lua require'codeql.explorer'.draw()]]
     vim.cmd [[command! -nargs=1 LoadMRVAScan lua require'codeql.mrva.panel'.draw(<f-args>)]]
-
+    vim.cmd [[command! CopyPermalink lua require'codeql'.copy_permalink()]]
+    vim.api.nvim_create_user_command("QL", function(copts)
+      require("codeql").command(unpack(copts.fargs))
+    end, { complete = require("codeql").command_complete, nargs = "*" })
     -- autocommands
     vim.cmd [[augroup codeql]]
     vim.cmd [[au!]]
@@ -402,6 +424,158 @@ function M.setup(opts)
     vim.cmd [[nnoremap <Plug>(CodeQLGoToDefinition) <cmd>lua require'codeql.defs'.find_at_cursor('definitions')<CR>]]
     vim.cmd [[nnoremap <Plug>(CodeQLFindReferences) <cmd>lua require'codeql.defs'.find_at_cursor('references')<CR>]]
     vim.cmd [[nnoremap <Plug>(CodeQLGrepSource) <cmd>lua require'codeql.grepper'.grep_source()<CR>]]
+  end
+end
+
+local commands = {
+  database = {
+    set = {
+      description = "Set the database to use for CodeQL queries",
+      args = {
+        {
+          name = "database",
+          description = "The path to the database to use",
+          type = "string",
+        },
+      },
+      handler = function(args)
+        M.set_database(args)
+      end,
+    },
+    unset = {
+      description = "Unset the database to use for CodeQL queries",
+      handler = function()
+        M.unregister_database()
+      end,
+    },
+    browse = {
+      description = "Browse the CodeQL database",
+      handler = function()
+        require("codeql.explorer").draw()
+      end,
+    },
+  },
+  query = {
+    run = {
+      description = "Run the current query",
+      handler = function()
+        M.run_query()
+      end,
+    },
+    cancel = {
+      description = "Cancel the current query",
+      handler = function()
+        require("codeql.queryserver").cancel_query()
+      end,
+    },
+    eval = {
+      description = "Evaluate the current predicate or statements",
+      handler = function()
+        M.smart_quick_evaluate()
+      end,
+    },
+  },
+  server = {
+    stop = {
+      description = "Stop the CodeQL query server",
+      handler = function()
+        require("codeql.queryserver").stop_server()
+      end,
+    },
+  },
+  history = {
+    list = {
+      description = "View the CodeQL query history",
+      handler = function()
+        require("codeql.history").menu()
+      end,
+    }
+  },
+  ast = {
+    print = {
+      description = "Print the AST for the current query",
+      handler = function()
+        M.run_print_ast()
+      end,
+    },
+  },
+  sarif = {
+    load = {
+      description = "Load a SARIF file",
+      args = {
+        {
+          name = "sarif",
+          description = "The path to the SARIF file to load",
+          type = "string",
+        },
+      },
+      handler = function(args)
+        require("codeql.loader").load_sarif_results(args)
+      end,
+    },
+    ["copy-permalink"] = {
+      description = "Copy a permalink to the current SARIF result",
+      handler = function()
+        M.copy_permalink()
+      end,
+    },
+  },
+  mrva = {
+    load = {
+      description = "Load an MRVA scan",
+      args = {
+        {
+          name = "scan",
+          description = "The path to the MRVA scan to load",
+          type = "string",
+        },
+      },
+      handler = function(args)
+        require("codeql.mrva.panel").draw(args)
+      end,
+    },
+  },
+}
+
+function M.command_complete(argLead, cmdLine)
+  -- ArgLead		the leading portion of the argument currently being completed on
+  -- CmdLine		the entire command line
+  -- CursorPos	the cursor position in it (byte index)
+  local command_keys = vim.tbl_keys(commands)
+  local parts = vim.split(vim.trim(cmdLine), " ")
+
+  local get_options = function(options)
+    local valid_options = {}
+    for _, option in pairs(options) do
+      if string.sub(option, 1, #argLead) == argLead then
+        table.insert(valid_options, option)
+      end
+    end
+    return valid_options
+  end
+
+  if #parts == 1 then
+    return command_keys
+  elseif #parts == 2 and not vim.tbl_contains(command_keys, parts[2]) then
+    return get_options(command_keys)
+  elseif (#parts == 2 and vim.tbl_contains(command_keys, parts[2]) or #parts == 3) then
+    local obj = commands[parts[2]]
+    if obj then
+      return get_options(vim.tbl_keys(obj))
+    end
+  end
+end
+
+function M.command(object, action, ...)
+  if not object or not action then
+    util.err_message("Missing arguments")
+    return
+  end
+  local command = commands[object] and commands[object][action]
+  if command then
+    command.handler(...)
+  else
+    util.err_message("Unknown command")
   end
 end
 
