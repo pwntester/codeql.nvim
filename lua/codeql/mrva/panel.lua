@@ -2,6 +2,7 @@ local NuiTree = require "nui.tree"
 local NuiLine = require "nui.line"
 local Split = require "nui.split"
 local util = require "codeql.util"
+local loader = require "codeql.loader"
 local vim = vim
 
 local M = {}
@@ -99,7 +100,7 @@ M.draw = function(name)
         line:append(" ")
         line:append(tostring(node.count) .. " 💥", "Comment")
         line:append(" ")
-        line:append(tostring(node.stars).. " ✨", "Comment")
+        line:append(tostring(node.stars) .. " ✨", "Comment")
       end
       return line
     end
@@ -115,9 +116,12 @@ M.draw = function(name)
     local node = tree:get_node()
     if node.type == "result" then
       local tmpdir = vim.fn.fnamemodify(vim.fn.tempname(), ":p:h")
-      vim.fn.system("gh mrva download --name " .. node.name .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir)
-      vim.api.nvim_command("LoadSarif " .. tmpdir .. "/" .. node.nwo:gsub("/", "_") .. ".sarif")
-      return
+      local filename = node.nwo:gsub("/", "_") .. ".sarif"
+      -- check if file exists
+      if vim.fn.filereadable(tmpdir .. "/" .. filename) == 0 then
+        vim.fn.system("gh mrva download --name " .. node.name .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir)
+      end
+      loader.load_sarif_results(tmpdir .. "/" .. filename)
     end
   end, map_options)
 
