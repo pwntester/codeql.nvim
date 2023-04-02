@@ -381,6 +381,10 @@ function M.load_vcs_buffer()
   end)
 end
 
+function M.deprecated()
+  print "This command is deprecated. Please use `:QL` instead."
+end
+
 function M.setup(opts)
   if vim.fn.executable "codeql" then
     config.setup(opts or {})
@@ -389,20 +393,21 @@ function M.setup(opts)
     vim.cmd [[highlight default link CodeqlAstFocus CursorLine]]
     vim.cmd [[highlight default link CodeqlRange Error]]
 
-    -- commands
-    vim.cmd [[command! -nargs=1 -complete=file SetDatabase lua require'codeql'.set_database(<f-args>)]]
-    vim.cmd [[command! UnsetDatabase lua require'codeql.queryserver'.unregister_database()]]
-    vim.cmd [[command! CancelQuery lua require'codeql.queryserver'.cancel_query()]]
-    vim.cmd [[command! RunQuery lua require'codeql'.run_query()]]
-    vim.cmd [[command! QuickEvalPredicate lua require'codeql'.smart_quick_evaluate()]]
-    vim.cmd [[command! -range QuickEval lua require'codeql'.quick_evaluate()]]
-    vim.cmd [[command! StopServer lua require'codeql.queryserver'.stop_server()]]
-    vim.cmd [[command! History lua require'codeql.history'.menu()]]
-    vim.cmd [[command! PrintAST lua require'codeql'.run_print_ast()]]
-    vim.cmd [[command! -nargs=1 -complete=file LoadSarif lua require'codeql.loader'.load_sarif_results(<f-args>)]]
-    vim.cmd [[command! ArchiveTree lua require'codeql.explorer'.draw()]]
-    vim.cmd [[command! -nargs=1 LoadMRVAScan lua require'codeql.mrva.panel'.draw(<f-args>)]]
-    vim.cmd [[command! CopyPermalink lua require'codeql'.copy_permalink()]]
+    -- deprecated commands
+    vim.cmd [[command! -nargs=1 -complete=file SetDatabase lua require'codeql'.deprecated();require'codeql'.set_database(<f-args>)]]
+    vim.cmd [[command! UnsetDatabase lua require'codeql'.deprecated();require'codeql.queryserver'.unregister_database()]]
+    vim.cmd [[command! CancelQuery lua require'codeql'.deprecated();require'codeql.queryserver'.cancel_query()]]
+    vim.cmd [[command! RunQuery lua require'codeql'.deprecated();require'codeql'.run_query()]]
+    vim.cmd [[command! QuickEvalPredicate require'codeql'.deprecated();lua require'codeql'.smart_quick_evaluate()]]
+    vim.cmd [[command! -range QuickEval lua require'codeql'.deprecated();require'codeql'.quick_evaluate()]]
+    vim.cmd [[command! StopServer lua require'codeql'.deprecated();require'codeql.queryserver'.stop_server()]]
+    vim.cmd [[command! History lua require'codeql'.deprecated();require'codeql.history'.menu()]]
+    vim.cmd [[command! PrintAST lua require'codeql'.deprecated();require'codeql'.run_print_ast()]]
+    vim.cmd [[command! -nargs=1 -complete=file LoadSarif lua require'codeql'.deprecated();require'codeql.loader'.load_sarif_results(<f-args>)]]
+    vim.cmd [[command! ArchiveTree lua require'codeql'.deprecated();require'codeql.explorer'.draw()]]
+    vim.cmd [[command! -nargs=1 LoadMRVAScan lua require'codeql'.deprecated();require'codeql.mrva.panel'.draw(<f-args>)]]
+    vim.cmd [[command! CopyPermalink lua require'codeql'.deprecated();require'codeql'.copy_permalink()]]
+    -- new QL command
     vim.api.nvim_create_user_command("QL", function(copts)
       require("codeql").command(unpack(copts.fargs))
     end, { complete = require("codeql").command_complete, nargs = "*" })
