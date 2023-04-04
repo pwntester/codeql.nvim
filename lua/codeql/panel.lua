@@ -733,7 +733,7 @@ function M.jump_to_code(stay_in_panel)
     -- go to the target window
     vim.fn.win_gotoid(target_winid)
 
-    local bufname
+    local bufname, revisionId, nwo
     if source == "source_archive" or source == "sarif" then
       -- create the codeql:// buffer
       bufname = string.format("codeql://%s", filename)
@@ -741,28 +741,50 @@ function M.jump_to_code(stay_in_panel)
       bufname = vim.fn.getcwd() .. "/" .. filename
     elseif source == "vcs" then
       local repositoryUri = node.versionControlProvenance.repositoryUri
-      local revisionId = node.versionControlProvenance.revisionId
-      local nwo = vim.split(repositoryUri, "github.com/")[2]
-      bufname = string.format(
-        "versionControlProvenance://%s/%s/%s?line=%s&startLine=%s&endLine=%s&startColumn=%s&endColumn=%s&stay=%s&panelId=%s"
-        , nwo, revisionId, filename, node.line, node.url.startLine, node.url.endLine, node.url.startColumn,
-        node.url.endColumn, stay_in_panel, panel_winid)
+      revisionId = node.versionControlProvenance.revisionId
+      nwo = vim.split(repositoryUri, "github.com/")[2]
+      bufname = string.format("versionControlProvenance://%s/%s/%s", nwo, revisionId, filename)
     end
-
-    if vim.fn.bufnr(bufname) == -1 then
-      vim.api.nvim_command(string.format("edit %s", bufname))
-    else
+    local jump = true
+    if vim.fn.bufnr(bufname) > -1 then
       vim.api.nvim_command(string.format("buffer %s", bufname))
+    else
+      if source ~= "vcs" then
+        vim.api.nvim_command(string.format("edit %s", bufname))
+      else
+        jump = false
+        local bufnr = vim.api.nvim_create_buf(false, true)
+        vim.api.nvim_buf_set_name(bufnr, bufname)
+        local owner, repo = unpack(vim.split(nwo, "/"))
+        util.get_file_contents(owner, repo, revisionId, filename, function(lines)
+          vim.api.nvim_buf_set_option(bufnr, "modifiable", true)
+          vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, lines)
+          local extension = string.match(bufname, ".*%.(.*)")
+          vim.api.nvim_buf_set_option(bufnr, "filetype", extension)
+          util.set_source_buffer_options(bufnr)
+          pcall(vim.api.nvim_win_set_cursor, 0, { tonumber(node.line), 0 })
+          vim.cmd "norm! zz"
+          -- highlight node
+          util.highlight_range(range_ns, tonumber(node.url.startLine), tonumber(node.url.endLine),
+            tonumber(node.url.startColumn),
+            tonumber(node.url.endColumn))
+          -- jump to main window if requested
+          if stay_in_panel == true then
+            vim.fn.win_gotoid(panel_winid)
+          end
+        end)
+      end
     end
-
-    if source ~= "vcs" then
-      -- move cursor to the node's line
+    local bufnr = vim.fn.bufnr(bufname)
+    if bufnr > -1 then
+      vim.api.nvim_win_set_buf(target_winid, bufnr)
+    end
+    if jump then
+      vim.fn.win_gotoid(target_winid)
       pcall(vim.api.nvim_win_set_cursor, 0, { node.line, 0 })
       vim.cmd "norm! zz"
-
       -- highlight node
       util.highlight_range(range_ns, node.url.startLine, node.url.endLine, node.url.startColumn, node.url.endColumn)
-
       -- jump to main window if requested
       if stay_in_panel then
         vim.fn.win_gotoid(panel_winid)

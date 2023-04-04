@@ -480,6 +480,7 @@ function M.get_file_contents(owner, name, commit, path, cb)
   local graphql = require "codeql.gh.graphql"
   local key = string.format("%s::%s::%s::%s", owner, name, commit, path)
   if M.file_cache[key] then
+    print("Using cached file contents for " .. key)
     cb(M.file_cache[key])
     return
   end
@@ -528,6 +529,16 @@ function M.highlight_range(ns, startLine, endLine, startColumn, endColumn)
       pcall(vim.api.nvim_buf_add_highlight, 0, ns, "CodeqlRange", i, hl_startColumn, hl_endColumn)
     end
   end
+end
+
+function M.set_source_buffer_options(bufnr)
+  vim.api.nvim_buf_call(bufnr, function()
+    vim.cmd "normal! ggdd"
+    pcall(vim.cmd, "filetype detect")
+    vim.api.nvim_buf_set_option(bufnr, "modified", false)
+    vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
+    vim.cmd "doau BufEnter"
+  end)
 end
 
 function M.tableMerge(t1, t2)
