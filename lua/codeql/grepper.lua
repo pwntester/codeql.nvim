@@ -1,3 +1,4 @@
+local vim = vim
 local pickers = require "telescope.pickers"
 local sorters = require "telescope.sorters"
 local finders = require "telescope.finders"
@@ -194,6 +195,8 @@ local function zip_grep(opts)
     return cmd
   end
 
+  local target_winid = vim.api.nvim_get_current_win()
+
   pickers.new(opts, {
     prompt_title = "",
     finder = finders.new_job(cmd_generator, opts.entry_maker, opts.max_results, opts.cwd),
@@ -204,14 +207,21 @@ local function zip_grep(opts)
         local entry = action_state.get_selected_entry(prompt_bufnr)
         actions.close(prompt_bufnr)
 
-        local bufname = string.format("codeql://%s", entry.filename)
-        if vim.fn.bufnr(bufname) == -1 then
-          vim.api.nvim_command(string.format("edit %s", bufname))
-        else
+        local bufname = string.format("ql://%s", entry.filename)
+        local oopts = {
+          line = entry.lnum,
+          target_winid = target_winid
+        }
+        if vim.fn.bufnr(bufname) > -1 then
           vim.api.nvim_command(string.format("buffer %s", bufname))
+          if opts.line then
+            util.jump_to_line(oopts)
+          end
+        else
+          local bufnr = vim.api.nvim_create_buf(false, true)
+          vim.api.nvim_buf_set_name(bufnr, bufname)
+          util.open_from_archive(bufnr, entry.filename, oopts)
         end
-        pcall(vim.api.nvim_win_set_cursor, 0, { entry.lnum, 0 })
-        vim.cmd "norm! zz"
       end)
       return true
     end,

@@ -5,45 +5,8 @@ local Path = require "plenary.path"
 local ts_utils_installed, ts_utils = pcall(require, "nvim-treesitter.ts_utils")
 local ts_parsers_installed, ts_parsers = pcall(require, "nvim-treesitter.parsers")
 local vim = vim
-local range_ns = vim.api.nvim_create_namespace "codeql"
 
 local M = {}
-
-function M.setup_archive_buffer()
-  local bufnr = vim.api.nvim_get_current_buf()
-
-  -- set codeql buffers as scratch buffers
-  vim.api.nvim_buf_set_option(bufnr, "buftype", "nofile")
-  vim.api.nvim_buf_set_option(bufnr, "bufhidden", "hide")
-  vim.api.nvim_buf_set_option(bufnr, "swapfile", false)
-
-  -- set mappings
-  vim.api.nvim_buf_call(bufnr, function()
-    vim.cmd [[nmap <buffer>gd <Plug>(CodeQLGoToDefinition)]]
-    vim.cmd [[nmap <buffer>gr <Plug>(CodeQLFindReferences)]]
-  end)
-
-  -- load definitions and references
-  M.load_definitions(bufnr)
-end
-
-function M.load_definitions(bufnr)
-  local bufname = vim.api.nvim_buf_get_name(bufnr)
-
-  -- check if file has already been processed
-  local defs = require "codeql.defs"
-  local fname = vim.split(bufname, "://")[2]
-  if defs.processedFiles[fname] then
-    return
-  end
-
-  -- query the buffer for defs and refs
-  M.run_templated_query("localDefinitions", fname)
-  M.run_templated_query("localReferences", fname)
-
-  -- prevent further definition queries from being run on the same buffer
-  defs.processedFiles[fname] = true
-end
 
 function M.set_database(dbpath)
   local conf = config.config
@@ -223,8 +186,8 @@ function M.run_print_ast()
   local bufnr = vim.api.nvim_get_current_buf()
   local bufname = vim.fn.bufname(bufnr)
 
-  -- not a codeql:/ buffer
-  if not vim.startswith(bufname, "codeql:/") then
+  -- not a ql:/ buffer
+  if not vim.startswith(bufname, "ql:/") then
     return
   end
 
@@ -232,10 +195,13 @@ function M.run_print_ast()
   M.run_templated_query("printAst", fname)
 end
 
-function M.run_templated_query(query_name, param)
+function M.run_templated_query(query_name, fname)
   local bufnr = vim.api.nvim_get_current_buf()
   local dbPath = config.database.path
   local ft = vim.bo[bufnr]["ft"]
+  if not ft or util.is_blank(ft) then
+    ft = vim.fn.fnamemodify(fname, ":e")
+  end
   if not templated_queries[ft] then
     --util.err_message(format('%s does not support %s file type', query_name, ft))
     return
@@ -247,9 +213,6 @@ function M.run_templated_query(query_name, param)
     local path = qlpacks[qlpack][1]
     local queryPath = string.format("%s/%s%s.ql", path, path_modifier, query_name)
     if util.is_file(queryPath) then
-      local templateValues = {
-        selectedSourceFile = "/" .. param,
-      }
       local libPaths = util.resolve_library_path(queryPath)
       if not libPaths then
         vim.notify("Cannot resolve QL library paths for: " .. query_name, 2)
@@ -263,7 +226,9 @@ function M.run_templated_query(query_name, param)
         metadata = util.query_info(queryPath),
         libraryPath = libPaths.libraryPath,
         dbschemePath = libPaths.dbscheme,
-        templateValues = templateValues,
+        templateValues = {
+          selectedSourceFile = "/" .. fname,
+        }
       }
       require("codeql.queryserver").run_query(opts)
     else
@@ -272,63 +237,41 @@ function M.run_templated_query(query_name, param)
   end
 end
 
-local function open_from_archive(bufnr, path)
-  local zipfile = config.database.sourceArchiveZip
-  local content = vim.fn.systemlist(string.format("unzip -p -- %s %s", zipfile, path))
-  vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, content)
-end
-
-local function open_from_sarif(bufnr, path)
-  local sarif = util.read_json_file(config.sarif.path)
-  if config.sarif.hasArtifacts then
-    local artifacts = sarif.runs[1].artifacts
-    for _, artifact in ipairs(artifacts) do
-      local uri = artifact.location.uri
-      if uri == path then
-        local content = vim.split(artifact.contents.text, "\n")
-        vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, content)
-        break
-      end
-    end
-  end
-end
-
-function M.copy_permalink()
+function M.get_permalink()
   local bufnr = vim.api.nvim_get_current_buf()
   local bufname = vim.api.nvim_buf_get_name(bufnr)
   local line = vim.api.nvim_win_get_cursor(0)[1]
-  local uri = string.match(bufname, "versionControlProvenance://(.*)")
+  local uri = string.match(bufname, "ql://(.*)")
   if not uri then
     util.err_message("Cannot copy permalink for this buffer")
     return
   end
-  local paramlessUri = vim.split(uri, "?")[1]
-  local chunks = vim.split(paramlessUri, "/")
+  local chunks = vim.split(uri, "/")
+  if #chunks < 4 then
+    util.err_message("Cannot copy permalink for this buffer")
+    return
+  end
   local owner = chunks[1]
   local name = chunks[2]
   local revisionId = chunks[3]
   local path = table.concat(chunks, "/", 4, #chunks)
-  local permalink = string.format("https://github.com/%s/%s/blob/%s/%s#L%d", owner, name, revisionId, path, line)
+  return string.format("https://github.com/%s/%s/blob/%s/%s#L%d", owner, name, revisionId, path, line)
+end
+
+function M.copy_permalink()
+  local permalink = M.get_permalink()
   vim.fn.setreg("+", permalink)
 end
 
-function M.load_source_buffer()
-  local bufnr = vim.api.nvim_get_current_buf()
-  local bufname = vim.api.nvim_buf_get_name(bufnr)
-  local path = string.match(bufname, "codeql://(.*)")
-  if config.sarif.path and config.sarif.hasArtifacts then
-    open_from_sarif(bufnr, path)
-    -- for snippets, do nothing since the buffer will be written from the `panel.jump_to_code`
-  elseif config.database.sourceArchiveZip then
-    open_from_archive(bufnr, path)
-  else
-    vim.notify "Cannot find source file"
-  end
-  util.set_source_buffer_options(bufnr)
+function M.open_in_browser()
+  local permalink = M.get_permalink()
+  -- replace github.com with github.dev
+  permalink = string.gsub(permalink, "github.com", "github.dev")
+  vim.fn.system(string.format("open %s", permalink))
 end
 
-function M.deprecated()
-  print "This command is deprecated. Please use `:QL` instead."
+function M.deprecated(cmd)
+  print("'" .. cmd .. "'command is deprecated. Please use `:QL` instead.")
 end
 
 function M.setup(opts)
@@ -340,19 +283,19 @@ function M.setup(opts)
     vim.cmd [[highlight default link CodeqlRange Error]]
 
     -- deprecated commands
-    vim.cmd [[command! -nargs=1 -complete=file SetDatabase lua require'codeql'.deprecated();require'codeql'.set_database(<f-args>)]]
-    vim.cmd [[command! UnsetDatabase lua require'codeql'.deprecated();require'codeql.queryserver'.unregister_database()]]
-    vim.cmd [[command! CancelQuery lua require'codeql'.deprecated();require'codeql.queryserver'.cancel_query()]]
-    vim.cmd [[command! RunQuery lua require'codeql'.deprecated();require'codeql'.run_query()]]
-    vim.cmd [[command! QuickEvalPredicate require'codeql'.deprecated();lua require'codeql'.smart_quick_evaluate()]]
-    vim.cmd [[command! -range QuickEval lua require'codeql'.deprecated();require'codeql'.quick_evaluate()]]
-    vim.cmd [[command! StopServer lua require'codeql'.deprecated();require'codeql.queryserver'.stop_server()]]
-    vim.cmd [[command! History lua require'codeql'.deprecated();require'codeql.history'.menu()]]
-    vim.cmd [[command! PrintAST lua require'codeql'.deprecated();require'codeql'.run_print_ast()]]
-    vim.cmd [[command! -nargs=1 -complete=file LoadSarif lua require'codeql'.deprecated();require'codeql.loader'.load_sarif_results(<f-args>)]]
-    vim.cmd [[command! ArchiveTree lua require'codeql'.deprecated();require'codeql.explorer'.draw()]]
-    vim.cmd [[command! -nargs=1 LoadMRVAScan lua require'codeql'.deprecated();require'codeql.mrva.panel'.draw(<f-args>)]]
-    vim.cmd [[command! CopyPermalink lua require'codeql'.deprecated();require'codeql'.copy_permalink()]]
+    vim.cmd [[command! -nargs=1 -complete=file SetDatabase lua require'codeql'.deprecated("SetDatabase");require'codeql'.set_database(<f-args>)]]
+    vim.cmd [[command! UnsetDatabase lua require'codeql'.deprecated("UnsetDatabase");require'codeql.queryserver'.unregister_database()]]
+    vim.cmd [[command! CancelQuery lua require'codeql'.deprecated("CancelQuery");require'codeql.queryserver'.cancel_query()]]
+    vim.cmd [[command! RunQuery lua require'codeql'.deprecated("RunQuery");require'codeql'.run_query()]]
+    vim.cmd [[command! QuickEvalPredicate require'codeql'.deprecated("QuickEvalPredicate");lua require'codeql'.smart_quick_evaluate()]]
+    vim.cmd [[command! -range QuickEval lua require'codeql'.deprecated("QuickEval");require'codeql'.quick_evaluate()]]
+    vim.cmd [[command! StopServer lua require'codeql'.deprecated("StopServer");require'codeql.queryserver'.stop_server()]]
+    vim.cmd [[command! History lua require'codeql'.deprecated("History");require'codeql.history'.menu()]]
+    vim.cmd [[command! PrintAST lua require'codeql'.deprecated("PrintAST");require'codeql'.run_print_ast()]]
+    vim.cmd [[command! -nargs=1 -complete=file LoadSarif lua require'codeql'.deprecated("LoadSarif");require'codeql.loader'.load_sarif_results(<f-args>)]]
+    vim.cmd [[command! ArchiveTree lua require'codeql'.deprecated("ArchiveTree");require'codeql.explorer'.draw()]]
+    vim.cmd [[command! -nargs=1 LoadMRVAScan lua require'codeql'.deprecated("LoadMRVAScan");require'codeql.mrva.panel'.load(<f-args>)]]
+    vim.cmd [[command! CopyPermalink lua require'codeql'.deprecated("CopyPermalink");require'codeql'.copy_permalink()]]
     -- new QL command
     vim.api.nvim_create_user_command("QL", function(copts)
       require("codeql").command(unpack(copts.fargs))
@@ -361,8 +304,6 @@ function M.setup(opts)
     vim.cmd [[augroup codeql]]
     vim.cmd [[au!]]
     vim.cmd [[au BufEnter * if &ft ==# 'codeql_panel' | execute("lua require'codeql.panel'.apply_mappings()") | endif]]
-    vim.cmd [[au BufEnter codeql://* lua require'codeql'.setup_archive_buffer()]]
-    vim.cmd [[au BufReadCmd codeql://* lua require'codeql'.load_source_buffer()]]
     vim.cmd [[autocmd FileType ql lua require'codeql.util'.apply_mappings()]]
 
     if require("codeql.config").config.format_on_save then
@@ -373,7 +314,6 @@ function M.setup(opts)
     -- mappings
     vim.cmd [[nnoremap <Plug>(CodeQLGoToDefinition) <cmd>lua require'codeql.defs'.find_at_cursor('definitions')<CR>]]
     vim.cmd [[nnoremap <Plug>(CodeQLFindReferences) <cmd>lua require'codeql.defs'.find_at_cursor('references')<CR>]]
-    vim.cmd [[nnoremap <Plug>(CodeQLGrepSource) <cmd>lua require'codeql.grepper'.grep_source()<CR>]]
   end
 end
 
@@ -402,6 +342,12 @@ local commands = {
       description = "Browse the CodeQL database",
       handler = function()
         require("codeql.explorer").draw()
+      end,
+    },
+    grep = {
+      description = "Grep the CodeQL database",
+      handler = function()
+        require("codeql.grepper").grep_source()
       end,
     },
   },
@@ -463,14 +409,26 @@ local commands = {
         require("codeql.loader").load_sarif_results(args)
       end,
     },
-    ["copy-permalink"] = {
+    ["permalink"] = {
       description = "Copy a permalink to the current SARIF result",
       handler = function()
         M.copy_permalink()
       end,
     },
+    ["browse"] = {
+      description = "Copy a permalink to the current SARIF result",
+      handler = function()
+        M.open_in_browser()
+      end,
+    },
   },
   mrva = {
+    list = {
+      description = "List the MRVA scans",
+      handler = function()
+        require("codeql.mrva.panel").list_sessions()
+      end,
+    },
     load = {
       description = "Load an MRVA scan",
       args = {
@@ -481,11 +439,13 @@ local commands = {
         },
       },
       handler = function(args)
-        require("codeql.mrva.panel").draw(args)
+        require("codeql.mrva.panel").load(args)
       end,
     },
   },
 }
+-- define an alias for database
+commands["db"] = commands["database"]
 
 function M.command_complete(argLead, cmdLine)
   -- ArgLead		the leading portion of the argument currently being completed on

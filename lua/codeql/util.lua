@@ -346,13 +346,13 @@ function M.bqrs_info(opts, cb)
       if json and json ~= "" and json ~= vim.NIL then
         local decoded, err = M.json_decode(json)
         if not decoded then
-          M.err_message(string.format("ERROR1: Could not get BQRS info for %s: %s", opts.query_path, vim.inspect(err)))
+          M.err_message(string.format("ERROR: Could not get BQRS info for %s: %s", opts.query_path, vim.inspect(err)))
         else
           cb(opts, decoded)
           return
         end
       end
-      M.err_message(string.format("ERROR2: Could not get BQRS info for %s.", opts.query_path))
+      M.err_message(string.format("ERROR: Could not get BQRS info for %s.", opts.query_path))
     end)
   )
 end
@@ -458,9 +458,9 @@ end
 function M.is_blank(s)
   return (
       s == nil
-          or s == vim.NIL
-          or (type(s) == "string" and string.match(s, "%S") == nil)
-          or (type(s) == "table" and next(s) == nil)
+      or s == vim.NIL
+      or (type(s) == "string" and string.match(s, "%S") == nil)
+      or (type(s) == "table" and next(s) == nil)
       )
 end
 
@@ -505,57 +505,164 @@ function M.get_file_contents(owner, name, commit, path, cb)
   }
 end
 
-function M.highlight_range(ns, startLine, endLine, startColumn, endColumn)
-  vim.api.nvim_buf_clear_namespace(0, ns, 0, -1)
-  startLine = startLine - 1
-  endLine = endLine - 1
-  startColumn = startColumn - 1
-  endColumn = endColumn - 1
-  if startLine == endLine then
-    pcall(vim.api.nvim_buf_add_highlight, 0, ns, "CodeqlRange", startLine, startColumn, endColumn)
-  else
-    for i = startLine, endLine do
-      local hl_startColumn, hl_endColumn
-      if i == startLine then
-        hl_startColumn = startColumn
-        hl_endColumn = #vim.fn.getline(i)
-      elseif i < endLine and i > startLine then
-        hl_startColumn = 1
-        hl_endColumn = #vim.fn.getline(i)
-      elseif i == endLine then
-        hl_startColumn = 1
-        hl_endColumn = endColumn
+function M.tableMerge(t1, t2)
+  if t1 and t2 then
+    for k, v in pairs(t2) do
+      if type(v) == "table" then
+        if type(t1[k] or false) == "table" then
+          M.tableMerge(t1[k] or {}, t2[k] or {})
+        else
+          t1[k] = v
+        end
+      else
+        t1[k] = v
       end
-      pcall(vim.api.nvim_buf_add_highlight, 0, ns, "CodeqlRange", i, hl_startColumn, hl_endColumn)
+    end
+    return t1
+  end
+end
+
+function M.open_from_archive(bufnr, path, opts)
+  vim.api.nvim_buf_set_var(bufnr, "source", "archive")
+  if vim.startswith(path, "/") then
+    vim.api.nvim_buf_set_var(bufnr, "path", path)
+  else
+    vim.api.nvim_buf_set_var(bufnr, "path", "/" .. path)
+  end
+  local zipfile = config.database.sourceArchiveZip
+  local content = vim.fn.systemlist(string.format("unzip -p -- %s %s", zipfile, path))
+  vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, content)
+  M.set_source_buffer_options(bufnr)
+  if opts.target_winid then
+    vim.api.nvim_win_set_buf(opts.target_winid, bufnr)
+  end
+  if opts.line then
+    M.jump_to_line(opts)
+  end
+  if opts.startLine and opts.endLine and opts.startColumn and opts.endColumn then
+    M.highlight_range(bufnr, opts)
+  end
+end
+
+function M.open_from_sarif(bufnr, path, opts)
+  vim.api.nvim_buf_set_var(bufnr, "source", "sarif")
+  if vim.startswith(path, "/") then
+    vim.api.nvim_buf_set_var(bufnr, "path", path)
+  else
+    vim.api.nvim_buf_set_var(bufnr, "path", "/" .. path)
+  end
+  local sarif = M.read_json_file(config.sarif.path)
+  if config.sarif.hasArtifacts then
+    local artifacts = sarif.runs[1].artifacts
+    for _, artifact in ipairs(artifacts) do
+      local uri = artifact.location.uri
+      if uri == path then
+        local content = vim.split(artifact.contents.text, "\n")
+        vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, content)
+        M.set_source_buffer_options(bufnr)
+        if opts.target_winid then
+          vim.api.nvim_win_set_buf(opts.target_winid, bufnr)
+        end
+        if opts.line then
+          M.jump_to_line(opts)
+        end
+        if opts.startLine and opts.endLine and opts.startColumn and opts.endColumn then
+          M.highlight_range(bufnr, opts)
+        end
+        return
+      end
+    end
+  end
+end
+
+function M.open_from_vcs(bufnr, path, opts)
+  vim.api.nvim_buf_set_var(bufnr, "source", "vcs")
+  if vim.startswith(path, "/") then
+    vim.api.nvim_buf_set_var(bufnr, "path", path)
+  else
+    vim.api.nvim_buf_set_var(bufnr, "path", "/" .. path)
+  end
+  local owner, repo = unpack(vim.split(opts.nwo, "/"))
+  M.get_file_contents(owner, repo, opts.revisionId, path, function(lines)
+    vim.api.nvim_buf_set_lines(bufnr, 1, 1, true, lines)
+    M.set_source_buffer_options(bufnr)
+    if opts.target_winid then
+      vim.api.nvim_win_set_buf(opts.target_winid, bufnr)
+    end
+    if opts.line then
+      M.jump_to_line(opts)
+    end
+    if opts.startLine and opts.endLine and opts.startColumn and opts.endColumn then
+      M.highlight_range(bufnr, opts)
+    end
+  end)
+end
+
+function M.jump_to_line(opts)
+  pcall(vim.api.nvim_win_set_cursor, opts.target_winid, { opts.line, 0 })
+  vim.cmd "norm! zz"
+  if opts.stay_in_panel then
+    vim.fn.win_gotoid(opts.panel_winid)
+  end
+end
+
+function M.highlight_range(bufnr, opts)
+  --ns, startLine, endLine, startColumn, endColumn)
+  vim.api.nvim_buf_clear_namespace(bufnr, opts.range_ns, 0, -1)
+  opts.startLine = opts.startLine - 1
+  opts.endLine = opts.endLine - 1
+  opts.startColumn = opts.startColumn - 1
+  opts.endColumn = opts.endColumn - 1
+  if opts.startLine == opts.endLine then
+    pcall(vim.api.nvim_buf_add_highlight, bufnr, opts.range_ns, "CodeqlRange", opts.startLine, opts.startColumn,
+    opts.endColumn)
+  else
+    for i = opts.startLine, opts.endLine do
+      local hl_startColumn, hl_endColumn
+      if i == opts.startLine then
+        hl_startColumn = opts.startColumn
+        hl_endColumn = #vim.fn.getline(i)
+      elseif i < opts.endLine and i > opts.startLine then
+        hl_startColumn = 1
+        hl_endColumn = #vim.fn.getline(i)
+      elseif i == opts.endLine then
+        hl_startColumn = 1
+        hl_endColumn = opts.endColumn
+      end
+      pcall(vim.api.nvim_buf_add_highlight, bufnr, opts.range_ns, "CodeqlRange", i, hl_startColumn, hl_endColumn)
     end
   end
 end
 
 function M.set_source_buffer_options(bufnr)
+  -- set filetype
   vim.api.nvim_buf_call(bufnr, function()
+    local bufname = vim.api.nvim_buf_get_name(bufnr)
+    local extension = string.match(bufname, ".*%.(.*)")
+    vim.api.nvim_buf_set_option(bufnr, "filetype", extension)
     vim.cmd "normal! ggdd"
     pcall(vim.cmd, "filetype detect")
-    vim.api.nvim_buf_set_option(bufnr, "modified", false)
-    vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
     vim.cmd "doau BufEnter"
   end)
-end
 
-function M.tableMerge(t1, t2)
-  if t1 and t2 then
-    for k,v in pairs(t2) do
-        if type(v) == "table" then
-            if type(t1[k] or false) == "table" then
-                M.tableMerge(t1[k] or {}, t2[k] or {})
-            else
-                t1[k] = v
-            end
-        else
-            t1[k] = v
-        end
-    end
-    return t1
-  end
+  -- set codeql buffers as scratch buffers
+  vim.api.nvim_buf_set_option(bufnr, "buftype", "nofile")
+  vim.api.nvim_buf_set_option(bufnr, "bufhidden", "hide")
+  vim.api.nvim_buf_set_option(bufnr, "swapfile", false)
+  vim.api.nvim_buf_set_option(bufnr, "modified", false)
+  vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
+
+  -- set mappings
+  vim.api.nvim_buf_call(bufnr, function()
+    vim.cmd [[nmap <buffer>gd <Plug>(CodeQLGoToDefinition)]]
+    vim.cmd [[nmap <buffer>gr <Plug>(CodeQLFindReferences)]]
+  end)
+
+  -- load definitions and references
+  local bufname = vim.api.nvim_buf_get_name(bufnr)
+  local fname = vim.split(bufname, "://")[2]
+  require("codeql").run_templated_query("localDefinitions", fname)
+  require("codeql").run_templated_query("localReferences", fname)
 end
 
 return M

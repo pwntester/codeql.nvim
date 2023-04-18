@@ -5,6 +5,7 @@ local Tree = require "codeql.tree"
 local config = require "codeql.config"
 local util = require "codeql.util"
 local devicons = require "nvim-web-devicons"
+local vim = vim
 
 local M = {}
 
@@ -119,11 +120,15 @@ M.create_split = function()
     end
     local target_winid = require("window-picker").pick_window()
     vim.api.nvim_set_current_win(target_winid)
-    local bufname = string.format("codeql:/%s/%s", config.database.sourceLocationPrefix, node.id)
-    if vim.fn.bufnr(bufname) == -1 then
-      vim.api.nvim_command(string.format("edit %s", bufname))
-    else
+    local filename = string.format("%s/%s", config.database.sourceLocationPrefix, node.id)
+    local bufname = string.format("ql:/%s", filename)
+    if vim.fn.bufnr(bufname) > -1 then
       vim.api.nvim_command(string.format("buffer %s", bufname))
+    else
+      local bufnr = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_name(bufnr, bufname)
+      filename = string.sub(filename, 2)
+      util.open_from_archive(bufnr, filename, {target_winid = target_winid})
     end
   end, map_options)
 

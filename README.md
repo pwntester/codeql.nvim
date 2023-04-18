@@ -122,14 +122,15 @@ require("codeql").setup {
 - `QL query cancel`: Cancels current query.
 - `QL history list`: Shows a menu to render results of previous queries (on the same nvim session).
 - `QL server stop`: Stops the query server associated with the query buffer. A new one will be started upon query evaluation.
-- `QL ast print`: On a `codeql:/` buffer, prints the AST of the current file.
+- `QL ast print`: On a `ql:/` buffer, prints the AST of the current file.
 - `QL sarif load <path to SARIF file>`: Loads the issues of a SARIF file. To browse the results, use `SetDatabase` before.
-- `QL sarif copy-permalink`: Copies a permalink to the current line of a SARIF file.
+- `QL sarif permalink`: Copies a permalink to the current line of a SARIF file.
+- `QL sarif browse`: Open the file in GitHub.
 - `QL mrva load <name of MRVA session>`: Loads results of MRVA scan.
 
 ## Mappings
-- `gd`: On a `codeql:/` file, jumps to the symbol definition.
-- `gr`: On a `codeql:/` file, show symbol references in the QuickFix window.
+- `gd`: On a `ql:/` file, jumps to the symbol definition.
+- `gr`: On a `ql:/` file, show symbol references in the QuickFix window.
 - `<leader>qr`: Runs the current query.
 - `<leader>qe`: Quick evaluate the selected predicate.
 - `<leader>qp`: Quick evaluate the enclosing predicate.

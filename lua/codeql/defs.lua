@@ -1,4 +1,5 @@
 local util = require "codeql.util"
+local vim = vim
 
 local M = {}
 
@@ -6,7 +7,6 @@ M.cache = {
   definitions = {},
   references = {},
 }
-M.processedFiles = {}
 
 local function add_to_cache(kind, fname, lnum, range, location)
   local key = string.format("%s::%d", fname, lnum)
@@ -81,9 +81,10 @@ function M.find_at_cursor(kind)
     return
   end
   local bufnr = vim.api.nvim_get_current_buf()
+  local winid = vim.api.nvim_get_current_win()
   local bufname = vim.api.nvim_buf_get_name(bufnr)
   local _, row, col = unpack(vim.fn.getpos ".")
-  if not vim.startswith(bufname, "codeql:/") then
+  if not vim.startswith(bufname, "ql:/") then
     return
   end
   local prefix = vim.split(bufname, "://")[1]
@@ -93,7 +94,7 @@ function M.find_at_cursor(kind)
   local key = string.format("/%s::%d", fname, row)
   local entry = M.cache[kind][key]
   if not entry or vim.tbl_count(entry) == 0 then
-    util.message(string.format("Didnt found %s for %s", kind, key))
+    util.message(string.format("Cannot find %s for %s", kind, key))
     return
   end
 
@@ -105,7 +106,7 @@ function M.find_at_cursor(kind)
   end
 
   if #matching_locs == 0 then
-    util.message(string.format("Didnt found matching %s for %s", kind, word_at_cursor))
+    util.message(string.format("Cannot find matching %s for %s", kind, word_at_cursor))
     return
   elseif #matching_locs == 1 then
     -- jump to location (def/ref)
@@ -119,14 +120,22 @@ function M.find_at_cursor(kind)
     local items = { { tagname = vim.fn.expand "<cword>", from = from } }
     vim.fn.settagstack(vim.fn.win_getid(), { items = items }, "t")
 
-    local def_bufname = string.format("codeql://%s", string.sub(location.fname, 2))
-    if vim.fn.bufnr(def_bufname) == -1 then
-      vim.api.nvim_command(string.format("edit %s", def_bufname))
-    else
+    local def_bufname = string.format("ql://%s", string.sub(location.fname, 2))
+    local opts = {
+      line = location.lnum,
+      target_winid = winid
+    }
+    if vim.fn.bufnr(def_bufname) > -1 then
       vim.api.nvim_command(string.format("buffer %s", def_bufname))
+      if opts.line then
+        util.jump_to_line(opts)
+      end
+    else
+      local def_bufnr = vim.api.nvim_create_buf(false, true)
+      vim.api.nvim_buf_set_name(def_bufnr, def_bufname)
+      local path = string.sub(location.fname, 2)
+      util.open_from_archive(def_bufnr, path, opts)
     end
-    pcall(vim.api.nvim_win_set_cursor, 0, { location.lnum, location.range[1] - 1 })
-    vim.cmd "norm! zz"
   elseif #matching_locs > 1 then
     local items = {}
     for _, location in ipairs(matching_locs) do

@@ -3,6 +3,7 @@ local panel = require "codeql.panel"
 local cli = require "codeql.cliserver"
 local config = require "codeql.config"
 local sarif = require "codeql.sarif"
+local vim = vim
 
 local M = {}
 
@@ -65,21 +66,16 @@ function M.process_results(opts, info)
     cli.runAsync(
       cmd,
       vim.schedule_wrap(function(_)
-        local qkind
-        if util.is_file(resultsPath) then
-          if vim.endswith(string.lower(queryPath), "/localdefinitions.ql") then
-            qkind = "definitions"
-            require("codeql.defs").process_defs(resultsPath)
-          elseif vim.endswith(string.lower(queryPath), "/localreferences.ql") then
-            qkind = "references"
-            require("codeql.defs").process_refs(resultsPath)
-          elseif vim.endswith(string.lower(queryPath), "/printast.ql") then
-            qkind = "AST"
-            require("codeql.ast").build_ast(resultsPath, bufnr)
-          end
-        else
-          util.err_message("Error: Failed to decode " .. qkind .. " results from " .. resultsPath)
-          panel.render()
+        if not util.is_file(resultsPath) then
+          util.err_message("Error: Failed to decode results for " .. queryPath)
+          return
+        end
+        if vim.endswith(string.lower(queryPath), "/localdefinitions.ql") then
+          require("codeql.defs").process_defs(resultsPath)
+        elseif vim.endswith(string.lower(queryPath), "/localreferences.ql") then
+          require("codeql.defs").process_refs(resultsPath)
+        elseif vim.endswith(string.lower(queryPath), "/printast.ql") then
+          require("codeql.ast").build_ast(resultsPath, bufnr)
         end
       end)
     )
