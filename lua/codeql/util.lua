@@ -362,10 +362,9 @@ function M.resolve_library_path(queryPath)
     return cache.library_paths[queryPath]
   end
   local cmd = { "resolve", "library-path", "-v", "--log-to-stderr", "--format=json", "--query=" .. queryPath }
-  local conf = config.config
-  if conf.additional_packs and #conf.additional_packs > 0 then
-    local additional_packs = table.concat(conf.additional_packs, ":")
-    table.insert(cmd, string.format("--additional-packs=%s", additional_packs))
+  local additionalPacks = M.get_additional_packs()
+  if additionalPacks then
+    table.insert(cmd, string.format("--additional-packs=%s", additionalPacks))
   end
   local json = cli.runSync(cmd)
   local decoded, err = M.json_decode(json)

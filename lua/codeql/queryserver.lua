@@ -116,6 +116,7 @@ function M.start_server()
     "--evaluator-log-level", "5",
     "-v",
     "--log-to-stderr",
+    --"--additional-packs", "/Users/pwntester/src/github.com/github/securitylab-codeql",
   }
   local conf = config.config
   vim.list_extend(cmd, conf.ram_opts)

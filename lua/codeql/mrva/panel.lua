@@ -42,10 +42,15 @@ local M = {}
 
 M.load = function(name)
   -- yep, self-CMDi, yay!
-  local json = vim.fn.system("gh mrva status --json --name " .. name)
+  local json = vim.fn.system("gh mrva status --json --session " .. name)
   local status, err = util.json_decode(json)
   if err then
     vim.notify(err, 2)
+    return
+  end
+
+  if status.total_repositories_with_findings == 0 then
+    vim.notify("No findings found", 2)
     return
   end
 
@@ -129,7 +134,7 @@ M.load = function(name)
       local json_filename = node.nwo:gsub("/", "_") .. ".json"
       -- check if file exists
       if vim.fn.filereadable(tmpdir .. "/" .. sarif_filename) == 0 and vim.fn.filereadable(tmpdir .. "/" .. bqrs_filename) == 0 then
-        vim.fn.system("gh mrva download --name " .. node.name .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir)
+        vim.fn.system("gh mrva download --session " .. node.name .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir)
       end
       if vim.fn.filereadable(tmpdir .. "/" .. sarif_filename) > 0 then
         loader.load_sarif_results(tmpdir .. "/" .. sarif_filename)
@@ -207,7 +212,7 @@ local function gen_from_gh_mrva_list()
 end
 
 function M.list_sessions()
-  local json_str = vim.fn.system("gh mrva list --json")
+  local json_str = vim.fn.system("gh mrva list --json | jq '. |= sort_by(.timestamp)'")
   local sessions = vim.fn.json_decode(json_str)
   pickers.new({}, {
     prompt_title = "MRVA session",
