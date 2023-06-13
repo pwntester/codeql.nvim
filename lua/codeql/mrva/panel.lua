@@ -134,11 +134,19 @@ M.load = function(name)
       local json_filename = node.nwo:gsub("/", "_") .. ".json"
       -- check if file exists
       if vim.fn.filereadable(tmpdir .. "/" .. sarif_filename) == 0 and vim.fn.filereadable(tmpdir .. "/" .. bqrs_filename) == 0 then
-        vim.fn.system("gh mrva download --session " .. node.name .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir)
+        local cmd = "gh mrva download --session " .. node.name .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir
+        local output = vim.fn.system(cmd)
+        output = output:gsub("\n", "")
+        if string.find(output, "Please try again later") then
+          util.err_message("Results are not ready yet")
+          return
+        end
       end
       if vim.fn.filereadable(tmpdir .. "/" .. sarif_filename) > 0 then
+        print("Loading SARIF results for " .. node.nwo .. " from " .. tmpdir .. "/" .. sarif_filename)
         loader.load_sarif_results(tmpdir .. "/" .. sarif_filename)
       elseif vim.fn.filereadable(tmpdir .. "/" .. bqrs_filename) > 0 then
+        print("Loading BQRS results for " .. node.nwo .. " from " .. tmpdir .. "/" .. bqrs_filename)
         local cmd = {
           "bqrs",
           "decode",
@@ -156,9 +164,13 @@ M.load = function(name)
               loader.load_raw_results(tmpdir .. "/" .. json_filename)
             else
               util.err_message("Error: Cant find raw results at " .. tmpdir .. "/" .. json_filename)
+              return
             end
           end)
         )
+      else
+        util.err_message("Error: Cant find results for " .. node.nwo)
+        return
       end
     end
   end, map_options)
