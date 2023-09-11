@@ -44,6 +44,7 @@ use {
                 "TelescopePrompt",
                 "TelescopeResults",
                 "notify",
+                "noice",
                 "NvimTree",
                 "neo-tree",
               },

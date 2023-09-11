@@ -17,6 +17,7 @@ local M = {}
 -- type RunStatus struct {
 -- 	Id            int    `json:"id"`
 -- 	Query         string `json:"query"`
+-- 	QueryId       string `json:"query_id"`
 -- 	Status        string `json:"status"`
 -- 	FailureReason string `json:"failure_reason"`
 -- }
@@ -25,6 +26,8 @@ local M = {}
 -- 	Nwo   string `json:"nwo"`
 -- 	Count int    `json:"count"`
 -- 	RunId int    `json:"run_id"`
+-- 	Query         string `json:"query"`
+-- 	QueryId       string `json:"query_id"`
 -- }
 -- type Results struct {
 -- 	Runs                                   []RunStatus        `json:"runs"`
@@ -43,12 +46,18 @@ local M = {}
 M.load = function(name)
   -- yep, self-CMDi, yay!
   local json = vim.fn.system("gh mrva status --json --session " .. name)
-  local status, err = util.json_decode(json)
+  local statuses, err = util.json_decode(json)
   if err then
     vim.notify(err, 2)
     return
   end
 
+  if #statuses == 0 or statuses == nil then
+    vim.notify("No results found", 2)
+    return
+  end
+
+  local status = statuses[1]
   if status.total_repositories_with_findings == 0 then
     vim.notify("No findings found", 2)
     return
@@ -62,20 +71,41 @@ M.load = function(name)
   -- total finding count
   table.insert(nodes, NuiTree.Node({ type = "label", label = "Findings: " .. status.total_findings_count }))
 
-  -- sort by stars
-  table.sort(status.repositories_with_findings, function(a, b)
-    return a.stars > b.stars
-  end)
-
+  -- group by query_id
+  local query_ids = {}
   for _, item in ipairs(status.repositories_with_findings) do
-    table.insert(nodes, NuiTree.Node({
-      type = "result",
-      nwo = item.nwo,
-      name = name,
-      count = item.count,
-      stars = item.stars,
-    }))
+    if query_ids[item.query_id] == nil then
+      query_ids[item.query_id] = { item }
+    else
+      table.insert(query_ids[item.query_id], item)
+    end
   end
+
+  for query_id, item_list in pairs(query_ids) do
+    -- sort by stars
+    table.sort(item_list, function(a, b)
+      return a.stars > b.stars
+    end)
+
+    -- children of query_id
+    local children = {}
+    for _, item in ipairs(item_list) do
+      table.insert(children, NuiTree.Node({
+        type = "result",
+        nwo = item.nwo,
+        name = name,
+        query_id = item.query_id,
+        run_id = item.run_id,
+        count = item.count,
+        stars = item.stars,
+      }))
+    end
+
+    -- add heading
+    table.insert(nodes, NuiTree.Node({ type = "label", label = query_id }, children))
+  end
+
+
 
   local split = Split {
     relative = "win",
@@ -102,13 +132,14 @@ M.load = function(name)
     nodes = nodes,
     prepare_node = function(node)
       local line = NuiLine()
+
       if node.type == "label" then
+        if node:has_children() then
+          line:append(node:is_expanded() and " " or " ", "SpecialChar")
+        end
         line:append(node.label, "Comment")
-      end
-      if node.type == "result" then
-        --line:append("  ")
-        --line:append("", "SpecialKey")
-        --line:append(" ")
+      elseif node.type == "result" then
+        line:append("  - ")
         line:append(node.nwo, "Normal")
         line:append(" ")
         line:append("💥 " .. tostring(node.count), "Comment")
@@ -119,22 +150,119 @@ M.load = function(name)
     end
   }
 
+  -- local function check_node_health(node)
+  --   local query_content = read_file(node.filepath)
+  --
+  --   local ok, err = pcall(vim.treesitter.query.parse_query, node.lang, query_content)
+  --
+  --   if ok then
+  --     node.ok = true
+  --     node.err = nil
+  --     node.err_position = nil
+  --   else
+  --     node.ok = false
+  --     node.err = err
+  --     node.err_position = string.match(node.err, "position (%d+)")
+  --   end
+  -- end
+
+  -- mappings
   local map_options = { noremap = true, nowait = true }
 
-  split:map("n", "q", function()
-    split:unmount()
-  end, { noremap = true })
+  -- A session can contains several runs,
+  -- each run correspond to one query/query_id on several repos
+  -- however, more than one run can use the same query. This is true if there is more than 1000 repos
+  -- two ways of presenting results:
+  -- 1. show query id at the top level and repos (stars/count) as children
+  -- 2. show repos at the top level and query id as children
+  -- Its common to run just one or few queries so 1. is better
+  -- When clicking on a child node, we need to download the results for a single repo/run_id combo
+  -- We can do that passing --run and --nwo to gh mrva download
 
+  -- exit
+  split:map("n", { "q", "<esc>" }, function()
+    split:unmount()
+  end, map_options)
+
+  -- refresh
+  split:map("n", "r", function()
+    -- local node = tree:get_node()
+    vim.schedule(function()
+      -- if node:has_children() then
+      --   for_each(tree:get_nodes(node:get_id()), check_node_health)
+      -- else
+      --   check_node_health(node)
+      -- end
+
+      tree:render()
+    end)
+  end, map_options)
+
+  -- collapse all
+  split:map("n", "c", function()
+    vim.schedule(function()
+      for _, node in ipairs(tree:get_nodes()) do
+        if node:has_children() and node:is_expanded() then
+          node:collapse()
+        end
+      end
+      tree:render()
+    end)
+  end, map_options)
+
+  -- expand all
+  split:map("n", "a", function()
+    vim.schedule(function()
+      for _, node in ipairs(tree:get_nodes()) do
+        if node:has_children() and not node:is_expanded() then
+          node:expand()
+        end
+      end
+      tree:render()
+    end)
+  end, map_options)
+
+  -- toggle expand/collapse
+  split:map("n", "o", function()
+    local node, linenr = tree:get_node()
+    if not node:has_children() then
+      node, linenr = tree:get_node(node:get_parent_id())
+    end
+    if node and node:is_expanded() and node:collapse() then
+      vim.api.nvim_win_set_cursor(split.winid, { linenr, 0 })
+      tree:render()
+    elseif node and not node:is_expanded() and node:expand() then
+      if not node.checked then
+        node.checked = true
+
+        vim.schedule(function()
+          -- for _, n in ipairs(tree:get_nodes(node:get_id())) do
+          --   check_node_health(n)
+          -- end
+          tree:render()
+        end)
+      end
+
+      vim.api.nvim_win_set_cursor(split.winid, { linenr, 0 })
+      tree:render()
+    end
+  end, map_options)
+
+  -- open
   split:map("n", "<CR>", function()
     local node = tree:get_node()
-    if node.type == "result" then
+    if node.type == "label" then
+
+    elseif node.type == "result" then
       local tmpdir = vim.fn.fnamemodify(vim.fn.tempname(), ":p:h")
-      local sarif_filename = node.nwo:gsub("/", "_") .. ".sarif"
-      local bqrs_filename = node.nwo:gsub("/", "_") .. ".bqrs"
-      local json_filename = node.nwo:gsub("/", "_") .. ".json"
+      local filename = node.nwo:gsub("/", "_") .. "___" .. node.query_id:gsub("/", "_")
+      local sarif_filename = filename .. ".sarif"
+      local bqrs_filename = filename .. ".bqrs"
+      local json_filename = filename .. ".json"
       -- check if file exists
       if vim.fn.filereadable(tmpdir .. "/" .. sarif_filename) == 0 and vim.fn.filereadable(tmpdir .. "/" .. bqrs_filename) == 0 then
-        local cmd = "gh mrva download --session " .. node.name .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir
+        local cmd = "gh mrva download --run " ..
+            node.run_id .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir .. " --output-filename " .. sarif_filename
         local output = vim.fn.system(cmd)
         output = output:gsub("\n", "")
         if string.find(output, "Please try again later") then
@@ -143,10 +271,10 @@ M.load = function(name)
         end
       end
       if vim.fn.filereadable(tmpdir .. "/" .. sarif_filename) > 0 then
-        print("Loading SARIF results for " .. node.nwo .. " from " .. tmpdir .. "/" .. sarif_filename)
+        --print("Loading SARIF results for " .. node.nwo .. " from " .. tmpdir .. "/" .. sarif_filename)
         loader.load_sarif_results(tmpdir .. "/" .. sarif_filename)
       elseif vim.fn.filereadable(tmpdir .. "/" .. bqrs_filename) > 0 then
-        print("Loading BQRS results for " .. node.nwo .. " from " .. tmpdir .. "/" .. bqrs_filename)
+        --print("Loading BQRS results for " .. node.nwo .. " from " .. tmpdir .. "/" .. bqrs_filename)
         local cmd = {
           "bqrs",
           "decode",

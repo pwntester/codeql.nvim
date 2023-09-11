@@ -83,7 +83,7 @@ function M.get_lsp_client_id()
   if lsp_client_id then
     return lsp_client_id
   else
-  local lsp_clients = vim.lsp.get_active_clients()
+    local lsp_clients = vim.lsp.get_active_clients()
     for _, lsp_client in ipairs(lsp_clients) do
       if lsp_client.name == "codeqlls" then
         lsp_client_id = lsp_client.id
@@ -102,7 +102,6 @@ function M.get_lsp_handler()
 end
 
 function M.start_server()
-
   if M.client then
     return M.client
   end
@@ -112,7 +111,7 @@ function M.start_server()
     "codeql",
     "execute",
     "query-server2",
-    "--debug", "--tuple-counting",
+    "--debug", "--tuple-counting", "--threads=0",
     "--evaluator-log-level", "5",
     "-v",
     "--log-to-stderr",
