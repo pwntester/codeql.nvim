@@ -180,7 +180,7 @@ M.load = function(name)
   -- We can do that passing --run and --nwo to gh mrva download
 
   -- exit
-  split:map("n", { "q", "<esc>" }, function()
+  split:map("n", "q", function()
     split:unmount()
   end, map_options)
 
@@ -271,7 +271,7 @@ M.load = function(name)
         end
       end
       if vim.fn.filereadable(tmpdir .. "/" .. sarif_filename) > 0 then
-        --print("Loading SARIF results for " .. node.nwo .. " from " .. tmpdir .. "/" .. sarif_filename)
+        print("Loading SARIF results for " .. node.nwo .. " from " .. tmpdir .. "/" .. sarif_filename)
         loader.load_sarif_results(tmpdir .. "/" .. sarif_filename)
       elseif vim.fn.filereadable(tmpdir .. "/" .. bqrs_filename) > 0 then
         --print("Loading BQRS results for " .. node.nwo .. " from " .. tmpdir .. "/" .. bqrs_filename)
