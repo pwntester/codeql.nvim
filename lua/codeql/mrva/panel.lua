@@ -255,14 +255,15 @@ M.load = function(name)
 
     elseif node.type == "result" then
       local tmpdir = vim.fn.fnamemodify(vim.fn.tempname(), ":p:h")
-      local filename = node.nwo:gsub("/", "_") .. "___" .. node.query_id:gsub("/", "_")
+      local filename = node.nwo:gsub("/", "_") .. "_" .. tostring(node.run_id)
       local sarif_filename = filename .. ".sarif"
       local bqrs_filename = filename .. ".bqrs"
       local json_filename = filename .. ".json"
       -- check if file exists
       if vim.fn.filereadable(tmpdir .. "/" .. sarif_filename) == 0 and vim.fn.filereadable(tmpdir .. "/" .. bqrs_filename) == 0 then
         local cmd = "gh mrva download --run " ..
-            node.run_id .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir .. " --output-filename " .. sarif_filename
+            node.run_id .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir
+        print("Downloading results for " .. node.nwo .. " with " .. cmd)
         local output = vim.fn.system(cmd)
         output = output:gsub("\n", "")
         if string.find(output, "Please try again later") then
@@ -274,7 +275,7 @@ M.load = function(name)
         print("Loading SARIF results for " .. node.nwo .. " from " .. tmpdir .. "/" .. sarif_filename)
         loader.load_sarif_results(tmpdir .. "/" .. sarif_filename)
       elseif vim.fn.filereadable(tmpdir .. "/" .. bqrs_filename) > 0 then
-        --print("Loading BQRS results for " .. node.nwo .. " from " .. tmpdir .. "/" .. bqrs_filename)
+        print("Loading BQRS results for " .. node.nwo .. " from " .. tmpdir .. "/" .. bqrs_filename)
         local cmd = {
           "bqrs",
           "decode",
@@ -291,13 +292,13 @@ M.load = function(name)
             if util.is_file(tmpdir .. "/" .. json_filename) then
               loader.load_raw_results(tmpdir .. "/" .. json_filename)
             else
-              util.err_message("Error: Cant find raw results at " .. tmpdir .. "/" .. json_filename)
+              util.err_message("Error: Can't find raw results at " .. tmpdir .. "/" .. json_filename)
               return
             end
           end)
         )
       else
-        util.err_message("Error: Cant find results for " .. node.nwo)
+        util.err_message("Error: Can't find results for " .. node.nwo)
         return
       end
     end
