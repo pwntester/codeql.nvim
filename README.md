@@ -234,4 +234,10 @@ It is possible to add codeql language server to `coc.nvim` using `coc-settings.j
   }
 }
 ```
+## 🙏 Say Thanks
 
+If you like this plugin and would like to buy me a coffee, you can!
+
+[<img src="https://cdn.buymeacoffee.com/buttons/v2/default-violet.png" alt="BuyMeACoffee" width="140">](https://www.buymeacoffee.com/pwntester)
+
+[![GitHub Sponsors](https://img.shields.io/github/sponsors/pwntester?style=social)](https://github.com/sponsors/pwntester)
