@@ -234,6 +234,7 @@ It is possible to add codeql language server to `coc.nvim` using `coc-settings.j
   }
 }
 ```
+
 ## 🙏 Say Thanks
 
 If you like this plugin and would like to buy me a coffee, you can!
