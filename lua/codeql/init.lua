@@ -51,6 +51,13 @@ function M.set_database(dbpath)
   end
 end
 
+function M.unset_database(dbpath)
+  if not util.is_blank(config.database) then
+    queryserver.unregister_database(function()
+    end)
+  end
+end
+
 local function is_predicate_node(node)
   return node:type() == "charpred" or node:type() == "memberPredicate" or node:type() == "classlessPredicate"
 end
@@ -335,7 +342,7 @@ local commands = {
     unset = {
       description = "Unset the database to use for CodeQL queries",
       handler = function()
-        M.unregister_database()
+        M.unset_database()
       end,
     },
     browse = {
