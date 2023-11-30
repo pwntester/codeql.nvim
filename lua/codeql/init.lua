@@ -2,8 +2,6 @@ local util = require "codeql.util"
 local queryserver = require "codeql.queryserver"
 local config = require "codeql.config"
 local Path = require "plenary.path"
-local ts_utils_installed, ts_utils = pcall(require, "nvim-treesitter.ts_utils")
-local ts_parsers_installed, ts_parsers = pcall(require, "nvim-treesitter.parsers")
 local vim = vim
 
 local M = {}
@@ -70,16 +68,14 @@ local function is_predicate_identifier_node(parent, node)
   end
 end
 
+---@return TSNode?, TSNode?
 function M.get_node_at_cursor()
-  if not ts_parsers_installed then
-    return
-  end
   local winnr = vim.api.nvim_get_current_win()
   local bufnr = vim.api.nvim_get_current_buf()
   local cursor = vim.api.nvim_win_get_cursor(winnr)
   local cursor_range = { cursor[1] - 1, cursor[2] }
-  local root_lang_tree = ts_parsers.get_parser(bufnr)
-  if not root_lang_tree then
+  local ok, root_lang_tree = pcall(vim.treesitter.get_parser, bufnr, vim.treesitter.language.get_lang(vim.bo.filetype))
+  if not ok then
     return
   end
   local root = root_lang_tree:trees()[1]:root()
@@ -88,7 +84,7 @@ end
 
 function M.get_eval_position()
   local bufnr = vim.api.nvim_get_current_buf()
-  if not ts_utils_installed then
+  if vim.treesitter.highlighter.active[bufnr] == nil then
     return
   end
   local node, root = M.get_node_at_cursor()
@@ -114,7 +110,7 @@ function M.get_eval_position()
     -- descend the predicate node till we find the name node
     for child in node:iter_children() do
       if is_predicate_identifier_node(node, child) then
-        util.message(string.format("Evaluating '%s' predicate", ts_utils.get_node_text(child, bufnr)[1]))
+        util.message(string.format("Evaluating '%s' predicate", vim.treesitter.get_node_text(child, bufnr)[1]))
         local srow, scol, erow, ecol = child:range()
         local midname = math.floor((scol + ecol) / 2)
         return { srow + 1, midname, erow + 1, midname }
