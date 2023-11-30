@@ -725,7 +725,7 @@ function M.jump_to_code(stay_in_panel)
   end
 
   if not source then
-    util.err_message("Cannot find source code for " .. filename)
+    util.err_message("Cannot figure out source code origin. Try setting up the database")
     return
   end
 
@@ -793,7 +793,7 @@ function M.jump_to_code(stay_in_panel)
   if bufnr > -1 then
     vim.api.nvim_win_set_buf(target_winid, bufnr)
   else
-    util.err_message("Cannot find source code for " .. filename)
+    util.err_message("Cannot find source code for " .. filename .. " in " .. source)
   end
 end
 
