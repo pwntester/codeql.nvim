@@ -5,6 +5,8 @@ local vim = vim
 
 local M = {}
 
+local debug_enabled = false
+
 local cache = {
   database_upgrades = {},
   library_paths = {},
@@ -239,6 +241,32 @@ function M.message(msg, opts)
   vim.notify(msg, vim.log.levels.INFO, opts)
 end
 
+function M.debug(msg, opts)
+  opts = opts or { title = "CodeQL" }
+  opts.title = opts.title or "CodeQL"
+  if debug_enabled then
+    local time = M.epoch_ms()
+    if opts.start_time then
+      local duration = time - opts.start_time
+      msg = time .. ": " .. msg .. " (duration: " .. duration .. "ms)"
+    else
+      msg = time .. ": " .. msg
+    end
+    vim.notify(msg, vim.log.levels.DEBUG, opts)
+    return time
+  end
+end
+
+function M.epoch_ms()
+  local s, ns = vim.loop.gettimeofday()
+  return s * 1000 + math.floor(ns / 1000)
+end
+
+function M.epoch_ns()
+  local s, ns = vim.loop.gettimeofday()
+  return s * 1000000 + ns
+end
+
 function M.json_encode(data)
   local status, result = pcall(vim.fn.json_encode, data)
   if status then
@@ -456,11 +484,11 @@ end
 
 function M.is_blank(s)
   return (
-      s == nil
-      or s == vim.NIL
-      or (type(s) == "string" and string.match(s, "%S") == nil)
-      or (type(s) == "table" and next(s) == nil)
-      )
+    s == nil
+    or s == vim.NIL
+    or (type(s) == "string" and string.match(s, "%S") == nil)
+    or (type(s) == "table" and next(s) == nil)
+  )
 end
 
 function M.get_flatten_artifacts_pages(text)
@@ -614,7 +642,7 @@ function M.highlight_range(bufnr, opts)
   opts.endColumn = opts.endColumn - 1
   if opts.startLine == opts.endLine then
     pcall(vim.api.nvim_buf_add_highlight, bufnr, opts.range_ns, "CodeqlRange", opts.startLine, opts.startColumn,
-    opts.endColumn)
+      opts.endColumn)
   else
     for i = opts.startLine, opts.endLine do
       local hl_startColumn, hl_endColumn

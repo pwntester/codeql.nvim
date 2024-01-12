@@ -96,13 +96,34 @@ function M.process_results(opts, info)
       "interpret",
       "-v",
       "--log-to-stderr",
+      "--output=" .. resultsPath,
+      "--format=sarifv2.1.0",
       "-t=id=" .. id,
       "-t=kind=" .. kind,
-      "-o=" .. resultsPath,
-      "--format=sarif-latest",
+      "--no-group-results",
+      "--threads=0",
       "--max-paths=" .. conf.results.max_paths,
       bqrsPath,
     }
+    -- TODO: add support for --source-archive and --source-location-prefix
+    --"--source-archive /Users/pwntester/Library/Application Support/Code/User/workspaceStorage/50b9d24ec6c3ace332caf92c45290d52/GitHub.vscode-codeql/e23b52929290b5b766ad32367a9cef69c7f3f2e3/ruby/src.zip",
+    --"--source-location-prefix /home/runner/work/github/github",
+
+    -- TODO: add support for all tags
+    --[[
+    -t=name=Code injection
+    -t=description=Interpreting unsanitized user input as code allows a malicious user to perform arbitrary code execution.
+    -t=kind=path-problem
+    -t=problem.severity=error
+    -t=security-severity=9.3
+    -t=sub-severity=high
+    -t=precision=high
+    -t=id=rb/code-injection
+    -t=tags=security external/cwe/cwe-094 external/cwe/cwe-095 external/cwe/cwe-116
+    ]]
+    --
+
+    --util.message(string.format("Processing SARIF results with %s", vim.inspect(cmd)))
     vim.list_extend(cmd, ram_opts)
     cli.runAsync(
       cmd,
@@ -257,7 +278,6 @@ function M.load_raw_results(path)
       vim.api.nvim_command "redraw"
     end
   end
-
 end
 
 function M.load_sarif_results(path)

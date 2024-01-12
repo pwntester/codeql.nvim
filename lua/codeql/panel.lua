@@ -24,7 +24,7 @@ local M = {
   panels = {},
 }
 
-local function generate_issue_label(node)
+_G.generate_issue_label = function(node)
   local label = node.label
   local conf = config.config
   if conf.panel.show_filename and node["filename"] and node["filename"] ~= nil then
@@ -101,6 +101,7 @@ local function is_filtered(filter, issue)
 end
 
 local function print_help(bufnr)
+  util.debug("Entering panel.print_help()")
   if panel_short_help then
     print_to_panel(bufnr, '" Press H for help')
     print_to_panel(bufnr, "")
@@ -111,10 +112,11 @@ local function print_help(bufnr)
     print_to_panel(bufnr, '" P: Previous path')
     print_to_panel(bufnr, '" N: Next path')
     print_to_panel(bufnr, '"')
-    print_to_panel(bufnr, '" ---------- Folds ----------')
+    print_to_panel(bufnr, '" --------- Filters ---------')
     print_to_panel(bufnr, '" f: Label filter')
     print_to_panel(bufnr, '" F: Generic filter')
     print_to_panel(bufnr, '" x: Clear filter')
+    print_to_panel(bufnr, '" s: Shortest path filter')
     print_to_panel(bufnr, '"')
     print_to_panel(bufnr, '" ---------- Folds ----------')
     print_to_panel(bufnr, '" o: Toggle fold')
@@ -149,6 +151,7 @@ local function get_node_location(node)
 end
 
 local function print_tree_node(bufnr, node, indent_level)
+  local start_time = util.debug("Entering panel.print_tree_node()")
   local text = ""
   local hl = {}
 
@@ -180,6 +183,7 @@ local function print_tree_node(bufnr, node, indent_level)
     kind = "node",
     obj = node,
   })
+  util.debug("Exiting panel.print_tree_node()", { start_time = start_time })
 end
 
 local function right_align(text, size)
@@ -205,6 +209,7 @@ local function get_table_nodes(issue, max_lengths)
 end
 
 local function print_tree_nodes(bufnr, issue, indent_level)
+  local start_time = util.debug("Entering panel.print_tree_nodes()")
   local line_map = M.panels[bufnr].line_map
   local curline = vim.api.nvim_buf_line_count(bufnr)
 
@@ -232,9 +237,11 @@ local function print_tree_nodes(bufnr, issue, indent_level)
   for _, node in ipairs(path) do
     print_tree_node(bufnr, node, indent_level)
   end
+  util.debug("Existing panel.print_tree_nodes()", { start_time = start_time })
 end
 
 local function print_header(bufnr, issues)
+  util.debug("Entering panel.print_header()")
   if config.database.path then
     local hl = { CodeqlPanelInfo = { { 0, string.len "Database:" } } }
     print_to_panel(bufnr, "Database: " .. config.database.path, hl)
@@ -245,7 +252,8 @@ local function print_header(bufnr, issues)
     print_to_panel(bufnr, "SARIF: " .. filename, hl)
   end
   local hl = { CodeqlPanelInfo = { { 0, string.len "Issues:" } } }
-  print_to_panel(bufnr, "Issues:   " .. table.getn(issues), hl)
+  -- print_to_panel(bufnr, "Issues:   " .. table.getn(issues), hl)
+  print_to_panel(bufnr, "Issues:   " .. #issues, hl)
 end
 
 local function get_column_names(columns, max_lengths)
@@ -256,16 +264,30 @@ local function get_column_names(columns, max_lengths)
   return result
 end
 
+local function min_path_length(paths)
+  local min_length = #paths[1]
+  for _, path in ipairs(paths) do
+    if #path < min_length then
+      min_length = #path
+    end
+  end
+  return min_length
+end
+
 local function print_issues(bufnr, results)
+  local start_time = util.debug("Entering panel.print_issues()")
   if results.mode == "tree" then
+    start_time = util.debug("Entering panel.print_issues():tree mode")
     -- print group name
     local query_foldmarker = not results.is_folded and icon_open or icon_closed
     local query_label = string.format("%s %s", query_foldmarker, results.label)
 
+    util.debug("Printing query label")
     print_to_panel(bufnr, string.format("%s (%d)", query_label, #results.issues), {
       CodeqlPanelFoldIcon = { { 0, string.len(query_foldmarker) } },
       CodeqlPanelQueryId = { { string.len(query_foldmarker), string.len(query_label) } },
     })
+    util.debug("Registering results")
     register(bufnr, {
       kind = "query",
       obj = results,
@@ -273,15 +295,18 @@ local function print_issues(bufnr, results)
 
     if not results.is_folded then
       -- print issue labels
+      util.debug("Printing issue labels")
       for _, issue in ipairs(results.issues) do
         -- print nodes
         if not issue.hidden then
+          local start_rtime = util.debug("Printing issue label")
           local is_folded = issue.is_folded
           local foldmarker = not is_folded and icon_open or icon_closed
-          local label = string.format("  %s %s", foldmarker, generate_issue_label(issue.node))
+          local label = string.format("  %s %s ↔ %d", foldmarker, issue.label, issue.min_path_length)
           print_to_panel(bufnr, label, {
             CodeqlPanelFoldIcon = { { 0, 2 + string.len(foldmarker) } },
-            --CodeqlPanelQueryId = { { 2 + string.len(foldmarker), string.len(label) } },
+            Normal = { { 2 + string.len(foldmarker), 2 + string.len(foldmarker) + string.len(issue.label) } },
+            CodeqlPanelQueryId = { { 4 + string.len(foldmarker) + string.len(issue.label), 4 + string.len(foldmarker) + string.len(issue.label) + 2 } },
           })
 
           register(bufnr, {
@@ -289,6 +314,7 @@ local function print_issues(bufnr, results)
             obj = issue,
           })
 
+          util.debug("Finished printing issue label", { start_time = start_rtime })
           if not is_folded then
             print_tree_nodes(bufnr, issue, 4)
           end
@@ -297,6 +323,7 @@ local function print_issues(bufnr, results)
     end
     print_to_panel(bufnr, "")
   elseif results.mode == "table" then
+    start_time = util.debug("Entering panel.print_issues():table mode")
     -- TODO: node.label may need to be tweaked (eg: replace new lines with "")
     -- and this is the place to do it
 
@@ -394,9 +421,11 @@ local function print_issues(bufnr, results)
     print_to_panel(bufnr, footer, { CodeqlPanelSeparator = { { 0, -1 } } })
     print_to_panel(bufnr, "")
   end
+  util.debug("Exiting panel.print_issues()", { start_time = start_time })
 end
 
 local function render_content(bufnr)
+  local start_time = util.debug("Entering panel.render_content()")
   if not bufnr or bufnr == -1 then
     util.err_message "Error opening CodeQL panel"
     return
@@ -422,9 +451,11 @@ local function render_content(bufnr)
     print_to_panel(bufnr, "No results found.")
   end
   vim.api.nvim_buf_set_option(bufnr, "modifiable", false)
+  util.debug("Existing panel.render_content()", { start_time = start_time })
 end
 
 local function render_keep_view(bufnr, line)
+  local start_time = util.debug("Entering panel.render_keep_view()")
   if line == nil then
     line = vim.fn.line "."
   end
@@ -442,8 +473,11 @@ local function render_keep_view(bufnr, line)
   vim.cmd "normal! zt"
   vim.fn.cursor(line, curcol)
 
+  local start_rtime = util.debug("Redrawing the screen")
   vim.cmd("let &scrolloff = " .. scrolloff_save)
   vim.cmd "redraw"
+  util.debug("Finishing redrawing the screen", { start_time = start_rtime })
+  util.debug("Exiting panel.render_keep_view()", { start_time = start_time })
 end
 
 -- exported functions
@@ -544,8 +578,15 @@ function M.apply_mappings()
   vim.api.nvim_buf_set_keymap(
     bufnr,
     "n",
-    "<S-x`>",
+    "x",
     [[<cmd>lua require'codeql.panel'.clear_filter()<CR>]],
+    { script = true, silent = true }
+  )
+  vim.api.nvim_buf_set_keymap(
+    bufnr,
+    "n",
+    "s",
+    [[<cmd>lua require'codeql.panel'.filter_shortest_path()<CR>]],
     { script = true, silent = true }
   )
 end
@@ -562,6 +603,36 @@ local function filter_issues(issues, filter_str)
       issue.hidden = true
     end
   end
+end
+
+function M.filter_shortest_path()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local panel = M.panels[bufnr]
+  local queries = panel.queries
+  for _, query in ipairs(queries) do
+    -- filter issues reaching the same sink, keeping only the shortest path
+    local issues = query.issues
+    local sinks = {}
+    for _, issue in ipairs(issues) do
+      issue.hidden = true
+      local key = issue.node.url.uri ..
+          ":" ..
+          issue.node.url.startLine ..
+          ":" .. issue.node.url.startColumn .. ":" .. issue.node.url.endLine .. ":" .. issue.node.url.endColumn
+
+      if sinks[key] then
+        if sinks[key].min_path_length > issue.min_path_length then
+          sinks[key] = issue
+        end
+      else
+        sinks[key] = issue
+      end
+    end
+    for _, issue in pairs(sinks) do
+      issue.hidden = false
+    end
+  end
+  render_content(bufnr)
 end
 
 function M.clear_filter()
@@ -626,6 +697,7 @@ local function get_enclosing_issue(line)
 end
 
 function M.toggle_fold()
+  local start_time = util.debug("Entering panel.toggle_fold()")
   local bufnr = vim.api.nvim_get_current_buf()
   -- prevent highlighting from being off after adding/removing the help text
   vim.cmd "match none"
@@ -637,13 +709,16 @@ function M.toggle_fold()
     render_keep_view(bufnr, line)
     vim.api.nvim_win_set_cursor(0, { enc_line, 0 })
   end
+  util.debug("Exiting panel.toggle_fold()", { start_time = start_time })
 end
 
 function M.toggle_help()
+  local start_time = util.debug("Entering panel.toggle_help()")
   local bufnr = vim.api.nvim_get_current_buf()
   panel_short_help = not panel_short_help
   -- prevent highlighting from being off after adding/removing the help text
   render_keep_view(bufnr)
+  util.debug("Exiting panel.toggle_help()", { start_time = start_time })
 end
 
 function M.set_fold_level(level)
@@ -942,6 +1017,7 @@ function M.close_panel()
 end
 
 function M.render(opts)
+  util.debug("Entering panel.render()")
   opts = opts or {}
   local issues = opts.issues or {}
   local panel_name = opts.panel_name or "__CodeQLPanel__"
@@ -958,12 +1034,17 @@ function M.render(opts)
   -- split issues in groups according to the query that generated them
   local query_groups = {}
   for _, issue in ipairs(issues) do
+    -- pre compute expensive values
+    issue.label = generate_issue_label(issue.node)
+    issue.min_path_length = min_path_length(issue.paths)
+
     if query_groups[issue.query_id] then
       table.insert(query_groups[issue.query_id], issue)
     else
       query_groups[issue.query_id] = { issue }
     end
   end
+
 
   local queries = {}
   local folded = #vim.tbl_keys(query_groups) > 1 and true or false
