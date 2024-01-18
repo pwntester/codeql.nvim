@@ -23,6 +23,7 @@ function M.setup(opts)
       long_filename = false,
       group_by = "sink",
       context_lines = 5,
+      alignment = "left"
     },
     mappings = {
       run_query = { modes = { "n" }, lhs = "<space>qr", desc = "run query" },

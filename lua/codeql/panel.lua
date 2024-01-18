@@ -186,6 +186,10 @@ local function print_tree_node(bufnr, node, indent_level)
   util.debug("Exiting panel.print_tree_node()", { start_time = start_time })
 end
 
+local function left_align(text, size)
+  return text .. string.rep(" ", size - vim.fn.strdisplaywidth(text))
+end
+
 local function right_align(text, size)
   return string.rep(" ", size - vim.fn.strdisplaywidth(text)) .. text
 end
@@ -197,13 +201,26 @@ local function center_align(text, size)
   return string.rep(" ", left_pad) .. text .. string.rep(" ", right_pad)
 end
 
+local function align(text, size)
+  local alignment = config.config.panel.alignment
+  if alignment == "left" then
+    return left_align(text, size)
+  elseif alignment == "right" then
+    return right_align(text, size)
+  elseif alignment == "center" then
+    return center_align(text, size)
+  else
+    return text
+  end
+end
+
 local function get_table_nodes(issue, max_lengths)
   local path = issue.paths[1]
   local labels = {}
   local locations = {}
   for i, node in ipairs(path) do
-    table.insert(labels, center_align(node.label, max_lengths[i]))
-    table.insert(locations, center_align(get_node_location(node), max_lengths[i]))
+    table.insert(labels, align(node.label, max_lengths[i]))
+    table.insert(locations, align(get_node_location(node), max_lengths[i]))
   end
   return { labels, locations }
 end
@@ -259,7 +276,7 @@ end
 local function get_column_names(columns, max_lengths)
   local result = {}
   for i, column in ipairs(columns) do
-    table.insert(result, center_align(column, max_lengths[i]))
+    table.insert(result, align(column, max_lengths[i]))
   end
   return result
 end
@@ -346,10 +363,10 @@ local function print_issues(bufnr, results)
       end
     end
 
-    local total_length = 4
-    for _, len in ipairs(max_lengths) do
-      total_length = total_length + len + 3
-    end
+    --local total_length = 4
+    --for _, len in ipairs(max_lengths) do
+    --  total_length = total_length + len + 3
+    --end
     print_to_panel(bufnr, "")
 
     local rows = {}
@@ -1034,7 +1051,7 @@ function M.render(opts)
   -- split issues in groups according to the query that generated them
   local query_groups = {}
   for _, issue in ipairs(issues) do
-    -- pre compute expensive values
+    -- pre-compute expensive values
     issue.label = generate_issue_label(issue.node)
     issue.min_path_length = min_path_length(issue.paths)
 
