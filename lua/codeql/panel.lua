@@ -47,9 +47,12 @@ local function register(bufnr, obj)
   M.panels[bufnr].line_map[curline] = obj
 end
 
+local function flatten_label(text)
+  return table.concat(vim.split(text, "\n"), " \\n ")
+end
+
 local function print_to_panel(bufnr, text, matches)
-  local lines = vim.split(text, "\n")
-  text = table.concat(lines, " <CR> ")
+  text = flatten_label(text)
 
   vim.api.nvim_buf_set_lines(bufnr, -1, -1, true, { text })
   if type(matches) == "table" then
@@ -214,12 +217,14 @@ local function align(text, size)
   end
 end
 
-local function get_table_nodes(issue, max_lengths)
+-- returns a tuple, where the first element is a list of the column labels and the second
+-- element is a list of column locations
+local function get_row_columns(issue, max_lengths)
   local path = issue.paths[1]
   local labels = {}
   local locations = {}
   for i, node in ipairs(path) do
-    table.insert(labels, align(node.label, max_lengths[i]))
+    table.insert(labels, align(flatten_label(node.label), max_lengths[i]))
     table.insert(locations, align(get_node_location(node), max_lengths[i]))
   end
   return { labels, locations }
@@ -291,152 +296,170 @@ local function min_path_length(paths)
   return min_length
 end
 
+local function print_tree(bufnr, results)
+  util.debug("Entering print_tree()")
+
+  -- print group name
+  local query_foldmarker = not results.is_folded and icon_open or icon_closed
+  local query_label = string.format("%s %s", query_foldmarker, results.label)
+
+  print_to_panel(bufnr, string.format("%s (%d)", query_label, #results.issues), {
+    CodeqlPanelFoldIcon = { { 0, string.len(query_foldmarker) } },
+    CodeqlPanelQueryId = { { string.len(query_foldmarker), string.len(query_label) } },
+  })
+  register(bufnr, {
+    kind = "query",
+    obj = results,
+  })
+
+  if not results.is_folded then
+    -- print issue labels
+    util.debug("Printing issue labels")
+    for _, issue in ipairs(results.issues) do
+      -- print nodes
+      if not issue.hidden then
+        local start_rtime = util.debug("Printing issue label")
+        local is_folded = issue.is_folded
+        local foldmarker = not is_folded and icon_open or icon_closed
+        local label = string.format("  %s %s ↔ %d", foldmarker, issue.label, issue.min_path_length)
+        print_to_panel(bufnr, label, {
+          CodeqlPanelFoldIcon = { { 0, 2 + string.len(foldmarker) } },
+          Normal = { { 2 + string.len(foldmarker), 2 + string.len(foldmarker) + string.len(issue.label) } },
+          CodeqlPanelQueryId = { { 4 + string.len(foldmarker) + string.len(issue.label), 4 + string.len(foldmarker) + string.len(issue.label) + 2 } },
+        })
+
+        register(bufnr, {
+          kind = "issue",
+          obj = issue,
+        })
+
+        util.debug("Finished printing issue label", { start_time = start_rtime })
+        if not is_folded then
+          print_tree_nodes(bufnr, issue, 4)
+        end
+      end
+    end
+  end
+  print_to_panel(bufnr, "")
+end
+
+local function print_table(bufnr, results)
+  -- TODO: node.label may need to be tweaked (eg: replace new lines with "")
+  -- and this is the place to do it
+
+  util.debug("Entering print_table()")
+
+  print_to_panel(bufnr, string.format("%s (%d)", results.label, #results.issues), {
+    CodeqlPanelQueryId = { { 0, string.len(results.label) } },
+  })
+
+  -- calculate max length for each cell
+  local max_lengths = {}
+  for _, issue in ipairs(results.issues) do
+    -- in table view, we only show the first path
+    local path = issue.paths[1]
+    -- in table view, each path node is a column
+    for i, column in ipairs(path) do
+      -- we need to take into account the length of the label and the location
+      -- the cell length is the max of the label and the location
+      max_lengths[i] = math.max(vim.fn.strdisplaywidth(flatten_label(column.label)), max_lengths[i] or -1)
+      max_lengths[i] = math.max(vim.fn.strdisplaywidth(get_node_location(column)), max_lengths[i] or -1)
+    end
+  end
+  if results.columns and #results.columns > 0 then
+    for i, column in ipairs(results.columns) do
+      max_lengths[i] = math.max(vim.fn.strdisplaywidth(column), max_lengths[i] or -1)
+    end
+  end
+
+  --local total_length = 4
+  --for _, len in ipairs(max_lengths) do
+  --  total_length = total_length + len + 3
+  --end
+  print_to_panel(bufnr, "")
+
+  local rows = {}
+  for _, issue in ipairs(results.issues) do
+    local row_columns = get_row_columns(issue, max_lengths)
+    table.insert(rows, row_columns)
+  end
+
+  local bars = {}
+  for _, len in ipairs(max_lengths) do
+    table.insert(bars, string.rep("─", len))
+  end
+
+  local column_names = get_column_names(results.columns, max_lengths)
+
+  -- header
+  local header1 = string.format("┌─%s─┐", table.concat(bars, "─┬─"))
+  print_to_panel(bufnr, header1, { CodeqlPanelSeparator = { { 0, -1 } } })
+  if results.columns and #results.columns > 0 then
+    local header2 = string.format("│ %s │", table.concat(column_names, " │ "))
+    print_to_panel(bufnr, header2, { CodeqlPanelSeparator = { { 0, -1 } } })
+    local header3 = string.format("├─%s─┤", table.concat(bars, "─┼─"))
+    print_to_panel(bufnr, header3, { CodeqlPanelSeparator = { { 0, -1 } } })
+  end
+
+  local separator_hls = { { 0, vim.fn.len "│ " } }
+  local acc = vim.fn.len "│ "
+  for _, len in ipairs(max_lengths) do
+    table.insert(separator_hls, { acc + len, acc + len + vim.fn.len " │ " })
+    acc = acc + len + vim.fn.len " │ "
+  end
+
+  local location_hls = {}
+  acc = vim.fn.len "│ "
+  for _, len in ipairs(max_lengths) do
+    table.insert(location_hls, { acc, acc + len })
+    acc = acc + len + vim.fn.len " │ "
+  end
+
+  local hl_labels = { CodeqlPanelSeparator = separator_hls }
+  local hl_locations = { CodeqlPanelSeparator = separator_hls, Comment = location_hls }
+  for i, row in ipairs(rows) do
+    -- labels
+    local r = string.format("│ %s │", table.concat(row[1], " │ "))
+    print_to_panel(bufnr, r, hl_labels)
+    register(bufnr, {
+      kind = "row",
+      obj = {
+        ranges = location_hls,
+        columns = results.issues[i].paths[1],
+      },
+    })
+
+    -- locations
+    r = string.format("│ %s │", table.concat(row[2], " │ "))
+    print_to_panel(bufnr, r, hl_locations)
+    register(bufnr, {
+      kind = "row",
+      obj = {
+        ranges = location_hls,
+        columns = results.issues[i].paths[1],
+      },
+    })
+
+    if i < #rows then
+      -- row separator
+      r = string.format("├─%s─┤", table.concat(bars, "─┼─"))
+    else
+      -- footer
+      r = string.format("└─%s─┘", table.concat(bars, "─┴─"))
+    end
+    print_to_panel(bufnr, r, { CodeqlPanelSeparator = { { 0, -1 } } })
+  end
+  print_to_panel(bufnr, "")
+end
+
 local function print_issues(bufnr, results)
   local start_time = util.debug("Entering panel.print_issues()")
   if results.mode == "tree" then
     start_time = util.debug("Entering panel.print_issues():tree mode")
-    -- print group name
-    local query_foldmarker = not results.is_folded and icon_open or icon_closed
-    local query_label = string.format("%s %s", query_foldmarker, results.label)
-
-    util.debug("Printing query label")
-    print_to_panel(bufnr, string.format("%s (%d)", query_label, #results.issues), {
-      CodeqlPanelFoldIcon = { { 0, string.len(query_foldmarker) } },
-      CodeqlPanelQueryId = { { string.len(query_foldmarker), string.len(query_label) } },
-    })
-    util.debug("Registering results")
-    register(bufnr, {
-      kind = "query",
-      obj = results,
-    })
-
-    if not results.is_folded then
-      -- print issue labels
-      util.debug("Printing issue labels")
-      for _, issue in ipairs(results.issues) do
-        -- print nodes
-        if not issue.hidden then
-          local start_rtime = util.debug("Printing issue label")
-          local is_folded = issue.is_folded
-          local foldmarker = not is_folded and icon_open or icon_closed
-          local label = string.format("  %s %s ↔ %d", foldmarker, issue.label, issue.min_path_length)
-          print_to_panel(bufnr, label, {
-            CodeqlPanelFoldIcon = { { 0, 2 + string.len(foldmarker) } },
-            Normal = { { 2 + string.len(foldmarker), 2 + string.len(foldmarker) + string.len(issue.label) } },
-            CodeqlPanelQueryId = { { 4 + string.len(foldmarker) + string.len(issue.label), 4 + string.len(foldmarker) + string.len(issue.label) + 2 } },
-          })
-
-          register(bufnr, {
-            kind = "issue",
-            obj = issue,
-          })
-
-          util.debug("Finished printing issue label", { start_time = start_rtime })
-          if not is_folded then
-            print_tree_nodes(bufnr, issue, 4)
-          end
-        end
-      end
-    end
-    print_to_panel(bufnr, "")
+    print_tree(bufnr, results)
   elseif results.mode == "table" then
     start_time = util.debug("Entering panel.print_issues():table mode")
-    -- TODO: node.label may need to be tweaked (eg: replace new lines with "")
-    -- and this is the place to do it
-
-    print_to_panel(bufnr, string.format("%s (%d)", results.label, #results.issues), {
-      CodeqlPanelQueryId = { { 0, string.len(results.label) } },
-    })
-
-    -- calculate max length for each cell
-    local max_lengths = {}
-    for _, issue in ipairs(results.issues) do
-      local path = issue.paths[1]
-      for i, node in ipairs(path) do
-        max_lengths[i] = math.max(vim.fn.strdisplaywidth(node.label), max_lengths[i] or -1)
-        max_lengths[i] = math.max(vim.fn.strdisplaywidth(get_node_location(node)), max_lengths[i] or -1)
-      end
-    end
-    if results.columns and #results.columns > 0 then
-      for i, column in ipairs(results.columns) do
-        max_lengths[i] = math.max(vim.fn.strdisplaywidth(column), max_lengths[i] or -1)
-      end
-    end
-
-    --local total_length = 4
-    --for _, len in ipairs(max_lengths) do
-    --  total_length = total_length + len + 3
-    --end
-    print_to_panel(bufnr, "")
-
-    local rows = {}
-    for _, issue in ipairs(results.issues) do
-      table.insert(rows, get_table_nodes(issue, max_lengths))
-    end
-
-    local bars = {}
-    for _, len in ipairs(max_lengths) do
-      table.insert(bars, string.rep("─", len))
-    end
-
-    local column_names = get_column_names(results.columns, max_lengths)
-
-    local header1 = string.format("┌─%s─┐", table.concat(bars, "─┬─"))
-    print_to_panel(bufnr, header1, { CodeqlPanelSeparator = { { 0, -1 } } })
-    if results.columns and #results.columns > 0 then
-      local header2 = string.format("│ %s │", table.concat(column_names, " │ "))
-      print_to_panel(bufnr, header2, { CodeqlPanelSeparator = { { 0, -1 } } })
-      local header3 = string.format("├─%s─┤", table.concat(bars, "─┼─"))
-      print_to_panel(bufnr, header3, { CodeqlPanelSeparator = { { 0, -1 } } })
-    end
-
-    local separator_hls = { { 0, vim.fn.len "│ " } }
-    local acc = vim.fn.len "│ "
-    for _, len in ipairs(max_lengths) do
-      table.insert(separator_hls, { acc + len, acc + len + vim.fn.len " │ " })
-      acc = acc + len + vim.fn.len " │ "
-    end
-
-    local location_hls = {}
-    acc = vim.fn.len "│ "
-    for _, len in ipairs(max_lengths) do
-      table.insert(location_hls, { acc, acc + len })
-      acc = acc + len + vim.fn.len " │ "
-    end
-
-    local hl_labels = { CodeqlPanelSeparator = separator_hls }
-    local hl_locations = { CodeqlPanelSeparator = separator_hls, Comment = location_hls }
-    for i, row in ipairs(rows) do
-      -- labels
-      local r = string.format("│ %s │", table.concat(row[1], " │ "))
-      print_to_panel(bufnr, r, hl_labels)
-      register(bufnr, {
-        kind = "row",
-        obj = {
-          ranges = location_hls,
-          columns = results.issues[i].paths[1],
-        },
-      })
-
-      -- locations
-      r = string.format("│ %s │", table.concat(row[2], " │ "))
-      print_to_panel(bufnr, r, hl_locations)
-      register(bufnr, {
-        kind = "row",
-        obj = {
-          ranges = location_hls,
-          columns = results.issues[i].paths[1],
-        },
-      })
-
-      if i < #rows then
-        r = string.format("├─%s─┤", table.concat(bars, "─┼─"))
-        print_to_panel(bufnr, r, { CodeqlPanelSeparator = { { 0, -1 } } })
-      end
-    end
-    local footer = string.format("└─%s─┘", table.concat(bars, "─┴─"))
-    print_to_panel(bufnr, footer, { CodeqlPanelSeparator = { { 0, -1 } } })
-    print_to_panel(bufnr, "")
+    print_table(bufnr, results)
   end
   util.debug("Exiting panel.print_issues()", { start_time = start_time })
 end
