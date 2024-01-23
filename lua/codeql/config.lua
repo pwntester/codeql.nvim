@@ -12,6 +12,7 @@ function M.setup(opts)
     max_ram = nil,
     job_timeout = 15000,
     format_on_save = false,
+    find_databases_cmd = nil, -- (eg: { "find", "/codeql-dbs/github.com/", "-type", "f" })
     results = {
       max_paths = 4,
       max_path_depth = nil,

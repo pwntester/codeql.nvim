@@ -6,6 +6,37 @@ local vim = vim
 
 local M = {}
 
+function M.list_databases()
+  local pok, pickers = pcall(require, "telescope.pickers")
+  local fok, finders = pcall(require, "telescope.finders")
+  local cok, conf = pcall(require, "telescope.config")
+  local aok, actions = pcall(require, "telescope.actions")
+  local sok, action_state = pcall(require, "telescope.actions.state")
+  if not (pok and fok and cok and aok and sok) then
+    util.err_message("Telescope is not installed")
+    return
+  end
+  local cmd = config.config.find_databases_cmd
+  if not cmd then
+    util.err_message("No find_databases_cmd set in config")
+    return
+  end
+  local opts = {}
+  pickers.new(opts, {
+    prompt_title = "CodeQL Databases",
+    finder = finders.new_oneshot_job(cmd, opts),
+    sorter = conf.values.generic_sorter(opts),
+    attach_mappings = function(prompt_bufnr)
+      actions.select_default:replace(function()
+        actions.close(prompt_bufnr)
+        local selection = action_state.get_selected_entry()
+        M.set_database(selection.value)
+      end)
+      return true
+    end,
+  }):find()
+end
+
 function M.set_database(dbpath)
   local conf = config.config
   conf.ram_opts = util.resolve_ram()
@@ -351,6 +382,12 @@ local commands = {
       description = "Grep the CodeQL database",
       handler = function()
         require("codeql.grepper").grep_source()
+      end,
+    },
+    list = {
+      description = "List the CodeQL databases known to CodeQL.nvim",
+      handler = function()
+        M.list_databases()
       end,
     },
   },
