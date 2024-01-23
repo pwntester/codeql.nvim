@@ -5,6 +5,8 @@ local warn = health.warn or health.report_warn
 local error = health.error or health.report_error
 local info = health.info or health.report_info
 
+local _, Job = pcall(require, "plenary.job")
+
 local dependencies = {
   { lib = "plenary" },
   { name = "nui", lib = "nui.popup" },
@@ -14,9 +16,9 @@ local dependencies = {
 }
 
 local binaries = {
-  { name = "codeql", cli = { "codeql", "--version" } },
-  { name = "gh", cli = { "gh", "--version" } },
-  { name = "mrva", cli = { "gh", "mrva", "--help" } },
+  { name = "codeql", command = "codeql", args = { "--version" } },
+  { name = "gh", command = "gh", args = { "--version" } },
+  { name = "mrva", command = "gh", args = { "mrva", "help" }, optional = true },
 }
 
 local M = {}
@@ -29,7 +31,7 @@ function M.check_dependencies()
     local optional = plugin.optional or false
     local name = plugin.name or plugin.lib
 
-    if result and not optional then
+    if result then
       ok("Installed plugin: " .. name)
     elseif not result and optional == true then
       warn("Optional plugin not installed: " .. name)
@@ -40,18 +42,23 @@ function M.check_dependencies()
 end
 
 --- Check if the given command is available
----@param cmds table
+---@param binary table
 ---@return boolean
-function M.check_cli(cmds)
+function M.check_cli(binary)
   local result = false
 
-  if vim.fn.executable(cmds[1]) == 1 then
-    local cli = table.concat(cmds, " ")
-    local status, output = pcall(vim.fn.system, cli)
-
-    if status and output ~= "" then
-      result = true
-    end
+  if vim.fn.executable(binary.command) == 1 then
+    -- run command and test if the exit code is 0
+    local job = Job:new {
+      enable_recording = true,
+      command = binary.command,
+      args = binary.args or {},
+      on_exit = function(_, code)
+        result = code == 0
+      end,
+    }
+    job:start()
+    job:wait()
   end
 
   return result
@@ -62,14 +69,13 @@ function M.check_binaries()
 
   for _, binary in ipairs(binaries) do
     -- run and check the command
-    local cmds = binary.cli or { binary.name }
     local optional = binary.optional or false
 
-    local result = M.check_cli(cmds)
+    local result = M.check_cli(binary)
 
-    if result and not optional then
+    if result == true then
       ok("Installed binary: " .. binary.name)
-    elseif not result and not optional then
+    elseif result == false and optional == true then
       warn("Optional binary not installed: " .. binary.name)
     else
       error("Required binary missing: " .. binary.name)
