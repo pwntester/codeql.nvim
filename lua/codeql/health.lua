@@ -18,7 +18,7 @@ local dependencies = {
 local binaries = {
   { name = "codeql", command = "codeql", args = { "--version" } },
   { name = "gh", command = "gh", args = { "--version" } },
-  { name = "mrva", command = "gh", args = { "mrva", "help" }, optional = true },
+  { name = "gh-mrva", command = "gh", args = { "mrva", "help" }, optional = true },
 }
 
 local M = {}
