@@ -12,7 +12,10 @@ function M.setup(opts)
     max_ram = nil,
     job_timeout = 15000,
     format_on_save = false,
-    find_databases_cmd = nil, -- (eg: { "find", "/codeql-dbs/github.com/", "-type", "f" })
+    -- Command returning list of CodeQL databases (eg: { "gh", "qldb", "list" })
+    find_databases_cmd = nil,
+    -- Telescope entry maker for the list of databases
+    database_list_entry_maker = nil,
     results = {
       max_paths = 4,
       max_path_depth = nil,

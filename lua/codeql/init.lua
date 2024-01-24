@@ -12,6 +12,7 @@ function M.list_databases()
   local cok, conf = pcall(require, "telescope.config")
   local aok, actions = pcall(require, "telescope.actions")
   local sok, action_state = pcall(require, "telescope.actions.state")
+  local uok, utils = pcall(require, "telescope.utils")
   if not (pok and fok and cok and aok and sok) then
     util.err_message("Telescope is not installed")
     return
@@ -21,8 +22,12 @@ function M.list_databases()
     util.err_message("No find_databases_cmd set in config")
     return
   end
+  if not type(cmd) == "table" then
+    util.err_message("find_databases_cmd should be a list of strings")
+    return
+  end
   local opts = {}
-  local entry_maker = config.values.database_entry_maker
+  local entry_maker = config.values.database_list_entry_maker
   if not entry_maker then
     entry_maker = function(line)
       return {
@@ -32,10 +37,15 @@ function M.list_databases()
       }
     end
   end
+
+  local results = utils.get_os_command_output(cmd)
   pickers.new(opts, {
     prompt_title = "CodeQL Databases",
     entry_maker = entry_maker,
-    finder = finders.new_oneshot_job(cmd, opts),
+    finder = finders.new_table {
+      results = results,
+      entry_maker = entry_maker,
+    },
     sorter = conf.values.generic_sorter(opts),
     attach_mappings = function(prompt_bufnr)
       actions.select_default:replace(function()
