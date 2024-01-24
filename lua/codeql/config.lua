@@ -1,6 +1,6 @@
 local M = {}
 
-M.config = {}
+M.values = {}
 M.database = {}
 M.ram_opts = {}
 M.sarif = {}
@@ -33,7 +33,7 @@ function M.setup(opts)
     },
   }
   local util = require("codeql.util")
-  M.config = util.tableMerge(defaults, opts)
+  M.values = util.tableMerge(defaults, opts)
 end
 
 return M

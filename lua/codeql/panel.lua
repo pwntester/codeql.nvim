@@ -26,7 +26,7 @@ local M = {
 
 _G.generate_issue_label = function(node)
   local label = node.label
-  local conf = config.config
+  local conf = config.values
   if conf.panel.show_filename and node["filename"] and node["filename"] ~= nil then
     if conf.panel.long_filename then
       label = node.filename
@@ -141,7 +141,7 @@ local function get_node_location(node)
       line = string.format(":%d", node.line)
     end
     local filename
-    local conf = config.config
+    local conf = config.values
     if conf.panel.long_filename then
       filename = node.filename
     else
@@ -205,7 +205,7 @@ local function center_align(text, size)
 end
 
 local function align(text, size)
-  local alignment = config.config.panel.alignment
+  local alignment = config.values.panel.alignment
   if alignment == "left" then
     return left_align(text, size)
   elseif alignment == "right" then
@@ -917,7 +917,7 @@ function M.preview_snippet()
   if not node or not node.visitable then
     return
   end
-  local conf = config.config
+  local conf = config.values
   local context_lines = conf.panel.context_lines
   local snippet = {}
   local max_len = 0
@@ -1012,7 +1012,7 @@ end
 
 function M.open_panel(panel_name)
   local bufnr = vim.fn.bufnr(panel_name)
-  local conf = config.config
+  local conf = config.values
 
   -- check if audit pane is already opened
   if get_panel_window(bufnr) then

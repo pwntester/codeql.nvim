@@ -16,13 +16,13 @@ function M.list_databases()
     util.err_message("Telescope is not installed")
     return
   end
-  local cmd = config.config.find_databases_cmd
+  local cmd = config.values.find_databases_cmd
   if not cmd then
     util.err_message("No find_databases_cmd set in config")
     return
   end
   local opts = {}
-  local entry_maker = config.config.database_entry_maker
+  local entry_maker = config.values.database_entry_maker
   if not entry_maker then
     entry_maker = function(line)
       return {
@@ -49,7 +49,7 @@ function M.list_databases()
 end
 
 function M.set_database(dbpath)
-  local conf = config.config
+  local conf = config.values
   conf.ram_opts = util.resolve_ram()
   dbpath = vim.fn.fnamemodify(vim.trim(dbpath), ":p")
   local database
@@ -351,7 +351,7 @@ function M.setup(opts)
     vim.cmd [[au BufEnter * if &ft ==# 'codeql_panel' | execute("lua require'codeql.panel'.apply_mappings()") | endif]]
     vim.cmd [[autocmd FileType ql lua require'codeql.util'.apply_mappings()]]
 
-    if require("codeql.config").config.format_on_save then
+    if require("codeql.config").values.format_on_save then
       vim.cmd [[autocmd FileType ql autocmd BufWrite <buffer> lua vim.lsp.buf.formatting()]]
     end
     vim.cmd [[augroup END]]

@@ -117,7 +117,7 @@ function M.start_server()
     "--log-to-stderr",
     --"--additional-packs", "/Users/pwntester/src/github.com/github/securitylab-codeql",
   }
-  local conf = config.config
+  local conf = config.values
   vim.list_extend(cmd, conf.ram_opts)
 
   local opts = {

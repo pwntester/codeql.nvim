@@ -18,7 +18,7 @@ local cache = {
 --- Apply mappings to a buffer
 function M.apply_mappings()
   local mappings = require "codeql.mappings"
-  local conf = config.config
+  local conf = config.values
   for action, value in pairs(conf.mappings) do
     if not M.is_blank(value)
         and not M.is_blank(action)
@@ -431,7 +431,7 @@ function M.get_additional_packs()
   end
 
   -- Check if additional_packs is set in config
-  local conf = config.config
+  local conf = config.values
   if conf.additional_packs and #conf.additional_packs > 0 then
     return table.concat(conf.additional_packs, ":")
   end
@@ -463,7 +463,7 @@ function M.resolve_ram()
     return cache.ram
   end
   local cmd = { "resolve", "ram", "--format=json" }
-  local conf = config.config
+  local conf = config.values
   if conf.max_ram and conf.max_ram > -1 then
     table.insert(cmd, "-M")
     table.insert(cmd, conf.max_ram)

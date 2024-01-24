@@ -87,7 +87,7 @@ end
 
 function M.runSync(cmd)
   local util = require("codeql.util")
-  local timeout = require("codeql.config").config.job_timeout
+  local timeout = require("codeql.config").values.job_timeout
   local done = false
   local result
   M.runAsync(cmd, function(res)
