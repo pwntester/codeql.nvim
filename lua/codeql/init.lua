@@ -26,26 +26,19 @@ function M.list_databases()
     util.err_message("find_databases_cmd should be a list of strings")
     return
   end
-  local opts = {}
+  local opts = config.values.telescope_opts
   local entry_maker = config.values.database_list_entry_maker
-  if not entry_maker then
-    entry_maker = function(line)
-      return {
-        value = line,
-        display = line,
-        ordinal = line,
-      }
-    end
-  end
+  local previewer = config.values.database_list_previewer
+
 
   local results = utils.get_os_command_output(cmd)
   pickers.new(opts, {
     prompt_title = "CodeQL Databases",
-    entry_maker = entry_maker,
     finder = finders.new_table {
       results = results,
       entry_maker = entry_maker,
     },
+    previewer = previewer(opts),
     sorter = conf.values.generic_sorter(opts),
     attach_mappings = function(prompt_bufnr)
       actions.select_default:replace(function()

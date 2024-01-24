@@ -16,6 +16,10 @@ function M.setup(opts)
     find_databases_cmd = nil,
     -- Telescope entry maker for the list of databases
     database_list_entry_maker = nil,
+    -- Telescope previewer for the list of databases
+    database_list_previewer = nil,
+    -- Telescope options
+    telescope_opts = {},
     results = {
       max_paths = 4,
       max_path_depth = nil,
