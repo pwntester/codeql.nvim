@@ -22,8 +22,19 @@ function M.list_databases()
     return
   end
   local opts = {}
+  local entry_maker = config.config.database_entry_maker
+  if not entry_maker then
+    entry_maker = function(line)
+      return {
+        value = line,
+        display = line,
+        ordinal = line,
+      }
+    end
+  end
   pickers.new(opts, {
     prompt_title = "CodeQL Databases",
+    entry_maker = entry_maker,
     finder = finders.new_oneshot_job(cmd, opts),
     sorter = conf.values.generic_sorter(opts),
     attach_mappings = function(prompt_bufnr)
