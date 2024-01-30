@@ -297,7 +297,7 @@ function M.register_database(database)
   end
   config.database = database
   local lang = config.database.languages[1]
-  -- https://github.com/github/vscode-codeql/blob/e913165249a272e13a785f542fa50c6a9d4eeb38/extensions/ql-vscode/src/helpers.ts#L432-L440
+  -- https://github.com/github/vscode-codeql/blob/0e2c03f572226a85ef4691621ca07424c06a2162/extensions/ql-vscode/src/common/query-language.ts#L48-L57
   local langTodbScheme = {
     javascript = 'semmlecode.javascript.dbscheme',
     cpp = 'semmlecode.cpp.dbscheme',
@@ -306,7 +306,9 @@ function M.register_database(database)
     csharp = 'semmlecode.csharp.dbscheme',
     go = 'go.dbscheme',
     ruby = 'ruby.dbscheme',
-    ql = 'ql.dbscheme'
+    ql = 'ql.dbscheme',
+    swift = 'swift.dbscheme',
+    yaml = 'yaml.dbscheme'
   }
   local dbschemePath = config.database.datasetFolder .. "/" .. langTodbScheme[lang]
   if not vim.fn.filereadable(dbschemePath) then
