@@ -22,6 +22,7 @@ local icon_open = "▼"
 -- global variables
 local M = {
   panels = {},
+  ns = range_ns
 }
 
 _G.generate_issue_label = function(node)

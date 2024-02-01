@@ -3,6 +3,7 @@ local loader = require "codeql.loader"
 local config = require "codeql.config"
 local rpc = require "vim.lsp.rpc"
 local protocol = require "vim.lsp.protocol"
+local vim = vim
 
 local client_index = 0
 local progress_id = -1

@@ -228,6 +228,9 @@ local templated_queries = {
   ql = { qlpack = "codeql/ql", path = "ide-contextual-queries/" },
   ruby = { qlpack = "codeql/ruby-all", path = "ide-contextual-queries/" },
   go = { qlpack = "codeql/go-all" },
+  yaml = { qlpack = "codeql/actions-all", path = "ql/lib/ide-contextual-queries/" },
+  yml = { qlpack = "codeql/actions-all", path = "ql/lib/ide-contextual-queries/" },
+  swift = { qlpack = "codeql/swift-all", path = "ide-contextual-queries/" },
 }
 
 function M.run_print_ast()
@@ -236,6 +239,7 @@ function M.run_print_ast()
 
   -- not a ql:/ buffer
   if not vim.startswith(bufname, "ql:/") then
+    util.err_message "Not a ql:/ buffer"
     return
   end
 
@@ -246,42 +250,40 @@ end
 function M.run_templated_query(query_name, fname)
   local bufnr = vim.api.nvim_get_current_buf()
   local dbPath = config.database.path
-  local ft = vim.bo[bufnr]["ft"]
-  if not ft or util.is_blank(ft) then
-    ft = vim.fn.fnamemodify(fname, ":e")
-  end
+  local ft = vim.fn.fnamemodify(fname, ":e")
   if not templated_queries[ft] then
-    --util.err_message(format('%s does not support %s file type', query_name, ft))
+    util.err_message(string.format('%s does not support %s file type', query_name, ft))
     return
   end
   local qlpack = templated_queries[ft].qlpack
   local path_modifier = templated_queries[ft].path or ""
   local qlpacks = util.resolve_qlpacks()
-  if qlpacks[qlpack] then
-    local path = qlpacks[qlpack][1]
-    local queryPath = string.format("%s/%s%s.ql", path, path_modifier, query_name)
-    if util.is_file(queryPath) then
-      local libPaths = util.resolve_library_path(queryPath)
-      if not libPaths then
-        vim.notify("Cannot resolve QL library paths for: " .. query_name, 2)
-        return
-      end
-      local opts = {
-        quick_eval = false,
-        bufnr = bufnr,
-        query = queryPath,
-        dbPath = dbPath,
-        metadata = util.query_info(queryPath),
-        libraryPath = libPaths.libraryPath,
-        dbschemePath = libPaths.dbscheme,
-        templateValues = {
-          selectedSourceFile = "/" .. fname,
-        }
-      }
-      require("codeql.queryserver").run_query(opts)
-    else
-      vim.notify("Cannot find a valid query: " .. queryPath, 2)
+  local path
+  if qlpacks and qlpacks[qlpack] then
+    path = qlpacks[qlpack][1]
+  else
+    path = vim.fn.getcwd()
+  end
+  local queryPath = string.format("%s/%s%s.ql", path, path_modifier, query_name)
+  if util.is_file(queryPath) then
+    local libPaths = util.resolve_library_path(queryPath)
+    if not libPaths then
+      vim.notify("Cannot resolve QL library paths for: " .. query_name, 2)
+      return
     end
+    local opts = {
+      quick_eval = false,
+      bufnr = bufnr,
+      query = queryPath,
+      dbPath = dbPath,
+      metadata = util.query_info(queryPath),
+      libraryPath = libPaths.libraryPath,
+      dbschemePath = libPaths.dbscheme,
+      templateValues = {
+        selectedSourceFile = "/" .. fname,
+      }
+    }
+    require("codeql.queryserver").run_query(opts)
   end
 end
 
@@ -319,7 +321,7 @@ function M.open_in_browser()
 end
 
 function M.deprecated(cmd)
-  print("'" .. cmd .. "'command is deprecated. Please use `:QL` instead.")
+  vim.notify("'" .. cmd .. "'command is deprecated. Please use `:QL` instead.")
 end
 
 function M.setup(opts)

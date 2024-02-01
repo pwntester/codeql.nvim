@@ -634,29 +634,24 @@ function M.jump_to_line(opts)
 end
 
 function M.highlight_range(bufnr, opts)
-  --ns, startLine, endLine, startColumn, endColumn)
   vim.api.nvim_buf_clear_namespace(bufnr, opts.range_ns, 0, -1)
-  opts.startLine = opts.startLine - 1
-  opts.endLine = opts.endLine - 1
-  opts.startColumn = opts.startColumn - 1
-  opts.endColumn = opts.endColumn - 1
   if opts.startLine == opts.endLine then
-    pcall(vim.api.nvim_buf_add_highlight, bufnr, opts.range_ns, "CodeqlRange", opts.startLine, opts.startColumn,
-      opts.endColumn)
+    pcall(vim.api.nvim_buf_add_highlight, bufnr, opts.range_ns, "CodeqlRange", opts.startLine - 1, opts.startColumn - 1,
+      opts.endColumn - 1)
   else
     for i = opts.startLine, opts.endLine do
       local hl_startColumn, hl_endColumn
       if i == opts.startLine then
-        hl_startColumn = opts.startColumn
+        hl_startColumn = opts.startColumn - 1
         hl_endColumn = #vim.fn.getline(i)
       elseif i < opts.endLine and i > opts.startLine then
-        hl_startColumn = 1
+        hl_startColumn = 0
         hl_endColumn = #vim.fn.getline(i)
       elseif i == opts.endLine then
-        hl_startColumn = 1
-        hl_endColumn = opts.endColumn
+        hl_startColumn = 0
+        hl_endColumn = opts.endColumn - 1
       end
-      pcall(vim.api.nvim_buf_add_highlight, bufnr, opts.range_ns, "CodeqlRange", i, hl_startColumn, hl_endColumn)
+      pcall(vim.api.nvim_buf_add_highlight, bufnr, opts.range_ns, "CodeqlRange", i - 1, hl_startColumn, hl_endColumn)
     end
   end
 end

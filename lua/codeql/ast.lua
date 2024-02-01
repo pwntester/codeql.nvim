@@ -1,5 +1,7 @@
 local util = require "codeql.util"
+local panel = require "codeql.panel"
 local codeql_ast_ns = vim.api.nvim_create_namespace "codeql_ast"
+local vim = vim
 
 local M = {}
 
@@ -70,7 +72,7 @@ local function setup_buf(for_buf)
   vim.api.nvim_buf_set_option(buf, "buftype", "nofile")
   vim.api.nvim_buf_set_option(buf, "swapfile", false)
   vim.api.nvim_buf_set_option(buf, "buflisted", false)
-  vim.api.nvim_buf_set_option(buf, "filetype", "codeqlast")
+  vim.api.nvim_buf_set_option(buf, "filetype", "codeql_ast")
 
   vim.cmd(string.format("augroup CodeQLAST_%d", buf))
   vim.cmd "au!"
@@ -401,6 +403,8 @@ function M.build_ast(jsonPath, bufnr)
     util.err_message "Invalid AST tree"
     return
   end
+
+  vim.api.nvim_buf_clear_namespace(bufnr, panel.ns, 0, -1)
 
   local idToItem = {}
   local parentToChildren = {}
