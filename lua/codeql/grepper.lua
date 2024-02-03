@@ -197,35 +197,37 @@ local function zip_grep(opts)
 
   local target_winid = vim.api.nvim_get_current_win()
 
-  pickers.new(opts, {
-    prompt_title = "",
-    finder = finders.new_job(cmd_generator, opts.entry_maker, opts.max_results, opts.cwd),
-    previewer = zip_grep_previewer.new(opts),
-    sorter = sorters.highlighter_only(opts),
-    attach_mappings = function()
-      action_set.select:replace(function(prompt_bufnr)
-        local entry = action_state.get_selected_entry(prompt_bufnr)
-        actions.close(prompt_bufnr)
+  pickers
+    .new(opts, {
+      prompt_title = "",
+      finder = finders.new_job(cmd_generator, opts.entry_maker, opts.max_results, opts.cwd),
+      previewer = zip_grep_previewer.new(opts),
+      sorter = sorters.highlighter_only(opts),
+      attach_mappings = function()
+        action_set.select:replace(function(prompt_bufnr)
+          local entry = action_state.get_selected_entry(prompt_bufnr)
+          actions.close(prompt_bufnr)
 
-        local bufname = string.format("ql://%s", entry.filename)
-        local oopts = {
-          line = entry.lnum,
-          target_winid = target_winid
-        }
-        if vim.fn.bufnr(bufname) > -1 then
-          vim.api.nvim_command(string.format("buffer %s", bufname))
-          if opts.line then
-            util.jump_to_line(oopts)
+          local bufname = string.format("ql://%s", entry.filename)
+          local oopts = {
+            line = entry.lnum,
+            target_winid = target_winid,
+          }
+          if vim.fn.bufnr(bufname) > -1 then
+            vim.api.nvim_command(string.format("buffer %s", bufname))
+            if opts.line then
+              util.jump_to_line(oopts)
+            end
+          else
+            local bufnr = vim.api.nvim_create_buf(false, true)
+            vim.api.nvim_buf_set_name(bufnr, bufname)
+            util.open_from_archive(bufnr, entry.filename, oopts)
           end
-        else
-          local bufnr = vim.api.nvim_create_buf(false, true)
-          vim.api.nvim_buf_set_name(bufnr, bufname)
-          util.open_from_archive(bufnr, entry.filename, oopts)
-        end
-      end)
-      return true
-    end,
-  }):find()
+        end)
+        return true
+      end,
+    })
+    :find()
 end
 
 function M.grep_source()

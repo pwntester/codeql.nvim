@@ -31,7 +31,7 @@ function M.setup(opts)
       long_filename = false,
       group_by = "sink",
       context_lines = 5,
-      alignment = "left"
+      alignment = "left",
     },
     mappings = {
       run_query = { modes = { "n" }, lhs = "<space>qr", desc = "run query" },
@@ -39,7 +39,7 @@ function M.setup(opts)
       quick_eval_predicate = { modes = { "n" }, lhs = "<space>qp", desc = "quick evaluate enclosing predicate" },
     },
   }
-  local util = require("codeql.util")
+  local util = require "codeql.util"
   M.values = util.tableMerge(defaults, opts)
 end
 

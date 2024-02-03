@@ -14,41 +14,42 @@ function M.list_databases()
   local sok, action_state = pcall(require, "telescope.actions.state")
   local uok, utils = pcall(require, "telescope.utils")
   if not (pok and fok and cok and aok and sok) then
-    util.err_message("Telescope is not installed")
+    util.err_message "Telescope is not installed"
     return
   end
   local cmd = config.values.find_databases_cmd
   if not cmd then
-    util.err_message("No find_databases_cmd set in config")
+    util.err_message "No find_databases_cmd set in config"
     return
   end
   if not type(cmd) == "table" then
-    util.err_message("find_databases_cmd should be a list of strings")
+    util.err_message "find_databases_cmd should be a list of strings"
     return
   end
   local opts = config.values.telescope_opts
   local entry_maker = config.values.database_list_entry_maker
   local previewer = config.values.database_list_previewer
 
-
   local results = utils.get_os_command_output(cmd)
-  pickers.new(opts, {
-    prompt_title = "CodeQL Databases",
-    finder = finders.new_table {
-      results = results,
-      entry_maker = entry_maker,
-    },
-    previewer = previewer(opts),
-    sorter = conf.values.generic_sorter(opts),
-    attach_mappings = function(prompt_bufnr)
-      actions.select_default:replace(function()
-        actions.close(prompt_bufnr)
-        local selection = action_state.get_selected_entry()
-        M.set_database(selection.value)
-      end)
-      return true
-    end,
-  }):find()
+  pickers
+    .new(opts, {
+      prompt_title = "CodeQL Databases",
+      finder = finders.new_table {
+        results = results,
+        entry_maker = entry_maker,
+      },
+      previewer = previewer(opts),
+      sorter = conf.values.generic_sorter(opts),
+      attach_mappings = function(prompt_bufnr)
+        actions.select_default:replace(function()
+          actions.close(prompt_bufnr)
+          local selection = action_state.get_selected_entry()
+          M.set_database(selection.value)
+        end)
+        return true
+      end,
+    })
+    :find()
 end
 
 function M.set_database(dbpath)
@@ -96,8 +97,7 @@ end
 
 function M.unset_database(dbpath)
   if not util.is_blank(config.database) then
-    queryserver.unregister_database(function()
-    end)
+    queryserver.unregister_database(function() end)
   end
 end
 
@@ -108,8 +108,8 @@ end
 local function is_predicate_identifier_node(parent, node)
   if parent then
     return (parent:type() == "charpred" and node:type() == "className")
-        or (parent:type() == "classlessPredicate" and node:type() == "predicateName")
-        or (parent:type() == "memberPredicate" and node:type() == "predicateName")
+      or (parent:type() == "classlessPredicate" and node:type() == "predicateName")
+      or (parent:type() == "memberPredicate" and node:type() == "predicateName")
   end
 end
 
@@ -233,6 +233,20 @@ local templated_queries = {
   swift = { qlpack = "codeql/swift-all", path = "ide-contextual-queries/" },
 }
 
+function M.run_print_cfg()
+  local bufnr = vim.api.nvim_get_current_buf()
+  local bufname = vim.fn.bufname(bufnr)
+
+  -- not a ql:/ buffer
+  if not vim.startswith(bufname, "ql:/") then
+    util.err_message "Not a ql:/ buffer"
+    return
+  end
+
+  local fname = vim.split(bufname, "://")[2]
+  M.run_templated_query("printCfg", fname)
+end
+
 function M.run_print_ast()
   local bufnr = vim.api.nvim_get_current_buf()
   local bufname = vim.fn.bufname(bufnr)
@@ -252,7 +266,7 @@ function M.run_templated_query(query_name, fname)
   local dbPath = config.database.path
   local ft = vim.fn.fnamemodify(fname, ":e")
   if not templated_queries[ft] then
-    util.err_message(string.format('%s does not support %s file type', query_name, ft))
+    util.err_message(string.format("%s does not support %s file type", query_name, ft))
     return
   end
   local qlpack = templated_queries[ft].qlpack
@@ -264,6 +278,7 @@ function M.run_templated_query(query_name, fname)
   else
     path = vim.fn.getcwd()
   end
+  local position = vim.api.nvim_win_get_cursor(0)
   local queryPath = string.format("%s/%s%s.ql", path, path_modifier, query_name)
   if util.is_file(queryPath) then
     local libPaths = util.resolve_library_path(queryPath)
@@ -281,7 +296,9 @@ function M.run_templated_query(query_name, fname)
       dbschemePath = libPaths.dbscheme,
       templateValues = {
         selectedSourceFile = "/" .. fname,
-      }
+        selectedSourceLine = tostring(position[1]),
+        selectedSourceColumn = tostring(position[2] + 1),
+      },
     }
     require("codeql.queryserver").run_query(opts)
   end
@@ -293,12 +310,12 @@ function M.get_permalink()
   local line = vim.api.nvim_win_get_cursor(0)[1]
   local uri = string.match(bufname, "ql://(.*)")
   if not uri then
-    util.err_message("Cannot copy permalink for this buffer")
+    util.err_message "Cannot copy permalink for this buffer"
     return
   end
   local chunks = vim.split(uri, "/")
   if #chunks < 4 then
-    util.err_message("Cannot copy permalink for this buffer")
+    util.err_message "Cannot copy permalink for this buffer"
     return
   end
   local owner = chunks[1]
@@ -320,8 +337,11 @@ function M.open_in_browser()
   vim.fn.system(string.format("open %s", permalink))
 end
 
-function M.deprecated(cmd)
-  vim.notify("'" .. cmd .. "'command is deprecated. Please use `:QL` instead.")
+function M.deprecated(cmd, replacement)
+  if not replacement then
+    replacement = ":QL"
+  end
+  vim.notify("'" .. cmd .. "'command is deprecated. Please use `" .. replacement .. "` instead.")
 end
 
 function M.setup(opts)
@@ -441,13 +461,27 @@ local commands = {
       handler = function()
         require("codeql.history").menu()
       end,
-    }
+    },
+  },
+  view = {
+    ast = {
+      description = "Print the AST for the current query",
+      handler = function()
+        M.run_print_ast()
+      end,
+    },
+    cfg = {
+      description = "Print the CFG for the current scope",
+      handler = function()
+        M.run_print_cfg()
+      end,
+    },
   },
   ast = {
     print = {
       description = "Print the AST for the current query",
       handler = function()
-        M.run_print_ast()
+        M.deprecated("QL ast print", "QL view ast")
       end,
     },
   },
@@ -524,7 +558,7 @@ function M.command_complete(argLead, cmdLine)
     return command_keys
   elseif #parts == 2 and not vim.tbl_contains(command_keys, parts[2]) then
     return get_options(command_keys)
-  elseif (#parts == 2 and vim.tbl_contains(command_keys, parts[2]) or #parts == 3) then
+  elseif #parts == 2 and vim.tbl_contains(command_keys, parts[2]) or #parts == 3 then
     local obj = commands[parts[2]]
     if obj then
       return get_options(vim.tbl_keys(obj))
@@ -534,14 +568,14 @@ end
 
 function M.command(object, action, ...)
   if not object or not action then
-    util.err_message("Missing arguments")
+    util.err_message "Missing arguments"
     return
   end
   local command = commands[object] and commands[object][action]
   if command then
     command.handler(...)
   else
-    util.err_message("Unknown command")
+    util.err_message "Unknown command"
   end
 end
 

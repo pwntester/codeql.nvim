@@ -112,8 +112,11 @@ function M.start_server()
     "codeql",
     "execute",
     "query-server2",
-    "--debug", "--tuple-counting", "--threads=0",
-    "--evaluator-log-level", "5",
+    "--debug",
+    "--tuple-counting",
+    "--threads=0",
+    "--evaluator-log-level",
+    "5",
     "-v",
     "--log-to-stderr",
     --"--additional-packs", "/Users/pwntester/src/github.com/github/securitylab-codeql",
@@ -146,7 +149,7 @@ function M.start_server()
           handler = function(result)
             -- https://github.com/neovim/neovim/blob/b8ad1bfe8bc23ed5ffbfe43df5fda3501f1d2802/runtime/lua/vim/lsp/handlers.lua#L24
             local ctx = {
-              client_id = M.get_lsp_client_id()
+              client_id = M.get_lsp_client_id(),
             }
             --vim.lsp.handlers["$/progress"](nil, {value = { message = "foo"}, token = "foo"}, { client_id = vim.lsp.get_active_clients()[1].id })
             --print(vim.inspect(result), vim.inspect(ctx))
@@ -162,36 +165,36 @@ function M.start_server()
         end
 
         if progress_stage == "begin" then
-          handler({
+          handler {
             token = "CodeQLToken",
             value = {
               kind = progress_stage,
               title = "CodeQL",
               percentage = 0,
             },
-          })
+          }
           progress_stage = "report"
         elseif progress_stage == "report" then
-          handler({
+          handler {
             token = "CodeQLToken",
             value = {
               kind = progress_stage,
               message = message,
               percentage = progress,
             },
-          })
+          }
         elseif progress_stage == "end" then
-          handler({
+          handler {
             token = "CodeQLToken",
             value = {
               kind = progress_stage,
               percentage = 100,
             },
-          })
+          }
           progress_stage = nil
         end
       end,
-    }
+    },
   }
   return M.start_client(opts)
 end
@@ -217,7 +220,7 @@ function M.run_query(opts)
     body = {
       db = dbPath,
       additionalPacks = {
-        additionalPacks or ""
+        additionalPacks or "",
       },
       externalInputs = {},
       singletonExternalInputs = opts.templateValues or {},
@@ -285,11 +288,7 @@ function M.run_query(opts)
   -- run query
   util.message(string.format("Running query %s", queryPath))
 
-  _, last_rpc_msg_id = M.client.request(
-    "evaluation/runQuery",
-    runQuery_params,
-    runQuery_callback
-  )
+  _, last_rpc_msg_id = M.client.request("evaluation/runQuery", runQuery_params, runQuery_callback)
 end
 
 function M.register_database(database)
@@ -300,20 +299,20 @@ function M.register_database(database)
   local lang = config.database.languages[1]
   -- https://github.com/github/vscode-codeql/blob/0e2c03f572226a85ef4691621ca07424c06a2162/extensions/ql-vscode/src/common/query-language.ts#L48-L57
   local langTodbScheme = {
-    javascript = 'semmlecode.javascript.dbscheme',
-    cpp = 'semmlecode.cpp.dbscheme',
-    java = 'semmlecode.dbscheme',
-    python = 'semmlecode.python.dbscheme',
-    csharp = 'semmlecode.csharp.dbscheme',
-    go = 'go.dbscheme',
-    ruby = 'ruby.dbscheme',
-    ql = 'ql.dbscheme',
-    swift = 'swift.dbscheme',
-    yaml = 'yaml.dbscheme'
+    javascript = "semmlecode.javascript.dbscheme",
+    cpp = "semmlecode.cpp.dbscheme",
+    java = "semmlecode.dbscheme",
+    python = "semmlecode.python.dbscheme",
+    csharp = "semmlecode.csharp.dbscheme",
+    go = "go.dbscheme",
+    ruby = "ruby.dbscheme",
+    ql = "ql.dbscheme",
+    swift = "swift.dbscheme",
+    yaml = "yaml.dbscheme",
   }
   local dbschemePath = config.database.datasetFolder .. "/" .. langTodbScheme[lang]
   if not vim.fn.filereadable(dbschemePath) then
-    util.err_message("Cannot find dbscheme file")
+    util.err_message "Cannot find dbscheme file"
     return
   else
     util.message(string.format("Using dbscheme file %s", dbschemePath))
@@ -326,7 +325,7 @@ function M.register_database(database)
   local params = {
     body = {
       databases = {
-        config.database.path
+        config.database.path,
       },
       progressId = next_progress_id(),
     },
@@ -344,7 +343,7 @@ end
 
 function M.unregister_database(cb)
   if util.is_blank(config.database) then
-    vim.notify("No database registered")
+    vim.notify "No database registered"
     return
   end
   if not M.client then

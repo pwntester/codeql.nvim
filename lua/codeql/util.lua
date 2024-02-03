@@ -20,10 +20,11 @@ function M.apply_mappings()
   local mappings = require "codeql.mappings"
   local conf = config.values
   for action, value in pairs(conf.mappings) do
-    if not M.is_blank(value)
-        and not M.is_blank(action)
-        and not M.is_blank(value.lhs)
-        and not M.is_blank(mappings[action])
+    if
+      not M.is_blank(value)
+      and not M.is_blank(action)
+      and not M.is_blank(value.lhs)
+      and not M.is_blank(mappings[action])
     then
       if M.is_blank(value.desc) then
         value.desc = ""
@@ -339,7 +340,7 @@ function M.database_upgrades(dbscheme)
 end
 
 function M.database_upgrade(path)
-  M.message("Upgrading DB")
+  M.message "Upgrading DB"
   cli.runSync { "database", "upgrade", path }
 end
 
@@ -405,7 +406,7 @@ function M.resolve_library_path(queryPath)
 end
 
 function M.get_version()
-  return cli.runSync({ "--version" })
+  return cli.runSync { "--version" }
 end
 
 function M.get_additional_packs()
@@ -416,7 +417,7 @@ function M.get_additional_packs()
   end
 
   -- Check if ~/.config/codeql/config exists
-  local config_path = vim.fn.fnamemodify('~/.config/codeql/config', ':p')
+  local config_path = vim.fn.fnamemodify("~/.config/codeql/config", ":p")
   if M.is_file(config_path) then
     local config_contents = vim.fn.readfile(config_path)
     for _, l in ipairs(config_contents) do
@@ -636,8 +637,15 @@ end
 function M.highlight_range(bufnr, opts)
   vim.api.nvim_buf_clear_namespace(bufnr, opts.range_ns, 0, -1)
   if opts.startLine == opts.endLine then
-    pcall(vim.api.nvim_buf_add_highlight, bufnr, opts.range_ns, "CodeqlRange", opts.startLine - 1, opts.startColumn - 1,
-      opts.endColumn - 1)
+    pcall(
+      vim.api.nvim_buf_add_highlight,
+      bufnr,
+      opts.range_ns,
+      "CodeqlRange",
+      opts.startLine - 1,
+      opts.startColumn - 1,
+      opts.endColumn - 1
+    )
   else
     for i = opts.startLine, opts.endLine do
       local hl_startColumn, hl_endColumn

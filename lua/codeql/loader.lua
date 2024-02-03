@@ -48,9 +48,10 @@ function M.process_results(opts, info)
   end
 
   -- process ASTs, definitions and references
-  if vim.endswith(queryPath, "/localDefinitions.ql")
-      or vim.endswith(queryPath, "/localReferences.ql")
-      or vim.endswith(queryPath, "/printAst.ql")
+  if
+    vim.endswith(queryPath, "/localDefinitions.ql")
+    or vim.endswith(queryPath, "/localReferences.ql")
+    or vim.endswith(queryPath, "/printAst.ql")
   then
     local cmd = {
       "bqrs",
@@ -89,6 +90,34 @@ function M.process_results(opts, info)
     end
   end
 
+  if vim.tbl_contains(query_kinds, "Graph") and kind == "graph" and id ~= nil then
+    -- process GRAPH results
+    local cmd = {
+      "bqrs",
+      "interpret",
+      "-v",
+      "--log-to-stderr",
+      "--output=" .. resultsPath,
+      "--format=dot",
+      "-t=id=" .. id,
+      "-t=kind=" .. kind,
+      "--no-group-results",
+      bqrsPath,
+    }
+    vim.list_extend(cmd, ram_opts)
+    cli.runAsync(
+      cmd,
+      vim.schedule_wrap(function(_)
+        local path = resultsPath .. "/" .. id .. ".dot"
+        if util.is_file(path) then
+          M.load_dot_results(path)
+        else
+          util.err_message("Error: Cant find DOT results at " .. path)
+        end
+      end)
+    )
+    return
+  end
   -- process SARIF results
   if vim.tbl_contains(query_kinds, "PathProblem") and kind == "path-problem" and id ~= nil then
     local cmd = {
@@ -269,12 +298,12 @@ function M.load_raw_results(path)
       panel.render()
       return
     else
-      panel.render({
+      panel.render {
         source = "raw",
         mode = "table",
         issues = issues,
         columns = col_names,
-      })
+      }
       vim.api.nvim_command "redraw"
     end
   end
@@ -287,12 +316,23 @@ function M.load_sarif_results(path)
     max_length = conf.results.max_path_depth,
     group_by = conf.panel.group_by,
   }
-  panel.render({
+  panel.render {
     source = "sarif",
     mode = "tree",
     issues = issues,
-  })
+  }
   vim.api.nvim_command "redraw"
+end
+
+function M.load_dot_results(path)
+  local format = "pdf"
+  local output = vim.fn.tempname()
+  local cmd1 = "dot -T" .. format .. " -o '" .. output .. "." .. format .. "' '" .. path .. "'"
+  local cmd2 = "open '" .. output .. "." .. format .. "'"
+  vim.fn.system(cmd1)
+  vim.fn.system(cmd2)
+  print(".dot file: " .. path)
+  print("Output: " .. output .. "." .. format)
 end
 
 return M

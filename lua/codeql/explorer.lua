@@ -128,7 +128,7 @@ M.create_split = function()
       local bufnr = vim.api.nvim_create_buf(false, true)
       vim.api.nvim_buf_set_name(bufnr, bufname)
       filename = string.sub(filename, 2)
-      util.open_from_archive(bufnr, filename, {target_winid = target_winid})
+      util.open_from_archive(bufnr, filename, { target_winid = target_winid })
     end
   end, map_options)
 

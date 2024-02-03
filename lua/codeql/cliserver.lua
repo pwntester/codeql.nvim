@@ -3,8 +3,8 @@ local M = {}
 M.client = nil
 
 local function start()
-  local util = require("codeql.util")
-  util.message("Starting CodeQL CLI Server")
+  local util = require "codeql.util"
+  util.message "Starting CodeQL CLI Server"
 
   --local cmd = "codeql"
   --local cmd_args = { "execute", "cli-server", "--logdir", "/tmp/codeql_queryserver" }
@@ -86,7 +86,7 @@ function M.runAsync(cmd, callback)
 end
 
 function M.runSync(cmd)
-  local util = require("codeql.util")
+  local util = require "codeql.util"
   local timeout = require("codeql.config").values.job_timeout
   local done = false
   local result

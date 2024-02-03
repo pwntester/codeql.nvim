@@ -66,10 +66,10 @@ M.load = function(name)
   local nodes = {}
 
   -- add title node
-  table.insert(nodes, NuiTree.Node({ type = "label", label = "MRVA Results - " .. name }))
+  table.insert(nodes, NuiTree.Node { type = "label", label = "MRVA Results - " .. name })
 
   -- total finding count
-  table.insert(nodes, NuiTree.Node({ type = "label", label = "Findings: " .. status.total_findings_count }))
+  table.insert(nodes, NuiTree.Node { type = "label", label = "Findings: " .. status.total_findings_count })
 
   -- group by query_id
   local query_ids = {}
@@ -90,22 +90,23 @@ M.load = function(name)
     -- children of query_id
     local children = {}
     for _, item in ipairs(item_list) do
-      table.insert(children, NuiTree.Node({
-        type = "result",
-        nwo = item.nwo,
-        name = name,
-        query_id = item.query_id,
-        run_id = item.run_id,
-        count = item.count,
-        stars = item.stars,
-      }))
+      table.insert(
+        children,
+        NuiTree.Node {
+          type = "result",
+          nwo = item.nwo,
+          name = name,
+          query_id = item.query_id,
+          run_id = item.run_id,
+          count = item.count,
+          stars = item.stars,
+        }
+      )
     end
 
     -- add heading
     table.insert(nodes, NuiTree.Node({ type = "label", label = query_id }, children))
   end
-
-
 
   local split = Split {
     relative = "win",
@@ -139,15 +140,15 @@ M.load = function(name)
         end
         line:append(node.label, "Comment")
       elseif node.type == "result" then
-        line:append("  - ")
+        line:append "  - "
         line:append(node.nwo, "Normal")
-        line:append(" ")
+        line:append " "
         line:append("💥 " .. tostring(node.count), "Comment")
-        line:append(" ")
+        line:append " "
         line:append("✨ " .. tostring(node.stars), "Comment")
       end
       return line
-    end
+    end,
   }
 
   -- local function check_node_health(node)
@@ -252,7 +253,6 @@ M.load = function(name)
   split:map("n", "<CR>", function()
     local node = tree:get_node()
     if node.type == "label" then
-
     elseif node.type == "result" then
       local tmpdir = vim.fn.fnamemodify(vim.fn.tempname(), ":p:h")
       local filename = node.nwo:gsub("/", "_") .. "_" .. tostring(node.run_id)
@@ -260,14 +260,16 @@ M.load = function(name)
       local bqrs_filename = filename .. ".bqrs"
       local json_filename = filename .. ".json"
       -- check if file exists
-      if vim.fn.filereadable(tmpdir .. "/" .. sarif_filename) == 0 and vim.fn.filereadable(tmpdir .. "/" .. bqrs_filename) == 0 then
-        local cmd = "gh mrva download --run " ..
-            node.run_id .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir
+      if
+        vim.fn.filereadable(tmpdir .. "/" .. sarif_filename) == 0
+        and vim.fn.filereadable(tmpdir .. "/" .. bqrs_filename) == 0
+      then
+        local cmd = "gh mrva download --run " .. node.run_id .. " --nwo " .. node.nwo .. " --output-dir " .. tmpdir
         print("Downloading results for " .. node.nwo .. " with " .. cmd)
         local output = vim.fn.system(cmd)
         output = output:gsub("\n", "")
         if string.find(output, "Please try again later") then
-          util.err_message("Results are not ready yet")
+          util.err_message "Results are not ready yet"
           return
         end
       end
@@ -322,7 +324,7 @@ local function gen_from_gh_mrva_list()
       { datetime },
       { entry.session.language },
       { entry.session.repository_count },
-      { entry.session.name,            "TelescopeResultsNumber" },
+      { entry.session.name, "TelescopeResultsNumber" },
     }
 
     local displayer = entry_display.create {
@@ -353,24 +355,26 @@ local function gen_from_gh_mrva_list()
 end
 
 function M.list_sessions()
-  local json_str = vim.fn.system("gh mrva list --json | jq '. |= sort_by(.timestamp)'")
+  local json_str = vim.fn.system "gh mrva list --json | jq '. |= sort_by(.timestamp)'"
   local sessions = vim.fn.json_decode(json_str)
-  pickers.new({}, {
-    prompt_title = "MRVA session",
-    finder = finders.new_table {
-      results = sessions,
-      entry_maker = gen_from_gh_mrva_list(),
-    },
-    sorter = conf.generic_sorter({}),
-    attach_mappings = function(prompt_bufnr)
-      actions.select_default:replace(function()
-        actions.close(prompt_bufnr)
-        local selection = action_state.get_selected_entry()
-        M.load(selection.value)
-      end)
-      return true
-    end,
-  }):find()
+  pickers
+    .new({}, {
+      prompt_title = "MRVA session",
+      finder = finders.new_table {
+        results = sessions,
+        entry_maker = gen_from_gh_mrva_list(),
+      },
+      sorter = conf.generic_sorter {},
+      attach_mappings = function(prompt_bufnr)
+        actions.select_default:replace(function()
+          actions.close(prompt_bufnr)
+          local selection = action_state.get_selected_entry()
+          M.load(selection.value)
+        end)
+        return true
+      end,
+    })
+    :find()
 end
 
 return M

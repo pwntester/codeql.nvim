@@ -213,23 +213,23 @@ function M.process_sarif(opts)
             local source = nodes[1]
             local sink = nodes[#nodes]
             local source_key = source.filename
-                .. "::"
-                .. source.url.startLine
-                .. "::"
-                .. source.url.endLine
-                .. "::"
-                .. source.url.startColumn
-                .. "::"
-                .. source.url.endColumn
+              .. "::"
+              .. source.url.startLine
+              .. "::"
+              .. source.url.endLine
+              .. "::"
+              .. source.url.startColumn
+              .. "::"
+              .. source.url.endColumn
             local sink_key = sink.filename
-                .. "::"
-                .. sink.url.startLine
-                .. "::"
-                .. sink.url.endLine
-                .. "::"
-                .. sink.url.startColumn
-                .. "::"
-                .. sink.url.endColumn
+              .. "::"
+              .. sink.url.startLine
+              .. "::"
+              .. sink.url.endLine
+              .. "::"
+              .. sink.url.startColumn
+              .. "::"
+              .. sink.url.endColumn
             local key = source_key .. "::" .. sink_key
 
             if not paths[key] then

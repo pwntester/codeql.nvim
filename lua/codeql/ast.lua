@@ -498,7 +498,7 @@ function M.build_ast(jsonPath, bufnr)
 
   sort_tree(roots)
 
-  util.message("found " .. #roots .. " roots")
+  --util.message("found " .. #roots .. " roots")
 
   M.attach(bufnr)
   local text_lines = print_tree(bufnr, roots)

@@ -123,7 +123,7 @@ function M.find_at_cursor(kind)
     local def_bufname = string.format("ql://%s", string.sub(location.fname, 2))
     local opts = {
       line = location.lnum,
-      target_winid = winid
+      target_winid = winid,
     }
     if vim.fn.bufnr(def_bufname) > -1 then
       vim.api.nvim_command(string.format("buffer %s", def_bufname))
