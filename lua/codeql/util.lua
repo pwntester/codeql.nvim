@@ -21,10 +21,10 @@ function M.apply_mappings()
   local conf = config.values
   for action, value in pairs(conf.mappings) do
     if
-      not M.is_blank(value)
-      and not M.is_blank(action)
-      and not M.is_blank(value.lhs)
-      and not M.is_blank(mappings[action])
+        not M.is_blank(value)
+        and not M.is_blank(action)
+        and not M.is_blank(value.lhs)
+        and not M.is_blank(mappings[action])
     then
       if M.is_blank(value.desc) then
         value.desc = ""
@@ -651,10 +651,10 @@ function M.highlight_range(bufnr, opts)
       local hl_startColumn, hl_endColumn
       if i == opts.startLine then
         hl_startColumn = opts.startColumn - 1
-        hl_endColumn = #vim.fn.getline(i)
+        hl_endColumn = #vim.api.nvim_buf_get_lines(bufnr, i - 1, i, false)[1]
       elseif i < opts.endLine and i > opts.startLine then
         hl_startColumn = 0
-        hl_endColumn = #vim.fn.getline(i)
+        hl_endColumn = #vim.api.nvim_buf_get_lines(bufnr, i - 1, i, false)[1]
       elseif i == opts.endLine then
         hl_startColumn = 0
         hl_endColumn = opts.endColumn - 1
