@@ -130,6 +130,7 @@ end
 function M.get_eval_position()
   local bufnr = vim.api.nvim_get_current_buf()
   if vim.treesitter.highlighter.active[bufnr] == nil then
+    util.err_message "No treesitter parser"
     return
   end
   local node, root = M.get_node_at_cursor()
@@ -188,7 +189,7 @@ end
 function M.query(quick_eval, position)
   local db = config.database
   if not db or not db.path then
-    util.err_message "Missing database. Use :SetDatabase command"
+    util.err_message "Missing database. Use `:QL db set` command"
     return
   end
 

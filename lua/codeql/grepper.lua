@@ -235,7 +235,7 @@ function M.grep_source()
   if ok then
     local db = config.database
     if not db then
-      util.err_message "Missing database. Use :SetDatabase command"
+      util.err_message "Missing database. Use `:QL db set` command"
       return
     else
       zip_grep {

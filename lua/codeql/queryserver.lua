@@ -202,7 +202,7 @@ end
 function M.run_query(opts)
   local dbPath = config.database.path
   if not dbPath then
-    --util.err_message "Cannot find dataset folder. Did you :SetDatabase?"
+    --util.err_message "Cannot find dataset folder. Did you `:QL db set`?"
     return
   end
 

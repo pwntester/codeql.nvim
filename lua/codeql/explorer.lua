@@ -162,7 +162,7 @@ end
 M.draw = function()
   local db = config.database
   if not db then
-    util.err_message "Missing database. Use :SetDatabase command"
+    util.err_message "Missing database. Use `QL db set` command"
     return
   else
     local files = util.list_from_archive(db.sourceArchiveZip)

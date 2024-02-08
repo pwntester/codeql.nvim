@@ -2,7 +2,7 @@
 
 Neovim plugin to help writing and testing CodeQL queries.
 
-## Features 
+## Features
 
 - Syntax highlighting for CodeQL query language
 - Query execution
@@ -77,7 +77,8 @@ Use `QL database unset` to unregister the current registered database.
 Use `QL query run` or `QL query quick-eval` commands or `qr`, `qp` shortcuts respectively to run the query or evaluate the predicate under the cursor.
 
 ## Configuration options
-- additional_packs: List of codeql qlpacks to use 
+
+- additional_packs: List of codeql qlpacks to use
 - max_ram: Max RAM memory to be used by CodeQL
 - job_timeout: Timeout for running sync jobs (default: 15000)
 
@@ -115,6 +116,7 @@ require("codeql").setup {
 ```
 
 ## Commands
+
 - `QL database set <path to db>`: Required before running any query.
 - `QL database unset`: Unregister current database.
 - `QL database browse`: Shows source archive tree explorer
@@ -124,12 +126,13 @@ require("codeql").setup {
 - `QL history list`: Shows a menu to render results of previous queries (on the same nvim session).
 - `QL server stop`: Stops the query server associated with the query buffer. A new one will be started upon query evaluation.
 - `QL ast print`: On a `ql:/` buffer, prints the AST of the current file.
-- `QL sarif load <path to SARIF file>`: Loads the issues of a SARIF file. To browse the results, use `SetDatabase` before.
+- `QL sarif load <path to SARIF file>`: Loads the issues of a SARIF file. To browse the results, use `QL db set` before.
 - `QL sarif permalink`: Copies a permalink to the current line of a SARIF file.
 - `QL sarif browse`: Open the file in GitHub.
 - `QL mrva load <name of MRVA session>`: Loads results of MRVA scan.
 
 ## Mappings
+
 - `gd`: On a `ql:/` file, jumps to the symbol definition.
 - `gr`: On a `ql:/` file, show symbol references in the QuickFix window.
 - `<leader>qr`: Runs the current query.
@@ -138,10 +141,11 @@ require("codeql").setup {
 - `<Plug>(CodeQLGrepSource)`: shows a telescope menu to grep the source archive
 
 ## Result Browser
+
 After running a query or quick evaluating a predicate, results will be rendered in a special panel.
 
 - `o`: collapses/Expands result
-- `Enter` (on a visitable result node): opens node file in nvim and moves cursor to window with source code file 
+- `Enter` (on a visitable result node): opens node file in nvim and moves cursor to window with source code file
 - `p`: similar to `Enter` but keeps cursor on the results panel
 - `N`: change to next path
 - `P`: change to previous path
@@ -152,8 +156,9 @@ After running a query or quick evaluating a predicate, results will be rendered 
 - `T`: closes all folds
 - `q`: closes result panel
 - `s`: show context snippet
- 
+
 ## Language Server Protocol
+
 This plugin does not provide any support for the Language Server Protocol (LSP). But in order to have the best CodeQL writing experience it is recommended to configure a LSP client to connect to the CodeQL Language Server.
 
 There are many LSP clients in the NeoVim ecosystem. The following clients have been tested with CodeQL Language Server:
@@ -168,7 +173,7 @@ use 'neovim/nvim-lsp'
 
 Using this client, it is only required to configure the client with:
 
-``` lua
+```lua
 local nvim_lsp = require 'nvim_lsp'
 
 nvim_lsp.codeqlls.setup{
@@ -183,7 +188,7 @@ NOTE: change `additional_packs` to the path where the [CodeQL](https://github.co
 
 It is also recommended to add an `on_attach` callback to define LSP mappings. E.g:
 
-``` lua
+```lua
 local function on_attach_callback(client, bufnr)
     api.nvim_buf_set_keymap(bufnr, "n", "gD", "<Cmd>lua show_diagnostics_details()<CR>", { silent = true; })
     api.nvim_buf_set_keymap(bufnr, "n", "gd", "<Cmd>lua vim.lsp.buf.definition()<CR>", { silent = true; })
@@ -194,7 +199,7 @@ local function on_attach_callback(client, bufnr)
     api.nvim_buf_set_keymap(bufnr, "n", "gF", "<Cmd>lua vim.lsp.buf.formatting()<CR>", { silent = true; })
     api.nvim_command [[autocmd CursorHold  <buffer> lua vim.lsp.buf.document_highlight()]]
     api.nvim_command [[autocmd CursorHoldI <buffer> lua vim.lsp.buf.document_highlight()]]
-    api.nvim_command [[autocmd CursorMoved <buffer> lua vim.lsp.util.buf_clear_references()]] 
+    api.nvim_command [[autocmd CursorMoved <buffer> lua vim.lsp.util.buf_clear_references()]]
 end
 
 local nvim_lsp = require 'nvim_lsp'
@@ -214,11 +219,10 @@ Check my [dotfiles](https://github.com/pwntester/dotfiles/blob/master/config/nvi
 It is possible to add codeql language server to `coc.nvim` using `coc-settings.json` as an
 [executable language server](https://github.com/neoclide/coc.nvim/wiki/Language-servers)
 
-
-``` json
+```json
 {
   "languageserver": {
-    "codeql" : {
+    "codeql": {
       "command": "<path to codeql binary>",
       "args": [
         "execute",
