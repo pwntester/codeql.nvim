@@ -840,15 +840,27 @@ function M.jump_to_code(stay_in_panel)
     filename = string.sub(filename, 2)
   end
 
-  local source
+  local source, bufname, revisionId, nwo
   if config.database.sourceArchiveZip and util.is_file(config.database.sourceArchiveZip) then
     source = "source_archive"
+    -- create the ql:// buffer
+    bufname = string.format("ql://%s", filename)
   elseif config.sarif.path and util.is_file(config.sarif.path) and config.sarif.hasArtifacts then
     source = "sarif"
+    -- create the ql:// buffer
+    bufname = string.format("ql://%s", filename)
+  elseif config.database.sourceArchiveRoot and util.is_file(config.database.sourceArchiveRoot .. "/" .. filename) then
+    source = "file_system"
+    bufname = config.database.sourceArchiveRoot .. "/" .. filename
   elseif util.is_file(vim.fn.getcwd() .. util.uri_to_fname("/" .. filename)) then
     source = "file_system"
+    bufname = vim.fn.getcwd() .. "/" .. filename
   elseif node.versionControlProvenance then
     source = "vcs"
+    local repositoryUri = node.versionControlProvenance.repositoryUri
+    revisionId = node.versionControlProvenance.revisionId
+    nwo = vim.split(repositoryUri, "github.com/")[2]
+    bufname = string.format("ql://%s/%s/%s", nwo, revisionId, filename)
   end
 
   if not source then
@@ -864,19 +876,6 @@ function M.jump_to_code(stay_in_panel)
 
   -- go to the target window
   vim.fn.win_gotoid(target_winid)
-
-  local bufname, revisionId, nwo
-  if source == "source_archive" or source == "sarif" then
-    -- create the ql:// buffer
-    bufname = string.format("ql://%s", filename)
-  elseif source == "file_system" then
-    bufname = vim.fn.getcwd() .. "/" .. filename
-  elseif source == "vcs" then
-    local repositoryUri = node.versionControlProvenance.repositoryUri
-    revisionId = node.versionControlProvenance.revisionId
-    nwo = vim.split(repositoryUri, "github.com/")[2]
-    bufname = string.format("ql://%s/%s/%s", nwo, revisionId, filename)
-  end
 
   local opts = {
     nwo = nwo,
@@ -915,6 +914,8 @@ function M.jump_to_code(stay_in_panel)
       bufnr = vim.api.nvim_create_buf(false, true)
       vim.api.nvim_buf_set_name(bufnr, bufname)
       util.open_from_vcs(bufnr, filename, opts)
+    elseif source == "file_system" then
+      bufnr = vim.fn.bufnr(bufname, true)
     end
   end
   if bufnr > -1 then
