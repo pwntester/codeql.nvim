@@ -4,7 +4,7 @@ Neovim plugin to help writing and testing CodeQL queries.
 
 ## Features
 
-- Syntax highlighting for CodeQL query language
+- Syntax highlighting for the CodeQL query language
 - Query execution
 - Quick query evaluation
 - Query history
@@ -20,6 +20,51 @@ Neovim plugin to help writing and testing CodeQL queries.
 - [ugrep](https://github.com/Genivia/ugrep)
 
 ## Install
+
+<details>
+<summary>Using lazy.nvim</summary>
+
+```lua
+{
+  "pwntester/codeql.nvim",
+  dependencies = {
+    "MunifTanjim/nui.nvim",
+    "nvim-lua/telescope.nvim",
+    "kyazdani42/nvim-web-devicons",
+    {
+      's1n7ax/nvim-window-picker',
+      version = 'v1.*',
+      opts = {
+        autoselect_one = true,
+        include_current = false,
+        filter_rules = {
+          bo = {
+            filetype = {
+              "codeql_panel",
+              "codeql_explorer",
+              "qf",
+              "TelescopePrompt",
+              "TelescopeResults",
+              "notify",
+              "noice",
+              "NvimTree",
+              "neo-tree",
+            },
+            buftype = { 'terminal' },
+          },
+        },
+        current_win_hl_color = '#e35e4f',
+        other_win_hl_color = '#44cc41',
+      },
+    }
+  },
+  opts = {}
+}
+```
+</details>
+
+<details>
+<summary>Using packer.nvim</summary>
 
 ```lua
 use {
@@ -62,6 +107,7 @@ use {
   end
 }
 ```
+</details>
 
 ## Usage
 
@@ -78,7 +124,7 @@ Use `QL query run` or `QL query quick-eval` commands or `qr`, `qp` shortcuts res
 
 ## Configuration options
 
-- additional_packs: List of codeql qlpacks to use
+- additional_packs: List of CodeQL qlpacks to use
 - max_ram: Max RAM memory to be used by CodeQL
 - job_timeout: Timeout for running sync jobs (default: 15000)
 
@@ -161,22 +207,22 @@ After running a query or quick evaluating a predicate, results will be rendered 
 
 This plugin does not provide any support for the Language Server Protocol (LSP). But in order to have the best CodeQL writing experience it is recommended to configure a LSP client to connect to the CodeQL Language Server.
 
-There are many LSP clients in the NeoVim ecosystem. The following clients have been tested with CodeQL Language Server:
+There are many LSP clients in the Neovim ecosystem. The following clients have been tested with CodeQL Language Server:
 
 ### Neovim Built-In LSP
 
-It is possible to configure the built-in LSP client without any additional plugins, but a default configuration for the CodeQL Language Server has been added to [Nvim-LSP](https://github.com/neovim/nvim-lsp). If you are using `packer`, it is a matter of adding following line to you vim config:
+It is possible to configure the built-in LSP client without any additional plugins, but a configuration for the CodeQL Language Server is included in [nvim-lspconfig](https://github.com/neovim/nvim-lspconfig). If you are using `packer`, it is a matter of adding following line to your neovim config:
 
 ```lua
-use 'neovim/nvim-lsp'
+use 'neovim/nvim-lspconfig'
 ```
 
 Using this client, it is only required to configure the client with:
 
 ```lua
-local nvim_lsp = require 'nvim_lsp'
+local lspconfig = require'lspconfig'
 
-nvim_lsp.codeqlls.setup{
+lspconfig.codeqlls.setup{
     on_attach = on_attach_callback;
     settings = {
         additional_packs = {'~/codeql-home/codeql-repo'};
@@ -202,9 +248,9 @@ local function on_attach_callback(client, bufnr)
     api.nvim_command [[autocmd CursorMoved <buffer> lua vim.lsp.util.buf_clear_references()]]
 end
 
-local nvim_lsp = require 'nvim_lsp'
+local lspconfig = require'lspconfig'
 
-nvim_lsp.codeqlls.setup{
+lspconfig.codeqlls.setup{
     on_attach = on_attach_callback;
     settings = {
         additional_packs = {'~/codeql-home/codeql-repo'};
