@@ -378,7 +378,7 @@ function M.setup(opts)
     vim.cmd [[autocmd FileType ql lua require'codeql.util'.apply_mappings()]]
 
     if require("codeql.config").values.format_on_save then
-      vim.cmd [[autocmd FileType ql autocmd BufWrite <buffer> lua vim.lsp.buf.formatting()]]
+      vim.cmd [[autocmd FileType ql autocmd BufWrite <buffer> lua vim.lsp.buf.format()]]
     end
     vim.cmd [[augroup END]]
 
