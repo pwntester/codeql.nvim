@@ -156,7 +156,7 @@ function M.get_eval_position()
     -- descend the predicate node till we find the name node
     for child in node:iter_children() do
       if is_predicate_identifier_node(node, child) then
-        util.message(string.format("Evaluating '%s' predicate", vim.treesitter.get_node_text(child, bufnr)[1]))
+        --util.message(string.format("Evaluating '%s' predicate", vim.treesitter.get_node_text(child, bufnr)[1]))
         local srow, scol, erow, ecol = child:range()
         local midname = math.floor((scol + ecol) / 2)
         return { srow + 1, midname, erow + 1, midname }

@@ -27,8 +27,6 @@ local M = {}
 M.client = nil
 
 function M.start_client(opts)
-  local cmd, cmd_args = util.cmd_parts(opts.cmd)
-
   local client_id = next_client_id()
 
   local callbacks = opts.callbacks or {}
@@ -73,7 +71,7 @@ function M.start_client(opts)
   end
 
   -- Start the RPC client.
-  local client = rpc.start(cmd, cmd_args, handlers, {
+  local client = rpc.start(opts.cmd, handlers, {
     env = opts.cmd_env,
   })
   client.id = client_id
@@ -286,7 +284,7 @@ function M.run_query(opts)
   end
 
   -- run query
-  util.message(string.format("Running query %s", queryPath))
+  --util.message(string.format("Running query %s", queryPath))
 
   _, last_rpc_msg_id = M.client.request("evaluation/runQuery", runQuery_params, runQuery_callback)
 end
